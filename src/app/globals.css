@@ -1,0 +1,77 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+/* ─── High Contrast Mode ───────────────────────────────── */
+
+html.high-contrast {
+  --background: #000000;
+  --foreground: #ffffff;
+}
+
+html.high-contrast body {
+  color: #ffffff;
+  background: #000000;
+}
+
+html.high-contrast .bg-white {
+  background-color: #1a1a1a !important;
+  color: #f5f5f5 !important;
+}
+
+html.high-contrast .bg-gray-50 {
+  background-color: #0d0d0d !important;
+}
+
+html.high-contrast .bg-gray-100 {
+  background-color: #1a1a1a !important;
+}
+
+html.high-contrast .border-gray-100,
+html.high-contrast .border-gray-200 {
+  border-color: #444444 !important;
+}
+
+html.high-contrast .text-gray-400,
+html.high-contrast .text-gray-500 {
+  color: #cccccc !important;
+}
+
+html.high-contrast .text-gray-600,
+html.high-contrast .text-gray-700 {
+  color: #e0e0e0 !important;
+}
+
+html.high-contrast .text-gray-900 {
+  color: #ffffff !important;
+}
+
+html.high-contrast a:focus,
+html.high-contrast button:focus {
+  outline: 2px solid #ffff00 !important;
+  outline-offset: 2px;
+}

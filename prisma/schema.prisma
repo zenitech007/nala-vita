@@ -1,0 +1,366 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Enums ───────────────────────────────────────────────
+
+enum Role {
+  PATIENT
+  DOCTOR
+  ADMIN
+}
+
+enum AppointmentStatus {
+  SCHEDULED
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum ConsultationType {
+  IN_PERSON
+  VIDEO
+  PHONE
+  CHAT
+}
+
+enum UrgencyLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+// ─── Models ──────────────────────────────────────────────
+
+model User {
+  id            String   @id @default(cuid())
+  supabaseId    String   @unique @map("supabase_id")
+  email         String   @unique
+  firstName     String   @map("first_name")
+  lastName      String   @map("last_name")
+  phone         String?
+  avatarUrl     String?  @map("avatar_url")
+  role          Role     @default(PATIENT)
+  isActive      Boolean  @default(true) @map("is_active")
+  emailVerified Boolean  @default(false) @map("email_verified")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  patient  Patient?
+  doctor   Doctor?
+  admin    Admin?
+
+  sentMessages     Message[]      @relation("SentMessages")
+  receivedMessages Message[]      @relation("ReceivedMessages")
+  notifications    Notification[]
+  fileUploads      FileUpload[]
+
+  @@map("users")
+}
+
+model Patient {
+  id            String    @id @default(cuid())
+  userId        String    @unique @map("user_id")
+  dateOfBirth   DateTime  @map("date_of_birth")
+  gender        String
+  bloodType     String?   @map("blood_type")
+  allergies     String[]
+  address       String?
+  emergencyName String?   @map("emergency_name")
+  emergencyPhone String?  @map("emergency_phone")
+  insuranceProvider String? @map("insurance_provider")
+  insuranceNumber   String? @map("insurance_number")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  appointments  Appointment[]
+  prescriptions Prescription[]
+  vitals        Vital[]
+  labOrders     LabOrder[]
+  medicalNotes  MedicalNote[]
+  referrals     Referral[]     @relation("PatientReferrals")
+  payments      Payment[]
+
+  @@map("patients")
+}
+
+model Doctor {
+  id                String   @id @default(cuid())
+  userId            String   @unique @map("user_id")
+  specialization    String
+  licenseNumber     String   @unique @map("license_number")
+  yearsOfExperience Int      @map("years_of_experience")
+  bio               String?
+  consultationFee   Float    @map("consultation_fee")
+  availableDays     String[] @map("available_days")
+  availableFrom     String?  @map("available_from")
+  availableTo       String?  @map("available_to")
+  isVerified        Boolean  @default(false) @map("is_verified")
+  rating            Float    @default(0)
+  totalReviews      Int      @default(0) @map("total_reviews")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  appointments  Appointment[]
+  prescriptions Prescription[]
+  medicalNotes  MedicalNote[]
+  labOrders     LabOrder[]
+  referralsFrom Referral[]     @relation("ReferringDoctor")
+  referralsTo   Referral[]     @relation("ReferredDoctor")
+
+  @@map("doctors")
+}
+
+model Admin {
+  id          String   @id @default(cuid())
+  userId      String   @unique @map("user_id")
+  department  String?
+  permissions String[]
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("admins")
+}
+
+model Appointment {
+  id               String            @id @default(cuid())
+  patientId        String            @map("patient_id")
+  doctorId         String            @map("doctor_id")
+  scheduledAt      DateTime          @map("scheduled_at")
+  duration         Int               @default(30)
+  status           AppointmentStatus @default(SCHEDULED)
+  consultationType ConsultationType  @map("consultation_type")
+  urgencyLevel     UrgencyLevel      @default(LOW) @map("urgency_level")
+  reason           String?
+  notes            String?
+  meetingUrl       String?           @map("meeting_url")
+  cancellationReason String?         @map("cancellation_reason")
+  createdAt        DateTime          @default(now()) @map("created_at")
+  updatedAt        DateTime          @updatedAt @map("updated_at")
+
+  patient  Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  doctor   Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  payment  Payment?
+
+  @@map("appointments")
+}
+
+model Prescription {
+  id             String   @id @default(cuid())
+  patientId      String   @map("patient_id")
+  doctorId       String   @map("doctor_id")
+  medication     String
+  dosage         String
+  frequency      String
+  duration       String
+  instructions   String?
+  refillsAllowed Int      @default(0) @map("refills_allowed")
+  refillsUsed    Int      @default(0) @map("refills_used")
+  isActive       Boolean  @default(true) @map("is_active")
+  prescribedAt   DateTime @default(now()) @map("prescribed_at")
+  expiresAt      DateTime? @map("expires_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  doctor  Doctor  @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+
+  @@map("prescriptions")
+}
+
+model Vital {
+  id              String   @id @default(cuid())
+  patientId       String   @map("patient_id")
+  bloodPressure   String?  @map("blood_pressure")
+  heartRate       Int?     @map("heart_rate")
+  temperature     Float?
+  respiratoryRate Int?     @map("respiratory_rate")
+  oxygenSaturation Float?  @map("oxygen_saturation")
+  weight          Float?
+  height          Float?
+  bloodSugar      Float?   @map("blood_sugar")
+  notes           String?
+  recordedAt      DateTime @default(now()) @map("recorded_at")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@map("vitals")
+}
+
+model LabOrder {
+  id          String      @id @default(cuid())
+  patientId   String      @map("patient_id")
+  doctorId    String      @map("doctor_id")
+  testName    String      @map("test_name")
+  testCode    String?     @map("test_code")
+  instructions String?
+  urgency     UrgencyLevel @default(LOW)
+  orderedAt   DateTime    @default(now()) @map("ordered_at")
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+
+  patient  Patient     @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  doctor   Doctor      @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  results  LabResult[]
+
+  @@map("lab_orders")
+}
+
+model LabResult {
+  id           String   @id @default(cuid())
+  labOrderId   String   @map("lab_order_id")
+  resultValue  String   @map("result_value")
+  unit         String?
+  referenceMin String?  @map("reference_min")
+  referenceMax String?  @map("reference_max")
+  isAbnormal   Boolean  @default(false) @map("is_abnormal")
+  notes        String?
+  reportUrl    String?  @map("report_url")
+  completedAt  DateTime @default(now()) @map("completed_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  labOrder LabOrder @relation(fields: [labOrderId], references: [id], onDelete: Cascade)
+
+  @@map("lab_results")
+}
+
+model MedicalNote {
+  id         String   @id @default(cuid())
+  patientId  String   @map("patient_id")
+  doctorId   String   @map("doctor_id")
+  title      String
+  content    String
+  category   String?
+  isPrivate  Boolean  @default(false) @map("is_private")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  doctor  Doctor  @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+
+  @@map("medical_notes")
+}
+
+model Message {
+  id         String   @id @default(cuid())
+  senderId   String   @map("sender_id")
+  receiverId String   @map("receiver_id")
+  content    String
+  isRead     Boolean  @default(false) @map("is_read")
+  attachmentUrl String? @map("attachment_url")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  sender   User @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver User @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  @@map("messages")
+}
+
+model Referral {
+  id               String   @id @default(cuid())
+  patientId        String   @map("patient_id")
+  referringDoctorId String  @map("referring_doctor_id")
+  referredDoctorId  String  @map("referred_doctor_id")
+  reason           String
+  notes            String?
+  status           String   @default("PENDING")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  patient         Patient @relation("PatientReferrals", fields: [patientId], references: [id], onDelete: Cascade)
+  referringDoctor Doctor  @relation("ReferringDoctor", fields: [referringDoctorId], references: [id], onDelete: Cascade)
+  referredDoctor  Doctor  @relation("ReferredDoctor", fields: [referredDoctorId], references: [id], onDelete: Cascade)
+
+  @@map("referrals")
+}
+
+model Payment {
+  id            String   @id @default(cuid())
+  patientId     String   @map("patient_id")
+  appointmentId String   @unique @map("appointment_id")
+  amount        Float
+  currency      String   @default("USD")
+  status        String   @default("PENDING")
+  stripePaymentId String? @map("stripe_payment_id")
+  method        String?
+  paidAt        DateTime? @map("paid_at")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  patient     Patient     @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  appointment Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+
+  @@map("payments")
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  title     String
+  message   String
+  type      String
+  isRead    Boolean  @default(false) @map("is_read")
+  link      String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+model BedResource {
+  id           String   @id @default(cuid())
+  ward         String
+  bedNumber    String   @unique @map("bed_number")
+  isOccupied   Boolean  @default(false) @map("is_occupied")
+  patientName  String?  @map("patient_name")
+  admittedAt   DateTime? @map("admitted_at")
+  notes        String?
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("bed_resources")
+}
+
+model FileUpload {
+  id          String   @id @default(cuid())
+  userId      String   @map("user_id")
+  fileName    String   @map("file_name")
+  fileSize    Int      @map("file_size")
+  mimeType    String   @map("mime_type")
+  storagePath String   @map("storage_path")
+  category    String   @default("general")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("file_uploads")
+}
+
+model AuditLog {
+  id           String   @id @default(cuid())
+  userId       String   @map("user_id")
+  action       String
+  resourceType String   @map("resource_type")
+  resourceId   String   @map("resource_id")
+  metadata     String?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([resourceType, resourceId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
