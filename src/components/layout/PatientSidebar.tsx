@@ -43,7 +43,7 @@ export default function PatientSidebar({ user }: Props) {
       <div className="p-6 border-b border-gray-100">
         <div className="flex items-center gap-2">
           <Heart className="w-6 h-6 text-blue-600" />
-          <span className="font-bold text-gray-900">MediConnect</span>
+          <span className="font-bold text-gray-900">Nala Vita</span>
         </div>
       </div>
 

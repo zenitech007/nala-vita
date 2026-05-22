@@ -21,21 +21,21 @@ const geistMono = localFont({
 
 export const metadata: Metadata = {
   title: {
-    default: "MediConnect — Healthcare Management Platform",
-    template: "%s | MediConnect",
+    default: "Nala Vita — Healthcare Management Platform",
+    template: "%s | Nala Vita",
   },
   description:
-    "MediConnect connects patients, doctors, and administrators. Book appointments, access telemedicine, manage prescriptions, and monitor health — all in one secure, HIPAA-aware platform.",
+    "Nala Vita connects patients, doctors, and administrators. Book appointments, access telemedicine, manage prescriptions, and monitor health — all in one secure, HIPAA-aware platform.",
   keywords: [
     "healthcare",
     "telemedicine",
     "doctor appointment",
     "medical records",
     "patient portal",
-    "MediConnect",
+    "Nala Vita",
   ],
   openGraph: {
-    title: "MediConnect — Healthcare Management Platform",
+    title: "Nala Vita — Healthcare Management Platform",
     description:
       "Book appointments, access telemedicine, manage prescriptions, and monitor health — all in one secure platform.",
     type: "website",
