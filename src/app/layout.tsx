@@ -1,9 +1,10 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages } from "next-intl/server";
 import "./globals.css";
 import Providers from "@/providers";
+import { ThemeProvider } from "@/components/providers/ThemeProvider";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -18,6 +19,13 @@ const geistMono = localFont({
   weight: "100 900",
   display: "swap",
 });
+
+export const viewport: Viewport = {
+  themeColor: "#FC94AF",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+};
 
 export const metadata: Metadata = {
   title: {
@@ -41,6 +49,11 @@ export const metadata: Metadata = {
     type: "website",
     locale: "en_US",
   },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Nala Vita",
+  },
   robots: {
     index: true,
     follow: true,
@@ -61,16 +74,13 @@ export default async function RootLayout({
   const messages = await getMessages();
 
   return (
-    <html lang={locale}>
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-        suppressHydrationWarning
-      >
-        <NextIntlClientProvider messages={messages} locale={locale}>
-          <Providers>
-            {children}
-          </Providers>
-        </NextIntlClientProvider>
+    <html lang={locale} className="theme-rose" suppressHydrationWarning>
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+        <ThemeProvider>
+          <NextIntlClientProvider messages={messages} locale={locale}>
+            <Providers>{children}</Providers>
+          </NextIntlClientProvider>
+        </ThemeProvider>
       </body>
     </html>
   );
