@@ -23,6 +23,7 @@
     "axios": "^1.15.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
+    "framer-motion": "^12.40.0",
     "lucide-react": "^1.8.0",
     "next": "14.2.35",
     "next-intl": "^4.9.1",
