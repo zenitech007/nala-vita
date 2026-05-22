@@ -2,11 +2,48 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+  Theme tokens.
+  --primary / --bg-tint / --text-on-tint match Amelia's THEMES palette.
+  --background / --foreground are the page chrome (light/dark mode).
+*/
+
 :root {
+  /* Light mode chrome */
   --background: #ffffff;
   --foreground: #171717;
+
+  /* Default theme = rose (overridden by .theme-* classes below) */
+  --primary: #FC94AF;
+  --bg-tint: #FFF0F3;
+  --text-on-tint: #881337;
 }
 
+.theme-rose {
+  --primary: #FC94AF;
+  --bg-tint: #FFF0F3;
+  --text-on-tint: #881337;
+}
+
+.theme-fuchsia {
+  --primary: #D946EF;
+  --bg-tint: #FDF4FF;
+  --text-on-tint: #701A75;
+}
+
+.theme-ocean {
+  --primary: #3B82F6;
+  --bg-tint: #EFF6FF;
+  --text-on-tint: #1E3A8A;
+}
+
+.theme-emerald {
+  --primary: #10B981;
+  --bg-tint: #ECFDF5;
+  --text-on-tint: #064E3B;
+}
+
+/* Dark mode flips chrome only; theme tint stays for brand colour continuity */
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #0a0a0a;
@@ -14,23 +51,17 @@
   }
 }
 
-body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+html.dark {
+  --background: #0a0a0a;
+  --foreground: #ededed;
 }
-
-@layer utilities {
-  .text-balance {
-    text-wrap: balance;
-  }
-}
-
-/* ─── High Contrast Mode ───────────────────────────────── */
 
 html.high-contrast {
   --background: #000000;
   --foreground: #ffffff;
+  --primary: #FFFF00;
+  --bg-tint: #000000;
+  --text-on-tint: #FFFFFF;
 }
 
 html.high-contrast body {
@@ -74,4 +105,16 @@ html.high-contrast a:focus,
 html.high-contrast button:focus {
   outline: 2px solid #ffff00 !important;
   outline-offset: 2px;
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
 }
