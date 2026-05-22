@@ -3,7 +3,9 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
-const registerSchema = z.object({
+// ─── Shared base fields ───────────────────────────────────
+
+const baseSchema = z.object({
   firstName: z.string().min(2, "First name must be at least 2 characters"),
   lastName: z.string().min(2, "Last name must be at least 2 characters"),
   email: z.string().email("Invalid email address"),
@@ -11,6 +13,39 @@ const registerSchema = z.object({
   password: z.string().min(8, "Password must be at least 8 characters"),
   role: z.enum(["PATIENT", "DOCTOR"]),
 });
+
+// ─── Patient-specific fields ──────────────────────────────
+
+const patientSchema = baseSchema.extend({
+  role: z.literal("PATIENT"),
+  dateOfBirth: z.string().date("Date of birth must be in YYYY-MM-DD format"),
+  gender: z.string().min(1, "Gender is required"),
+});
+
+// ─── Doctor-specific fields ───────────────────────────────
+
+const doctorSchema = baseSchema.extend({
+  role: z.literal("DOCTOR"),
+  licenseNumber: z
+    .string()
+    .min(3, "License number must be at least 3 characters")
+    .regex(/^[A-Z0-9\-]+$/i, "License number may only contain letters, numbers and hyphens"),
+  specialization: z.string().min(2, "Specialization is required"),
+  yearsOfExperience: z
+    .number()
+    .int()
+    .min(0, "Years of experience must be 0 or more")
+    .max(60, "Years of experience must be 60 or less"),
+  consultationFee: z
+    .number()
+    .min(0, "Consultation fee must be 0 or more")
+    .max(10_000, "Consultation fee seems too high"),
+  bio: z.string().optional(),
+});
+
+const registerSchema = z.discriminatedUnion("role", [patientSchema, doctorSchema]);
+
+// ─── POST: Register a new user ────────────────────────────
 
 export async function POST(req: NextRequest) {
   try {
@@ -27,6 +62,19 @@ export async function POST(req: NextRequest) {
         { error: "An account with this email already exists" },
         { status: 409 }
       );
+    }
+
+    // Doctor-specific: ensure license number is not already taken
+    if (validated.role === "DOCTOR") {
+      const existingDoctor = await prisma.doctor.findUnique({
+        where: { licenseNumber: validated.licenseNumber },
+      });
+      if (existingDoctor) {
+        return NextResponse.json(
+          { error: "A doctor with this license number already exists" },
+          { status: 409 }
+        );
+      }
     }
 
     // Create user in Supabase Auth
@@ -63,18 +111,21 @@ export async function POST(req: NextRequest) {
           ? {
               patient: {
                 create: {
-                  dateOfBirth: new Date("1990-01-01"),
-                  gender: "Not specified",
+                  dateOfBirth: new Date(validated.dateOfBirth),
+                  gender: validated.gender,
                 },
               },
             }
           : {
               doctor: {
                 create: {
-                  specialization: "General Practice",
-                  licenseNumber: `TEMP-${Date.now()}`,
-                  yearsOfExperience: 0,
-                  consultationFee: 0,
+                  specialization: validated.specialization,
+                  licenseNumber: validated.licenseNumber,
+                  yearsOfExperience: validated.yearsOfExperience,
+                  consultationFee: validated.consultationFee,
+                  bio: validated.bio || null,
+                  // Doctors are unverified until an admin manually verifies them
+                  isVerified: false,
                 },
               },
             }),
@@ -87,13 +138,17 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(
       {
-        message: "Registration successful",
+        message:
+          validated.role === "DOCTOR"
+            ? "Registration successful. Your account is pending admin verification before you can see patients."
+            : "Registration successful",
         user: {
           id: user.id,
           email: user.email,
           firstName: user.firstName,
           lastName: user.lastName,
           role: user.role,
+          ...(user.doctor ? { isVerified: user.doctor.isVerified } : {}),
         },
       },
       { status: 201 }
@@ -106,7 +161,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    console.error("Registration error:", error);
+    const message = error instanceof Error ? error.message : "Unknown error";
+    console.error("Registration error:", message, error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

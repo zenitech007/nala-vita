@@ -9,22 +9,95 @@ import Link from "next/link";
 import { Heart, Loader2, Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const registerSchema = z
-  .object({
-    firstName: z.string().min(2, "First name must be at least 2 characters"),
-    lastName: z.string().min(2, "Last name must be at least 2 characters"),
-    email: z.string().email("Invalid email address"),
-    phone: z.string().optional(),
-    password: z.string().min(8, "Password must be at least 8 characters"),
-    confirmPassword: z.string(),
-    role: z.enum(["PATIENT", "DOCTOR"]),
-  })
-  .refine((data) => data.password === data.confirmPassword, {
+// ─── Validation schemas ───────────────────────────────────
+
+const baseSchema = z.object({
+  firstName: z.string().min(2, "First name must be at least 2 characters"),
+  lastName: z.string().min(2, "Last name must be at least 2 characters"),
+  email: z.string().email("Invalid email address"),
+  phone: z.string().optional(),
+  password: z.string().min(8, "Password must be at least 8 characters"),
+  confirmPassword: z.string(),
+  role: z.enum(["PATIENT", "DOCTOR"]),
+  // Patient fields
+  dateOfBirth: z.string().optional(),
+  gender: z.string().optional(),
+  // Doctor fields
+  licenseNumber: z.string().optional(),
+  specialization: z.string().optional(),
+  yearsOfExperience: z.coerce.number().optional(),
+  consultationFee: z.coerce.number().optional(),
+});
+
+const registerSchema = baseSchema
+  .refine((d) => d.password === d.confirmPassword, {
     message: "Passwords do not match",
     path: ["confirmPassword"],
-  });
+  })
+  .refine(
+    (d) => d.role !== "PATIENT" || (!!d.dateOfBirth && !!d.gender),
+    { message: "Date of birth is required for patients", path: ["dateOfBirth"] }
+  )
+  .refine(
+    (d) => d.role !== "PATIENT" || !!d.gender,
+    { message: "Gender is required for patients", path: ["gender"] }
+  )
+  .refine(
+    (d) =>
+      d.role !== "DOCTOR" ||
+      (!!d.licenseNumber && !!d.specialization &&
+        d.yearsOfExperience !== undefined && d.consultationFee !== undefined),
+    { message: "License number is required for doctors", path: ["licenseNumber"] }
+  );
 
-type RegisterForm = z.infer<typeof registerSchema>;
+// Explicit form type — avoids z.coerce inference issues with react-hook-form generics
+interface RegisterForm {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone?: string;
+  password: string;
+  confirmPassword: string;
+  role: "PATIENT" | "DOCTOR";
+  // Patient-specific
+  dateOfBirth?: string;
+  gender?: string;
+  // Doctor-specific
+  licenseNumber?: string;
+  specialization?: string;
+  yearsOfExperience?: number;
+  consultationFee?: number;
+}
+
+// ─── Field wrapper ────────────────────────────────────────
+
+function Field({
+  label,
+  optional,
+  error,
+  children,
+}: {
+  label: string;
+  optional?: boolean;
+  error?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1">
+        {label}{" "}
+        {optional && <span className="text-gray-400 font-normal">(optional)</span>}
+      </label>
+      {children}
+      {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
+    </div>
+  );
+}
+
+const inputCls =
+  "w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition";
+
+// ─── Page ─────────────────────────────────────────────────
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -48,18 +121,36 @@ export default function RegisterPage() {
     setServerError("");
     setSuccessMessage("");
 
+    const payload =
+      data.role === "PATIENT"
+        ? {
+            firstName: data.firstName,
+            lastName: data.lastName,
+            email: data.email,
+            phone: data.phone,
+            password: data.password,
+            role: data.role,
+            dateOfBirth: data.dateOfBirth,
+            gender: data.gender,
+          }
+        : {
+            firstName: data.firstName,
+            lastName: data.lastName,
+            email: data.email,
+            phone: data.phone,
+            password: data.password,
+            role: data.role,
+            licenseNumber: data.licenseNumber,
+            specialization: data.specialization,
+            yearsOfExperience: Number(data.yearsOfExperience),
+            consultationFee: Number(data.consultationFee),
+          };
+
     try {
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          firstName: data.firstName,
-          lastName: data.lastName,
-          email: data.email,
-          phone: data.phone,
-          password: data.password,
-          role: data.role,
-        }),
+        body: JSON.stringify(payload),
       });
 
       const result = await res.json();
@@ -69,8 +160,8 @@ export default function RegisterPage() {
         return;
       }
 
-      setSuccessMessage("Account created successfully! Redirecting to login...");
-      setTimeout(() => router.push("/login"), 2000);
+      setSuccessMessage(result.message || "Account created successfully! Redirecting to login...");
+      setTimeout(() => router.push("/login"), 3000);
     } catch {
       setServerError("Something went wrong. Please try again.");
     }
@@ -105,9 +196,7 @@ export default function RegisterPage() {
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
             {/* Role Toggle */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                I am a
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">I am a</label>
               <div className="grid grid-cols-2 gap-3">
                 {(["PATIENT", "DOCTOR"] as const).map((role) => (
                   <label
@@ -135,80 +224,104 @@ export default function RegisterPage() {
 
             {/* Name Fields */}
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  First Name
-                </label>
+              <Field label="First Name" error={errors.firstName?.message}>
                 <input
                   {...register("firstName")}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
+                  className={inputCls}
                   placeholder="John"
                 />
-                {errors.firstName && (
-                  <p className="mt-1 text-xs text-red-500">
-                    {errors.firstName.message}
-                  </p>
-                )}
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Last Name
-                </label>
+              </Field>
+              <Field label="Last Name" error={errors.lastName?.message}>
                 <input
                   {...register("lastName")}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
+                  className={inputCls}
                   placeholder="Doe"
                 />
-                {errors.lastName && (
-                  <p className="mt-1 text-xs text-red-500">
-                    {errors.lastName.message}
-                  </p>
-                )}
-              </div>
+              </Field>
             </div>
 
             {/* Email */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Email
-              </label>
-              <input
-                type="email"
-                {...register("email")}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
-                placeholder="john@example.com"
-              />
-              {errors.email && (
-                <p className="mt-1 text-xs text-red-500">
-                  {errors.email.message}
-                </p>
-              )}
-            </div>
+            <Field label="Email" error={errors.email?.message}>
+              <input type="email" {...register("email")} className={inputCls} placeholder="john@example.com" />
+            </Field>
 
             {/* Phone */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Phone{" "}
-                <span className="text-gray-400 font-normal">(optional)</span>
-              </label>
-              <input
-                type="tel"
-                {...register("phone")}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
-                placeholder="+1 (555) 000-0000"
-              />
-            </div>
+            <Field label="Phone" optional>
+              <input type="tel" {...register("phone")} className={inputCls} placeholder="+1 (555) 000-0000" />
+            </Field>
+
+            {/* ── Patient-specific fields ── */}
+            {selectedRole === "PATIENT" && (
+              <>
+                <div className="grid grid-cols-2 gap-4">
+                  <Field label="Date of Birth" error={errors.dateOfBirth?.message}>
+                    <input type="date" {...register("dateOfBirth")} className={inputCls} />
+                  </Field>
+                  <Field label="Gender" error={errors.gender?.message}>
+                    <select {...register("gender")} className={inputCls}>
+                      <option value="">Select gender</option>
+                      <option value="Male">Male</option>
+                      <option value="Female">Female</option>
+                      <option value="Non-binary">Non-binary</option>
+                      <option value="Prefer not to say">Prefer not to say</option>
+                    </select>
+                  </Field>
+                </div>
+              </>
+            )}
+
+            {/* ── Doctor-specific fields ── */}
+            {selectedRole === "DOCTOR" && (
+              <>
+                <div className="p-4 bg-amber-50 border border-amber-200 text-amber-700 rounded-xl text-sm">
+                  ⚠️ Doctor accounts require admin verification before you can see patients.
+                </div>
+                <Field label="Medical License Number" error={errors.licenseNumber?.message}>
+                  <input
+                    {...register("licenseNumber")}
+                    className={inputCls}
+                    placeholder="e.g. MD-12345"
+                  />
+                </Field>
+                <Field label="Specialization" error={errors.specialization?.message}>
+                  <input
+                    {...register("specialization")}
+                    className={inputCls}
+                    placeholder="e.g. Cardiology"
+                  />
+                </Field>
+                <div className="grid grid-cols-2 gap-4">
+                  <Field label="Years of Experience" error={errors.yearsOfExperience?.message}>
+                    <input
+                      type="number"
+                      min={0}
+                      max={60}
+                      {...register("yearsOfExperience")}
+                      className={inputCls}
+                      placeholder="5"
+                    />
+                  </Field>
+                  <Field label="Consultation Fee (USD)" error={errors.consultationFee?.message}>
+                    <input
+                      type="number"
+                      min={0}
+                      step={0.01}
+                      {...register("consultationFee")}
+                      className={inputCls}
+                      placeholder="150.00"
+                    />
+                  </Field>
+                </div>
+              </>
+            )}
 
             {/* Password */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Password
-              </label>
+            <Field label="Password" error={errors.password?.message}>
               <div className="relative">
                 <input
                   type={showPassword ? "text" : "password"}
                   {...register("password")}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition pr-10"
+                  className={cn(inputCls, "pr-10")}
                   placeholder="Min. 8 characters"
                 />
                 <button
@@ -216,37 +329,20 @@ export default function RegisterPage() {
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                 >
-                  {showPassword ? (
-                    <EyeOff className="w-5 h-5" />
-                  ) : (
-                    <Eye className="w-5 h-5" />
-                  )}
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
               </div>
-              {errors.password && (
-                <p className="mt-1 text-xs text-red-500">
-                  {errors.password.message}
-                </p>
-              )}
-            </div>
+            </Field>
 
             {/* Confirm Password */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Confirm Password
-              </label>
+            <Field label="Confirm Password" error={errors.confirmPassword?.message}>
               <input
                 type="password"
                 {...register("confirmPassword")}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
+                className={inputCls}
                 placeholder="Re-enter your password"
               />
-              {errors.confirmPassword && (
-                <p className="mt-1 text-xs text-red-500">
-                  {errors.confirmPassword.message}
-                </p>
-              )}
-            </div>
+            </Field>
 
             {/* Submit */}
             <button
@@ -268,10 +364,7 @@ export default function RegisterPage() {
           {/* Footer */}
           <p className="text-center text-sm text-gray-500 mt-6">
             Already have an account?{" "}
-            <Link
-              href="/login"
-              className="text-blue-600 hover:text-blue-700 font-medium"
-            >
+            <Link href="/login" className="text-blue-600 hover:text-blue-700 font-medium">
               Sign in
             </Link>
           </p>

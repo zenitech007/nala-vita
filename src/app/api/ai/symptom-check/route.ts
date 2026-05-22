@@ -3,7 +3,7 @@ import { z } from "zod";
 import OpenAI from "openai";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { prisma } from "@/lib/prisma";
-import { checkRateLimit } from "@/lib/rate-limit";
+import { checkRateLimitAsync } from "@/lib/rate-limit";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
     }
 
     // ─── Rate limit (10 calls / 60s per user) ────────────
-    const limit = checkRateLimit(`ai:symptom-check:${user.id}`);
+    const limit = await checkRateLimitAsync(`ai:symptom-check:${user.id}`);
     if (!limit.allowed) {
       return NextResponse.json(
         {

@@ -122,22 +122,32 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Doctor not found" }, { status: 404 });
     }
 
-    // Check for conflicting appointment in the same slot
+    // Check for conflicting appointment: two intervals overlap when
+    //   existingStart < newEnd  AND  existingEnd > newStart
+    // Prisma doesn't know each appointment's duration directly, so we fetch
+    // active appointments in the broad window and check overlap in JS.
     const scheduledDate = new Date(validated.scheduledAt);
     const duration = validated.duration || 30;
-    const slotEnd = new Date(scheduledDate.getTime() + duration * 60000);
+    const slotEnd = new Date(scheduledDate.getTime() + duration * 60_000);
 
-    const conflict = await prisma.appointment.findFirst({
+    const broadWindowStart = new Date(scheduledDate.getTime() - 4 * 60 * 60 * 1000); // 4 h before
+    const broadWindowEnd   = new Date(scheduledDate.getTime() + 4 * 60 * 60 * 1000); // 4 h after
+
+    const activeInWindow = await prisma.appointment.findMany({
       where: {
         doctorId: validated.doctorId,
         status: { in: ["SCHEDULED", "CONFIRMED", "IN_PROGRESS"] },
-        scheduledAt: { lt: slotEnd },
-        // Check overlap: existing appointment starts before our slot ends
-        // AND existing appointment ends after our slot starts
-        AND: {
-          scheduledAt: { gte: new Date(scheduledDate.getTime() - duration * 60000) },
-        },
+        scheduledAt: { gte: broadWindowStart, lte: broadWindowEnd },
       },
+      select: { id: true, scheduledAt: true, duration: true },
+    });
+
+    const conflict = activeInWindow.find((appt) => {
+      const existingStart = appt.scheduledAt.getTime();
+      const existingEnd   = existingStart + appt.duration * 60_000;
+      const newStart      = scheduledDate.getTime();
+      const newEnd        = slotEnd.getTime();
+      return existingStart < newEnd && existingEnd > newStart;
     });
 
     if (conflict) {

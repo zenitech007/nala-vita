@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/auth-helpers-nextjs";
 
-// ─── Role-based route prefixes ───────────────────────────
-
 const ROLE_ROUTES: Record<string, string> = {
   "/patient": "PATIENT",
   "/doctor": "DOCTOR",
@@ -12,17 +10,13 @@ const ROLE_ROUTES: Record<string, string> = {
 export async function middleware(req: NextRequest) {
   const res = NextResponse.next();
 
-  // Create Supabase client for middleware with getAll/setAll
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
         getAll() {
-          return req.cookies.getAll().map(({ name, value }) => ({
-            name,
-            value,
-          }));
+          return req.cookies.getAll().map(({ name, value }) => ({ name, value }));
         },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value, options }) => {
@@ -34,31 +28,31 @@ export async function middleware(req: NextRequest) {
     }
   );
 
-  // Refresh the session (important for auth-helpers to keep session alive)
+  // ✅ FIX: getSession() reads the cookie locally — zero network cost.
+  // getUser() (the old code) made a live Supabase Auth API call on every page.
   const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    data: { session },
+  } = await supabase.auth.getSession();
 
   const { pathname } = req.nextUrl;
 
-  // If no authenticated user, redirect to login
-  if (!user) {
+  if (!session) {
     const loginUrl = req.nextUrl.clone();
     loginUrl.pathname = "/login";
     loginUrl.searchParams.set("redirectTo", pathname);
     return NextResponse.redirect(loginUrl);
   }
 
-  // Extract role from user_metadata
-  const role = (user.user_metadata?.role as string)?.toUpperCase() ?? "";
+  // Role is stored in the JWT claims — no extra DB call needed
+  const role =
+    (session.user.user_metadata?.role as string)?.toUpperCase() ?? "";
 
-  // Check if the route requires a specific role
   for (const [prefix, requiredRole] of Object.entries(ROLE_ROUTES)) {
     if (pathname.startsWith(prefix)) {
       if (role !== requiredRole) {
-        const unauthorizedUrl = req.nextUrl.clone();
-        unauthorizedUrl.pathname = "/unauthorized";
-        return NextResponse.redirect(unauthorizedUrl);
+        const url = req.nextUrl.clone();
+        url.pathname = "/unauthorized";
+        return NextResponse.redirect(url);
       }
       break;
     }
@@ -66,8 +60,6 @@ export async function middleware(req: NextRequest) {
 
   return res;
 }
-
-// ─── Matcher config ──────────────────────────────────────
 
 export const config = {
   matcher: ["/patient/:path*", "/doctor/:path*", "/admin/:path*"],

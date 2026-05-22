@@ -1,0 +1,15 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /patient/
+Disallow: /doctor/
+Disallow: /admin/
+Disallow: /unauthorized
+
+# Allow public pages
+Allow: /$
+Allow: /login
+Allow: /register
+Allow: /forgot-password
+
+Sitemap: https://mediconnect.app/sitemap.xml

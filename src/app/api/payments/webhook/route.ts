@@ -1,53 +1,93 @@
 import { NextRequest, NextResponse } from "next/server";
-import Stripe from "stripe";
+import { createHmac, timingSafeEqual } from "crypto";
 import { prisma } from "@/lib/prisma";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2026-03-25.dahlia",
-});
+// ─── Paystack webhook handler ─────────────────────────────
+//
+// Register this URL in your Paystack dashboard:
+//   Dashboard → Settings → API Keys & Webhooks → Webhook URL
+//   → https://yourdomain.com/api/payments/webhook
+//
+// Paystack signs every webhook with HMAC-SHA512 using your secret key.
+// The signature is sent in the "x-paystack-signature" header.
 
-const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
+const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY!;
+
+function verifyPaystackSignature(body: string, signature: string | null): boolean {
+  if (!signature) return false;
+  const expected = createHmac("sha512", PAYSTACK_SECRET_KEY)
+    .update(body)
+    .digest("hex");
+  // Use timingSafeEqual to prevent timing attacks
+  try {
+    return timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
+  } catch {
+    return false;
+  }
+}
+
+// ─── Paystack event types ────────────────────────────────
+
+interface PaystackCustomer {
+  email: string;
+}
+
+interface PaystackChargeData {
+  reference: string;
+  amount: number; // in kobo/cents (smallest currency unit)
+  currency: string;
+  status: string;
+  channel: string; // e.g. "card", "bank", "ussd", "qr", "mobile_money"
+  paid_at: string;
+  customer: PaystackCustomer;
+  metadata: {
+    appointmentId?: string;
+    patientId?: string;
+  };
+}
+
+interface PaystackEvent {
+  event: string;
+  data: PaystackChargeData;
+}
 
 export async function POST(req: NextRequest) {
   const body = await req.text();
-  const signature = req.headers.get("stripe-signature");
+  const signature = req.headers.get("x-paystack-signature");
 
-  if (!signature) {
+  // ── Verify webhook authenticity ──────────────────────────
+  if (!verifyPaystackSignature(body, signature)) {
+    console.warn("Paystack webhook: invalid signature");
     return NextResponse.json(
-      { error: "Missing stripe-signature header" },
+      { error: "Invalid webhook signature" },
       { status: 400 }
     );
   }
 
-  let event: Stripe.Event;
-
+  let event: PaystackEvent;
   try {
-    event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown error";
-    console.error("Webhook signature verification failed:", message);
-    return NextResponse.json(
-      { error: `Webhook Error: ${message}` },
-      { status: 400 }
-    );
+    event = JSON.parse(body) as PaystackEvent;
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  // Handle the event
-  switch (event.type) {
-    case "payment_intent.succeeded": {
-      const paymentIntent = event.data.object as Stripe.PaymentIntent;
-      const { appointmentId, patientId } = paymentIntent.metadata;
+  // ── Route events ─────────────────────────────────────────
+  switch (event.event) {
+    // ── Successful payment ───────────────────────────────
+    case "charge.success": {
+      const charge = event.data;
+      const { appointmentId, patientId } = charge.metadata ?? {};
 
       if (!appointmentId || !patientId) {
-        console.error("Missing metadata on payment_intent:", paymentIntent.id);
+        console.error("Paystack webhook: missing metadata on charge", charge.reference);
         break;
       }
 
       try {
         await prisma.$transaction(async (tx) => {
-          // Update payment status
+          // Find the payment by Paystack reference
           const payment = await tx.payment.findFirst({
-            where: { stripePaymentId: paymentIntent.id },
+            where: { paystackReference: charge.reference },
           });
 
           if (payment) {
@@ -55,19 +95,20 @@ export async function POST(req: NextRequest) {
               where: { id: payment.id },
               data: {
                 status: "COMPLETED",
-                method: paymentIntent.payment_method_types?.[0] || "card",
-                paidAt: new Date(),
+                // Normalise channel name → human-readable method
+                method: formatChannel(charge.channel),
+                paidAt: new Date(charge.paid_at),
               },
             });
           }
 
-          // Confirm the appointment
+          // Confirm the linked appointment
           await tx.appointment.update({
             where: { id: appointmentId },
             data: { status: "CONFIRMED" },
           });
 
-          // Get appointment details for notifications
+          // Fetch appointment details for notifications
           const appointment = await tx.appointment.findUnique({
             where: { id: appointmentId },
             include: {
@@ -82,7 +123,8 @@ export async function POST(req: NextRequest) {
 
           if (!appointment) return;
 
-          const amountFormatted = `$${(paymentIntent.amount / 100).toFixed(2)}`;
+          // Paystack amount is in kobo/cents — convert to decimal
+          const amountFormatted = formatAmount(charge.amount, charge.currency);
 
           // Notify patient
           await tx.notification.create({
@@ -107,7 +149,7 @@ export async function POST(req: NextRequest) {
           });
         });
       } catch (error) {
-        console.error("Error processing payment_intent.succeeded:", error);
+        console.error("Error processing charge.success:", error);
         return NextResponse.json(
           { error: "Error processing webhook" },
           { status: 500 }
@@ -116,12 +158,14 @@ export async function POST(req: NextRequest) {
       break;
     }
 
-    case "payment_intent.payment_failed": {
-      const paymentIntent = event.data.object as Stripe.PaymentIntent;
+    // ── Failed / reversed charge ─────────────────────────
+    case "charge.failed":
+    case "transfer.reversed": {
+      const charge = event.data;
 
       try {
         const payment = await prisma.payment.findFirst({
-          where: { stripePaymentId: paymentIntent.id },
+          where: { paystackReference: charge.reference },
           include: {
             patient: {
               include: { user: { select: { id: true } } },
@@ -139,22 +183,46 @@ export async function POST(req: NextRequest) {
             data: {
               userId: payment.patient.user.id,
               title: "Payment Failed",
-              message: `Your payment of $${payment.amount.toFixed(2)} could not be processed. Please try again or use a different payment method.`,
+              message: `Your payment of ${formatAmount(charge.amount, charge.currency)} could not be processed. Please try again or use a different payment method.`,
               type: "PAYMENT",
               link: "/patient/payments",
             },
           });
         }
       } catch (error) {
-        console.error("Error processing payment_intent.payment_failed:", error);
+        console.error("Error processing charge.failed:", error);
       }
       break;
     }
 
     default:
-      // Unhandled event type
+      // Unhandled event type — acknowledge receipt
       break;
   }
 
+  // Always return 200 to acknowledge receipt (Paystack retries on non-200)
   return NextResponse.json({ received: true });
+}
+
+// ─── Helpers ─────────────────────────────────────────────
+
+/** Format smallest-currency-unit amount to a human-readable string */
+function formatAmount(amountInKobo: number, currency: string): string {
+  const decimal = amountInKobo / 100;
+  const symbol = currency === "NGN" ? "₦" : currency === "GHS" ? "₵" : "$";
+  return `${symbol}${decimal.toLocaleString("en-NG", { minimumFractionDigits: 2 })}`;
+}
+
+/** Map Paystack channel codes to readable method names */
+function formatChannel(channel: string): string {
+  const map: Record<string, string> = {
+    card: "Card",
+    bank: "Bank Transfer",
+    ussd: "USSD",
+    qr: "QR Code",
+    mobile_money: "Mobile Money",
+    bank_transfer: "Bank Transfer",
+    eft: "EFT",
+  };
+  return map[channel] ?? channel;
 }

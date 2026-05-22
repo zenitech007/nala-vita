@@ -1,7 +1,32 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Heart, Shield, Stethoscope, Calendar } from "lucide-react";
+import { supabase } from "@/lib/supabase";
 
 export default function Home() {
+  const router = useRouter();
+  const [checking, setChecking] = useState(true);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) {
+        setChecking(false);
+        return;
+      }
+      const role = session.user.user_metadata?.role?.toUpperCase();
+      if (role === "DOCTOR") router.replace("/doctor/dashboard");
+      else if (role === "ADMIN") router.replace("/admin/dashboard");
+      else router.replace("/patient/dashboard");
+    });
+  }, [router]);
+
+  if (checking) {
+    return <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50" />;
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 font-[family-name:var(--font-geist-sans)]">
       {/* Header */}

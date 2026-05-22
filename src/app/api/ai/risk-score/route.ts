@@ -42,6 +42,35 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const validated = riskScoreSchema.parse(body);
 
+    // ─── Enforce doctor-patient relationship ─────────────
+    // Admins can access any patient; doctors must have an existing
+    // appointment with the patient (past or upcoming).
+    if (user.role === "DOCTOR") {
+      const doctor = await prisma.doctor.findUnique({
+        where: { userId: user.id },
+        select: { id: true },
+      });
+
+      if (!doctor) {
+        return NextResponse.json({ error: "Doctor profile not found" }, { status: 404 });
+      }
+
+      const relationship = await prisma.appointment.findFirst({
+        where: {
+          doctorId: doctor.id,
+          patientId: validated.patientId,
+        },
+        select: { id: true },
+      });
+
+      if (!relationship) {
+        return NextResponse.json(
+          { error: "You can only request risk scores for your own patients" },
+          { status: 403 }
+        );
+      }
+    }
+
     // ─── Fetch patient data ──────────────────────────────
 
     const patient = await prisma.patient.findUnique({

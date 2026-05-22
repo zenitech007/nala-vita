@@ -179,13 +179,10 @@ export default function PatientPaymentsPage() {
       });
       if (res.ok) {
         const data = await res.json();
-        // In production, redirect to Stripe Checkout or use Elements
-        // For now, simulate success
-        if (data.clientSecret) {
-          // Would use stripe.confirmPayment() here
-          alert(`Payment initiated. Client secret: ${data.clientSecret.slice(0, 20)}...`);
+        // Redirect to Paystack hosted checkout
+        if (data.authorizationUrl) {
+          window.location.href = data.authorizationUrl;
         }
-        fetchPayments();
       }
     } catch {
       //

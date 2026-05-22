@@ -4,7 +4,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 // ─── Enums ───────────────────────────────────────────────
@@ -294,7 +296,7 @@ model Payment {
   amount        Float
   currency      String   @default("USD")
   status        String   @default("PENDING")
-  stripePaymentId String? @map("stripe_payment_id")
+  paystackReference String? @map("paystack_reference")
   method        String?
   paidAt        DateTime? @map("paid_at")
   createdAt     DateTime @default(now()) @map("created_at")
