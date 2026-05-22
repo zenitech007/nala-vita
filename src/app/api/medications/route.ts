@@ -27,7 +27,7 @@ function computeNextDoseAt(frequency: string): string | null {
   return tomorrow.toISOString();
 }
 
-export async function GET(req: NextRequest) {
+export async function GET(_req: NextRequest) {
   try {
     const supabase = createServerSupabaseClient();
     const {

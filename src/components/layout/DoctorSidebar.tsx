@@ -30,7 +30,7 @@ const navItems = [
     { name: "Settings", href: "/doctor/settings", icon: Settings },
 ];
 
-export default function DoctorSidebar({ user }: { user: any }) {
+export default function DoctorSidebar({ user }: { user: { lastName?: string } | null }) {
     const pathname = usePathname();
 
     return (

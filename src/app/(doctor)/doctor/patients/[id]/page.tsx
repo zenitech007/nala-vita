@@ -22,7 +22,7 @@ import {
   Phone,
   User,
   Video,
-  Clock,
+  Clock as _Clock,
   AlertCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";

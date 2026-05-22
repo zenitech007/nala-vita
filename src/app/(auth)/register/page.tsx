@@ -25,8 +25,8 @@ const baseSchema = z.object({
   // Doctor fields
   licenseNumber: z.string().optional(),
   specialization: z.string().optional(),
-  yearsOfExperience: z.coerce.number().optional(),
-  consultationFee: z.coerce.number().optional(),
+  yearsOfExperience: z.coerce.number<number>().optional(),
+  consultationFee: z.coerce.number<number>().optional(),
 });
 
 const registerSchema = baseSchema

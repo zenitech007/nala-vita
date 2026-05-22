@@ -8,7 +8,7 @@ const moodSchema = z.object({
   note: z.string().max(2000).optional().default(""),
 });
 
-export async function GET(req: NextRequest) {
+export async function GET(_req: NextRequest) {
   try {
     const supabase = createServerSupabaseClient();
     const {

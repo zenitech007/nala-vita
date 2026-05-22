@@ -159,7 +159,7 @@ function MoodDot(props: {
 function BreathingExercise() {
   const [isRunning, setIsRunning] = useState(false);
   const [phase, setPhase] = useState<"inhale" | "hold" | "exhale">("inhale");
-  const [seconds, setSeconds] = useState(0);
+  const [_seconds, setSeconds] = useState(0);
 
   useEffect(() => {
     if (!isRunning) return;
