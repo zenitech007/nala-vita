@@ -15,6 +15,6 @@ export const THEMES = {
 
 export type ThemeName = keyof typeof THEMES;
 
-export const THEME_NAMES: ThemeName[] = ["rose", "fuchsia", "ocean", "emerald"];
+export const THEME_NAMES = Object.keys(THEMES) as readonly ThemeName[];
 
 export const DEFAULT_THEME: ThemeName = "rose";

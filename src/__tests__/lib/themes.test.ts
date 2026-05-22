@@ -1,5 +1,5 @@
 import { describe, it, expect } from "@jest/globals";
-import { THEMES, THEME_NAMES, type ThemeName } from "@/lib/themes";
+import { THEMES, THEME_NAMES, DEFAULT_THEME, type ThemeName } from "@/lib/themes";
 
 describe("THEMES", () => {
   it("exports exactly 4 themes", () => {
@@ -29,5 +29,9 @@ describe("THEMES", () => {
 
   it("THEME_NAMES is the keys array", () => {
     expect(THEME_NAMES).toEqual(["rose", "fuchsia", "ocean", "emerald"]);
+  });
+
+  it("DEFAULT_THEME is rose", () => {
+    expect(DEFAULT_THEME).toBe("rose");
   });
 });

@@ -39,3 +39,12 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# graphify knowledge graph (regenerated on demand via `graphify update .`)
+/graphify-out/
+
+# archived legacy histories (preserved before pivot; .bundle files only)
+/.archive/
+
+# recovered Amelia source — reference only, do not check into the new git tree
+/.amelia-source/
