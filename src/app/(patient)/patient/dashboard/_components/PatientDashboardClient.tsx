@@ -4,12 +4,25 @@
 
 import Link from "next/link";
 import {
-  Calendar, Pill, Activity, MessageSquare, Plus,
-  Stethoscope, FileText, AlertTriangle, TrendingUp,
-  Clock, ChevronRight,
+  Calendar,
+  Pill,
+  Activity,
+  MessageSquare,
+  Plus,
+  Stethoscope,
+  FileText,
+  AlertTriangle,
+  TrendingUp,
+  Clock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { MetricCard } from "@/components/ui/MetricCard";
+import { SectionCard } from "@/components/ui/SectionCard";
+import { EmptyState } from "@/components/ui/EmptyState";
+import HealthDashboard from "@/components/dashboard/HealthDashboard";
+import MedicationSchedule from "@/components/medications/MedicationSchedule";
 
 interface Props {
   data: {
@@ -46,82 +59,83 @@ export default function PatientDashboardClient({ data }: Props) {
   const greeting =
     hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
 
-  const metricCards = [
+  const quickActions = [
     {
-      label: "Upcoming Appointments",
-      value: data.upcomingAppointments.length,
-      icon: Calendar,
-      lightColor: "bg-blue-50",
-      textColor: "text-blue-600",
-      href: "/patient/appointments",
+      label: "Book Appointment",
+      icon: Plus,
+      href: "/patient/appointments?action=book",
+      primary: true,
     },
     {
-      label: "Active Medications",
-      value: data.activeMedications.length,
-      icon: Pill,
-      lightColor: "bg-emerald-50",
-      textColor: "text-emerald-600",
-      href: "/patient/medications",
+      label: "Check Symptoms",
+      icon: Stethoscope,
+      href: "/patient/symptom-checker",
+      primary: false,
     },
     {
-      label: "Latest Blood Pressure",
-      value: data.latestVital?.bloodPressure ?? "—",
-      subtitle: "mmHg",
-      icon: Activity,
-      lightColor: "bg-violet-50",
-      textColor: "text-violet-600",
-      href: "/patient/vitals",
-    },
-    {
-      label: "Unread Messages",
-      value: data.unreadMessages,
+      label: "Chat with Doctor",
       icon: MessageSquare,
-      lightColor: "bg-amber-50",
-      textColor: "text-amber-600",
       href: "/patient/chat",
+      primary: false,
+    },
+    {
+      label: "View Records",
+      icon: FileText,
+      href: "/patient/records",
+      primary: false,
     },
   ];
 
-  const quickActions = [
-    { label: "Book Appointment", icon: Plus, href: "/patient/appointments?action=book", color: "bg-blue-600 hover:bg-blue-700" },
-    { label: "Check Symptoms", icon: Stethoscope, href: "/patient/symptom-checker", color: "bg-emerald-600 hover:bg-emerald-700" },
-    { label: "Chat with Doctor", icon: MessageSquare, href: "/patient/chat", color: "bg-violet-600 hover:bg-violet-700" },
-    { label: "View Records", icon: FileText, href: "/patient/records", color: "bg-amber-600 hover:bg-amber-700" },
-  ];
+  // Adapt activeMedications (DB shape) to MedicationSchedule prop shape
+  const medicationsForSchedule = data.activeMedications.map((m) => ({
+    id: m.id,
+    name: m.medication,
+    dosage: m.dosage,
+    frequency: m.frequency,
+  }));
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <h1 className="text-2xl font-bold text-gray-900">
-            {greeting}, {data.firstName}
-          </h1>
-          <p className="text-gray-500 mt-1">Here&apos;s your health overview</p>
-        </div>
-      </header>
-
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+        <PageHeader
+          title={`${greeting}, ${data.firstName}`}
+          subtitle="Here's your health overview"
+        />
+
         {/* Metric Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {metricCards.map((card) => (
-            <Link
-              key={card.label}
-              href={card.href}
-              className="bg-white rounded-2xl border border-gray-100 p-6 hover:shadow-lg transition-shadow group"
-            >
-              <div className="flex items-start justify-between">
-                <div className={cn("w-12 h-12 rounded-xl flex items-center justify-center", card.lightColor)}>
-                  <card.icon className={cn("w-6 h-6", card.textColor)} />
-                </div>
-                <ChevronRight className="w-5 h-5 text-gray-300 group-hover:text-gray-500 transition" />
-              </div>
-              <div className="mt-4">
-                <p className="text-3xl font-bold text-gray-900">{card.value}</p>
-                {card.subtitle && <p className="text-xs text-gray-400 mt-0.5">{card.subtitle}</p>}
-                <p className="text-sm text-gray-500 mt-1">{card.label}</p>
-              </div>
-            </Link>
-          ))}
+          <Link href="/patient/appointments" className="block">
+            <MetricCard
+              label="Upcoming Appointments"
+              value={data.upcomingAppointments.length}
+              icon={<Calendar className="w-5 h-5" />}
+              tone="primary"
+            />
+          </Link>
+          <Link href="/patient/medications" className="block">
+            <MetricCard
+              label="Active Medications"
+              value={data.activeMedications.length}
+              icon={<Pill className="w-5 h-5" />}
+              tone="success"
+            />
+          </Link>
+          <Link href="/patient/vitals" className="block">
+            <MetricCard
+              label="Latest BP (mmHg)"
+              value={data.latestVital?.bloodPressure ?? "—"}
+              icon={<Activity className="w-5 h-5" />}
+              tone="neutral"
+            />
+          </Link>
+          <Link href="/patient/chat" className="block">
+            <MetricCard
+              label="Unread Messages"
+              value={data.unreadMessages}
+              icon={<MessageSquare className="w-5 h-5" />}
+              tone="warning"
+            />
+          </Link>
         </div>
 
         {/* Quick Actions */}
@@ -132,7 +146,12 @@ export default function PatientDashboardClient({ data }: Props) {
               <Link
                 key={action.label}
                 href={action.href}
-                className={cn("flex flex-col items-center gap-3 p-5 rounded-2xl text-white transition-transform hover:scale-[1.02]", action.color)}
+                className={cn(
+                  "flex flex-col items-center gap-3 p-5 rounded-2xl transition-transform hover:scale-[1.02]",
+                  action.primary
+                    ? "bg-[var(--primary)] text-white hover:opacity-90"
+                    : "bg-white border border-gray-100 text-gray-700 hover:bg-gray-50"
+                )}
               >
                 <action.icon className="w-7 h-7" />
                 <span className="text-sm font-medium text-center">{action.label}</span>
@@ -141,20 +160,52 @@ export default function PatientDashboardClient({ data }: Props) {
           </div>
         </div>
 
-        {/* Upcoming appointments + Notifications */}
+        {/* Daily Vitals widget (Phase 3 component) */}
+        {/* TODO: wire initialVitals + onUpdate to a daily-log API once the endpoint exists */}
+        <HealthDashboard />
+
+        {/* Medications + Appointments side-by-side */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <div className="bg-white rounded-2xl border border-gray-100 p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-semibold text-gray-900">Upcoming Appointments</h2>
-              <TrendingUp className="w-5 h-5 text-gray-400" />
-            </div>
+          <SectionCard
+            title="Active Prescriptions"
+            action={
+              <Link
+                href="/patient/medications"
+                className="text-sm font-medium text-[var(--primary)] hover:opacity-80"
+              >
+                View all
+              </Link>
+            }
+          >
+            <MedicationSchedule medications={medicationsForSchedule} />
+          </SectionCard>
+
+          <SectionCard
+            title="Upcoming Appointments"
+            action={<TrendingUp className="w-5 h-5 text-gray-400" />}
+          >
             {data.upcomingAppointments.length === 0 ? (
-              <p className="text-gray-500 text-sm text-center py-8">No upcoming appointments.</p>
+              <EmptyState
+                icon={<Calendar className="w-6 h-6" />}
+                title="No upcoming appointments"
+                description="Book a visit when you're ready."
+                action={
+                  <Link
+                    href="/patient/appointments?action=book"
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--primary)] text-white text-sm font-medium hover:opacity-90"
+                  >
+                    <Plus className="w-4 h-4" /> Book now
+                  </Link>
+                }
+              />
             ) : (
               <div className="space-y-4">
                 {data.upcomingAppointments.map((appt) => (
-                  <div key={appt.id} className="flex items-start gap-4 p-3 rounded-xl hover:bg-gray-50 transition">
-                    <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center flex-shrink-0">
+                  <div
+                    key={appt.id}
+                    className="flex items-start gap-4 p-3 rounded-xl hover:bg-gray-50 transition"
+                  >
+                    <div className="w-10 h-10 rounded-xl bg-[var(--primary)]/10 text-[var(--primary)] flex items-center justify-center flex-shrink-0">
                       <Calendar className="w-4 h-4" />
                     </div>
                     <div className="flex-1 min-w-0">
@@ -171,27 +222,31 @@ export default function PatientDashboardClient({ data }: Props) {
                 ))}
               </div>
             )}
-          </div>
-
-          <div className="bg-white rounded-2xl border border-gray-100 p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-semibold text-gray-900">Notifications</h2>
-              <AlertTriangle className="w-5 h-5 text-amber-500" />
-            </div>
-            {data.notifications.length === 0 ? (
-              <p className="text-gray-500 text-sm text-center py-8">You&apos;re all caught up.</p>
-            ) : (
-              <div className="space-y-3">
-                {data.notifications.map((n) => (
-                  <div key={n.id} className="p-3 rounded-xl bg-amber-50 border border-amber-100">
-                    <p className="text-sm font-medium text-amber-900">{n.title}</p>
-                    <p className="text-xs text-amber-700 mt-0.5">{n.message}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          </SectionCard>
         </div>
+
+        {/* Notifications */}
+        <SectionCard
+          title="Notifications"
+          action={<AlertTriangle className="w-5 h-5 text-amber-500" />}
+        >
+          {data.notifications.length === 0 ? (
+            <EmptyState
+              icon={<AlertTriangle className="w-6 h-6" />}
+              title="You're all caught up"
+              description="New alerts will appear here."
+            />
+          ) : (
+            <div className="space-y-3">
+              {data.notifications.map((n) => (
+                <div key={n.id} className="p-3 rounded-xl bg-amber-50 border border-amber-100">
+                  <p className="text-sm font-medium text-amber-900">{n.title}</p>
+                  <p className="text-xs text-amber-700 mt-0.5">{n.message}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </SectionCard>
       </main>
     </div>
   );
