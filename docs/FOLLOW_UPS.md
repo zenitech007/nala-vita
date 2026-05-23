@@ -42,8 +42,8 @@ deferrals. Each has a rationale in the original task / phase plan.
    directly in components. A `useAuth()` hook would centralise. Cosmetic.
 
 7. **Step 25 runtime: RLS policies applied in Supabase dashboard.**
-   `supabase/rls-policies.sql` exists but enforcement requires applying it
-   in the Supabase project console. User task.
+   ✅ Done 2026-05-22. 60 policies applied across 16 tables. See
+   `docs/SUPABASE_SETUP.md` for the apply command.
 
 8. **Spec Stripe items vs. Paystack reality.** See
    [`docs/decisions/2026-05-22-paystack-over-stripe.md`](decisions/2026-05-22-paystack-over-stripe.md). Spec says Stripe; we use Paystack

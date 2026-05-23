@@ -42,7 +42,7 @@ enum UrgencyLevel {
 
 model User {
   id            String   @id @default(cuid())
-  supabaseId    String   @unique @map("supabase_id")
+  supabaseId    String   @unique @map("supabase_id") @db.Uuid
   email         String   @unique
   firstName     String   @map("first_name")
   lastName      String   @map("last_name")
