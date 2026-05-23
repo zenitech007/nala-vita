@@ -297,7 +297,7 @@ export default function DoctorReferralsPage() {
               {/* Select Receiving Doctor */}
               <div className="bg-white rounded-2xl border border-gray-100 p-6">
                 <h3 className="text-base font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                  <Stethoscope className="w-5 h-5 text-blue-600" />
+                  <Stethoscope className="w-5 h-5 text-[var(--primary)]" />
                   Select Receiving Doctor
                 </h3>
 
@@ -306,7 +306,7 @@ export default function DoctorReferralsPage() {
                   <select
                     value={specialityFilter}
                     onChange={(e) => setSpecialityFilter(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] bg-white"
                   >
                     <option value="">All Specialities</option>
                     {specialities.map((s) => (
@@ -323,7 +323,7 @@ export default function DoctorReferralsPage() {
                     placeholder="Search doctor by name..."
                     value={doctorSearch}
                     onChange={(e) => setDoctorSearch(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
                   />
                 </div>
 
@@ -341,12 +341,12 @@ export default function DoctorReferralsPage() {
                         className={cn(
                           "w-full flex items-center gap-3 p-3 rounded-xl text-left transition",
                           selectedDoctor?.id === doc.id
-                            ? "bg-blue-50 border border-blue-200"
+                            ? "bg-[var(--primary)]/10 border border-[var(--primary)]/30"
                             : "hover:bg-gray-50 border border-transparent"
                         )}
                       >
-                        <div className="w-9 h-9 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                          <Stethoscope className="w-4 h-4 text-blue-600" />
+                        <div className="w-9 h-9 bg-[var(--primary)]/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                          <Stethoscope className="w-4 h-4 text-[var(--primary)]" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-gray-900">
@@ -357,7 +357,7 @@ export default function DoctorReferralsPage() {
                           </p>
                         </div>
                         {selectedDoctor?.id === doc.id && (
-                          <CheckCircle className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                          <CheckCircle className="w-4 h-4 text-[var(--primary)] flex-shrink-0" />
                         )}
                       </button>
                     ))
@@ -379,7 +379,7 @@ export default function DoctorReferralsPage() {
                     placeholder="Search patient by name..."
                     value={patientSearch}
                     onChange={(e) => setPatientSearch(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
                   />
                 </div>
 
@@ -433,7 +433,7 @@ export default function DoctorReferralsPage() {
                     value={reason}
                     onChange={(e) => setReason(e.target.value)}
                     placeholder="e.g. Suspected cardiac arrhythmia requiring specialist evaluation"
-                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
                   />
                 </div>
 
@@ -446,14 +446,14 @@ export default function DoctorReferralsPage() {
                     onChange={(e) => setNotes(e.target.value)}
                     placeholder="Any additional context, history, or instructions for the receiving doctor..."
                     rows={4}
-                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] resize-none"
                   />
                 </div>
               </div>
 
               {/* Summary + Submit */}
               {selectedDoctor && selectedPatient && (
-                <div className="mt-4 p-4 bg-blue-50 border border-blue-100 rounded-xl">
+                <div className="mt-4 p-4 bg-[var(--primary)]/10 border border-[var(--primary)]/20 rounded-xl">
                   <p className="text-sm text-blue-800">
                     <strong>{selectedPatient.name}</strong>{" "}
                     <ArrowRight className="w-3.5 h-3.5 inline mx-1" />{" "}
@@ -466,7 +466,7 @@ export default function DoctorReferralsPage() {
                 <button
                   onClick={handleCreateReferral}
                   disabled={submitting || !selectedDoctor || !selectedPatient || !reason.trim()}
-                  className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl transition text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex items-center gap-2 px-6 py-2.5 bg-[var(--primary)] hover:opacity-90 text-white font-medium rounded-xl transition text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {submitting ? (
                     <Loader2 className="w-4 h-4 animate-spin" />

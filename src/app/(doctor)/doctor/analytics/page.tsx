@@ -51,8 +51,8 @@ export default function DoctorAnalyticsPage() {
       label: "Total Patients",
       value: dateRange === "7d" ? "24" : dateRange === "30d" ? "87" : dateRange === "90d" ? "215" : "842",
       icon: Users,
-      color: "bg-blue-100",
-      iconColor: "text-blue-600",
+      color: "bg-[var(--primary)]/10",
+      iconColor: "text-[var(--primary)]",
       change: "+12%",
       changeUp: true,
     },
@@ -198,7 +198,7 @@ export default function DoctorAnalyticsPage() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
         {loading ? (
           <div className="flex items-center justify-center py-20">
-            <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+            <Loader2 className="w-8 h-8 animate-spin text-[var(--primary)]" />
           </div>
         ) : (
           <>

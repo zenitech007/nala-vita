@@ -297,10 +297,10 @@ export default function DoctorPrescriptionsPage() {
           <h2 className="text-lg font-semibold text-gray-900 mb-4">1. Select Patient</h2>
 
           {selectedPatient ? (
-            <div className="flex items-center justify-between p-4 bg-blue-50 border border-blue-200 rounded-xl">
+            <div className="flex items-center justify-between p-4 bg-[var(--primary)]/10 border border-[var(--primary)]/30 rounded-xl">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
-                  <User className="w-5 h-5 text-blue-600" />
+                <div className="w-10 h-10 bg-[var(--primary)]/10 rounded-xl flex items-center justify-center">
+                  <User className="w-5 h-5 text-[var(--primary)]" />
                 </div>
                 <div>
                   <p className="font-semibold text-gray-900">
@@ -318,7 +318,7 @@ export default function DoctorPrescriptionsPage() {
               </div>
               <button
                 onClick={() => setSelectedPatient(null)}
-                className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                className="text-sm text-[var(--primary)] hover:text-[var(--primary)] font-medium"
               >
                 Change
               </button>
@@ -332,7 +332,7 @@ export default function DoctorPrescriptionsPage() {
                   value={patientSearch}
                   onChange={(e) => setPatientSearch(e.target.value)}
                   placeholder="Search patient by name..."
-                  className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                  className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent outline-none"
                 />
               </div>
               {patientSearch && (
@@ -376,7 +376,7 @@ export default function DoctorPrescriptionsPage() {
             <h2 className="text-lg font-semibold text-gray-900">2. Medications</h2>
             <button
               onClick={() => setShowDrugForm(true)}
-              className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-xl transition"
+              className="inline-flex items-center gap-1.5 px-4 py-2 bg-[var(--primary)] hover:opacity-90 text-white text-sm font-medium rounded-xl transition"
             >
               <Plus className="w-4 h-4" />
               Add Drug
@@ -481,7 +481,7 @@ export default function DoctorPrescriptionsPage() {
 
           {/* Add drug form */}
           {showDrugForm && (
-            <div className="border border-blue-200 bg-blue-50/50 rounded-xl p-5 space-y-4">
+            <div className="border border-[var(--primary)]/30 bg-[var(--primary)]/10/50 rounded-xl p-5 space-y-4">
               <h3 className="font-semibold text-gray-900 text-sm">New Medication</h3>
 
               {/* Drug name with autocomplete */}
@@ -492,7 +492,7 @@ export default function DoctorPrescriptionsPage() {
                   value={newDrug.medication}
                   onChange={(e) => handleDrugNameChange(e.target.value)}
                   placeholder="Start typing drug name..."
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent outline-none text-sm"
                 />
                 {drugSuggestions.length > 0 && (
                   <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-40 overflow-y-auto">
@@ -520,7 +520,7 @@ export default function DoctorPrescriptionsPage() {
                     value={newDrug.dosage}
                     onChange={(e) => setNewDrug({ ...newDrug, dosage: e.target.value })}
                     placeholder="e.g., 500mg"
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm"
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent outline-none text-sm"
                   />
                 </div>
                 <div>
@@ -528,7 +528,7 @@ export default function DoctorPrescriptionsPage() {
                   <select
                     value={newDrug.frequency}
                     onChange={(e) => setNewDrug({ ...newDrug, frequency: e.target.value })}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm bg-white"
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent outline-none text-sm bg-white"
                   >
                     {FREQUENCY_OPTIONS.map((f) => (
                       <option key={f} value={f}>{f}</option>
@@ -543,7 +543,7 @@ export default function DoctorPrescriptionsPage() {
                   <select
                     value={newDrug.duration}
                     onChange={(e) => setNewDrug({ ...newDrug, duration: e.target.value })}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm bg-white"
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent outline-none text-sm bg-white"
                   >
                     {DURATION_OPTIONS.map((d) => (
                       <option key={d} value={d}>{d}</option>
@@ -558,7 +558,7 @@ export default function DoctorPrescriptionsPage() {
                     max={12}
                     value={newDrug.refillsAllowed}
                     onChange={(e) => setNewDrug({ ...newDrug, refillsAllowed: parseInt(e.target.value) || 0 })}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm"
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent outline-none text-sm"
                   />
                 </div>
               </div>
@@ -570,7 +570,7 @@ export default function DoctorPrescriptionsPage() {
                   onChange={(e) => setNewDrug({ ...newDrug, instructions: e.target.value })}
                   rows={2}
                   placeholder="e.g., Take with food. Avoid alcohol."
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm resize-none"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent outline-none text-sm resize-none"
                 />
               </div>
 
@@ -595,7 +595,7 @@ export default function DoctorPrescriptionsPage() {
                 <button
                   onClick={addDrug}
                   disabled={!newDrug.medication || !newDrug.dosage}
-                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-xl transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-5 py-2 bg-[var(--primary)] hover:opacity-90 text-white text-sm font-medium rounded-xl transition disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Add Medication
                 </button>
@@ -618,7 +618,7 @@ export default function DoctorPrescriptionsPage() {
                 <select
                   value={expiryDays}
                   onChange={(e) => setExpiryDays(parseInt(e.target.value))}
-                  className="px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm bg-white"
+                  className="px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent outline-none text-sm bg-white"
                 >
                   <option value={7}>7 days</option>
                   <option value={14}>14 days</option>

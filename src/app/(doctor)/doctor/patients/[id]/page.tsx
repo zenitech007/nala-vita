@@ -160,7 +160,7 @@ const STATUS_COLORS: Record<string, string> = {
   COMPLETED: "bg-green-100 text-green-700",
   DECLINED: "bg-red-100 text-red-700",
   CANCELLED: "bg-red-100 text-red-700",
-  IN_PROGRESS: "bg-blue-100 text-blue-700",
+  IN_PROGRESS: "bg-[var(--primary)]/10 text-[var(--primary)]",
 };
 
 function formatStatus(status: string): string {
@@ -239,7 +239,7 @@ export default function PatientDetailPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+        <Loader2 className="w-8 h-8 animate-spin text-[var(--primary)]" />
       </div>
     );
   }
@@ -251,7 +251,7 @@ export default function PatientDetailPage() {
         <p className="text-gray-500">Patient not found</p>
         <Link
           href="/doctor/patients"
-          className="mt-4 text-blue-600 hover:text-blue-700 text-sm font-medium"
+          className="mt-4 text-[var(--primary)] hover:text-[var(--primary)] text-sm font-medium"
         >
           Back to Patients
         </Link>
@@ -279,8 +279,8 @@ export default function PatientDetailPage() {
               </Link>
 
               {/* Avatar */}
-              <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-                <span className="text-blue-600 font-semibold text-sm">
+              <div className="w-12 h-12 bg-[var(--primary)]/10 rounded-full flex items-center justify-center flex-shrink-0">
+                <span className="text-[var(--primary)] font-semibold text-sm">
                   {patient.user.firstName.charAt(0)}
                   {patient.user.lastName.charAt(0)}
                 </span>
@@ -328,7 +328,7 @@ export default function PatientDetailPage() {
             {/* Start Consultation */}
             <Link
               href={`/doctor/consultation?patientId=${patientId}`}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-xl transition flex-shrink-0"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-[var(--primary)] hover:opacity-90 text-white text-sm font-medium rounded-xl transition flex-shrink-0"
             >
               <Video className="w-4 h-4" />
               Start Consultation
@@ -348,7 +348,7 @@ export default function PatientDetailPage() {
                 className={cn(
                   "px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition",
                   activeTab === tab.key
-                    ? "bg-blue-50 text-blue-700"
+                    ? "bg-[var(--primary)]/10 text-[var(--primary)]"
                     : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
                 )}
               >
@@ -410,7 +410,7 @@ export default function PatientDetailPage() {
                     setNoteForm((f) => ({ ...f, title: e.target.value }))
                   }
                   placeholder="Note title..."
-                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent"
                 />
               </div>
 
@@ -423,7 +423,7 @@ export default function PatientDetailPage() {
                   onChange={(e) =>
                     setNoteForm((f) => ({ ...f, category: e.target.value }))
                   }
-                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent bg-white"
                 >
                   {NOTE_CATEGORIES.map((cat) => (
                     <option key={cat} value={cat}>
@@ -444,7 +444,7 @@ export default function PatientDetailPage() {
                   }
                   placeholder="Write your note..."
                   rows={5}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent resize-none"
                 />
               </div>
             </div>
@@ -463,7 +463,7 @@ export default function PatientDetailPage() {
                   !noteForm.title.trim() ||
                   !noteForm.content.trim()
                 }
-                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl transition"
+                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-[var(--primary)] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl transition"
               >
                 {noteSubmitting && (
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -532,8 +532,8 @@ function OverviewTab({
               : "--",
           unit: "%",
           icon: Droplets,
-          color: "text-blue-500",
-          bg: "bg-blue-50",
+          color: "text-[var(--primary)]",
+          bg: "bg-[var(--primary)]/10",
         },
         {
           label: "Weight",
@@ -611,8 +611,8 @@ function OverviewTab({
                 className="flex items-center justify-between px-5 py-3"
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center">
-                    <Pill className="w-4 h-4 text-blue-500" />
+                  <div className="w-8 h-8 bg-[var(--primary)]/10 rounded-lg flex items-center justify-center">
+                    <Pill className="w-4 h-4 text-[var(--primary)]" />
                   </div>
                   <div>
                     <p className="text-sm font-medium text-gray-900">
@@ -897,13 +897,13 @@ function PrescriptionsTab({
                 <div
                   className={cn(
                     "w-9 h-9 rounded-lg flex items-center justify-center",
-                    rx.isActive ? "bg-blue-50" : "bg-gray-50"
+                    rx.isActive ? "bg-[var(--primary)]/10" : "bg-gray-50"
                   )}
                 >
                   <Pill
                     className={cn(
                       "w-4 h-4",
-                      rx.isActive ? "text-blue-500" : "text-gray-400"
+                      rx.isActive ? "text-[var(--primary)]" : "text-gray-400"
                     )}
                   />
                 </div>
@@ -1039,7 +1039,7 @@ function LabResultsTab({ labOrders }: { labOrders: LabOrder[] }) {
                         href={result.reportUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-blue-600 hover:text-blue-700 font-medium"
+                        className="text-[var(--primary)] hover:text-[var(--primary)] font-medium"
                       >
                         Report
                       </a>
@@ -1074,7 +1074,7 @@ function NotesTab({
         </h2>
         <button
           onClick={onAddNote}
-          className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-xl transition"
+          className="inline-flex items-center gap-1.5 px-4 py-2 bg-[var(--primary)] hover:opacity-90 text-white text-sm font-medium rounded-xl transition"
         >
           <Plus className="w-4 h-4" />
           Add Note
@@ -1099,7 +1099,7 @@ function NotesTab({
                     {note.title}
                   </h3>
                   {note.category && (
-                    <span className="px-2 py-0.5 bg-blue-50 text-blue-700 text-xs font-medium rounded-full">
+                    <span className="px-2 py-0.5 bg-[var(--primary)]/10 text-[var(--primary)] text-xs font-medium rounded-full">
                       {note.category}
                     </span>
                   )}

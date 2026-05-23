@@ -49,7 +49,7 @@ interface PatientsResponse {
 // ─── Helpers ─────────────────────────────────────────────
 
 const AVATAR_COLORS = [
-  "bg-blue-500",
+  "bg-[var(--primary)]",
   "bg-emerald-500",
   "bg-purple-500",
   "bg-amber-500",
@@ -75,8 +75,8 @@ function calculateAge(dateOfBirth: string): number {
 
 const STATUS_COLORS: Record<string, string> = {
   COMPLETED: "bg-green-100 text-green-700",
-  CONFIRMED: "bg-blue-100 text-blue-700",
-  SCHEDULED: "bg-blue-100 text-blue-700",
+  CONFIRMED: "bg-[var(--primary)]/10 text-[var(--primary)]",
+  SCHEDULED: "bg-[var(--primary)]/10 text-[var(--primary)]",
   CANCELLED: "bg-red-100 text-red-700",
   IN_PROGRESS: "bg-yellow-100 text-yellow-700",
   NO_SHOW: "bg-gray-100 text-gray-700",
@@ -149,12 +149,12 @@ export default function DoctorPatientsPage() {
                   value={search}
                   onChange={(e) => handleSearchChange(e.target.value)}
                   placeholder="Search patients..."
-                  className="pl-9 pr-4 py-2 w-64 border border-gray-200 rounded-xl text-sm bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                  className="pl-9 pr-4 py-2 w-64 border border-gray-200 rounded-xl text-sm bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent transition"
                 />
               </div>
 
               {/* Total badge */}
-              <span className="inline-flex items-center gap-1.5 px-3 py-2 bg-blue-50 text-blue-700 text-sm font-medium rounded-xl">
+              <span className="inline-flex items-center gap-1.5 px-3 py-2 bg-[var(--primary)]/10 text-[var(--primary)] text-sm font-medium rounded-xl">
                 <Users className="w-4 h-4" />
                 {total} {total === 1 ? "patient" : "patients"}
               </span>
@@ -167,7 +167,7 @@ export default function DoctorPatientsPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {loading ? (
           <div className="flex items-center justify-center py-20">
-            <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+            <Loader2 className="w-8 h-8 animate-spin text-[var(--primary)]" />
           </div>
         ) : patients.length === 0 ? (
           /* ─── Empty State ─── */
@@ -276,7 +276,7 @@ export default function DoctorPatientsPage() {
                   <div className="flex gap-2">
                     <Link
                       href={`/doctor/patients/${patient.id}`}
-                      className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg transition"
+                      className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-[var(--primary)] hover:opacity-90 text-white text-xs font-medium rounded-lg transition"
                     >
                       <ClipboardList className="w-3.5 h-3.5" />
                       View Records

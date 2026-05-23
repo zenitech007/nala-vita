@@ -118,7 +118,7 @@ export default function DoctorBillingPage() {
   const PAYOUT_STATUS: Record<string, { color: string; bg: string }> = {
     COMPLETED: { color: "text-green-700", bg: "bg-green-100" },
     PENDING: { color: "text-amber-700", bg: "bg-amber-100" },
-    PROCESSING: { color: "text-blue-700", bg: "bg-blue-100" },
+    PROCESSING: { color: "text-[var(--primary)]", bg: "bg-[var(--primary)]/10" },
   };
 
   const periods: { key: PeriodKey; label: string }[] = [
@@ -147,7 +147,7 @@ export default function DoctorBillingPage() {
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
         {loading ? (
           <div className="flex items-center justify-center py-20">
-            <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+            <Loader2 className="w-8 h-8 animate-spin text-[var(--primary)]" />
           </div>
         ) : (
           <>
@@ -168,8 +168,8 @@ export default function DoctorBillingPage() {
 
               <div className="bg-white rounded-2xl border border-gray-100 p-5">
                 <div className="flex items-center justify-between mb-3">
-                  <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
-                    <TrendingUp className="w-5 h-5 text-blue-600" />
+                  <div className="w-10 h-10 bg-[var(--primary)]/10 rounded-xl flex items-center justify-center">
+                    <TrendingUp className="w-5 h-5 text-[var(--primary)]" />
                   </div>
                   <span className="flex items-center gap-0.5 text-xs text-green-600 font-medium">
                     <ArrowUpRight className="w-3.5 h-3.5" /> +8%
@@ -296,7 +296,7 @@ export default function DoctorBillingPage() {
             <div className="bg-white rounded-2xl border border-gray-100">
               <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
                 <h2 className="text-lg font-semibold text-gray-900">Payout History</h2>
-                <button className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1">
+                <button className="text-sm text-[var(--primary)] hover:text-[var(--primary)] font-medium flex items-center gap-1">
                   <Download className="w-4 h-4" /> Export
                 </button>
               </div>

@@ -215,7 +215,7 @@ export default function DoctorMonitoringPage() {
                         onClick={() => setSelectedPatient(patient)}
                         className={cn(
                           "border-b border-gray-50 cursor-pointer transition",
-                          selectedPatient?.id === patient.id ? "bg-blue-50" : "hover:bg-gray-50"
+                          selectedPatient?.id === patient.id ? "bg-[var(--primary)]/10" : "hover:bg-gray-50"
                         )}
                       >
                         <td className="py-3 px-4">
@@ -267,8 +267,8 @@ export default function DoctorMonitoringPage() {
             {/* Header */}
             <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
-                  <User className="w-5 h-5 text-blue-600" />
+                <div className="w-10 h-10 bg-[var(--primary)]/10 rounded-xl flex items-center justify-center">
+                  <User className="w-5 h-5 text-[var(--primary)]" />
                 </div>
                 <div>
                   <p className="font-semibold text-gray-900 text-sm">{selectedPatient.name}</p>
@@ -295,7 +295,7 @@ export default function DoctorMonitoringPage() {
                   onClick={() => setDetailVitalKey(v.key)}
                   className={cn(
                     "w-full flex items-center justify-between px-3 py-2 rounded-xl transition text-sm",
-                    detailVitalKey === v.key ? "bg-blue-50 border border-blue-200" : "hover:bg-gray-50"
+                    detailVitalKey === v.key ? "bg-[var(--primary)]/10 border border-[var(--primary)]/30" : "hover:bg-gray-50"
                   )}
                 >
                   <span className="text-gray-600">{v.label}</span>

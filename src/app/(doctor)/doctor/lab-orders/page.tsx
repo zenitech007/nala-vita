@@ -186,7 +186,7 @@ export default function DoctorLabOrdersPage() {
             </div>
             <button
               onClick={() => setShowOrderForm(true)}
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition"
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-[var(--primary)] hover:opacity-90 text-white font-semibold rounded-xl transition"
             >
               <Plus className="w-4 h-4" />
               New Lab Order
@@ -212,7 +212,7 @@ export default function DoctorLabOrdersPage() {
         {/* Orders list */}
         {loading ? (
           <div className="flex items-center justify-center py-20">
-            <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+            <Loader2 className="w-8 h-8 animate-spin text-[var(--primary)]" />
           </div>
         ) : displayOrders.length === 0 ? (
           <div className="text-center py-20">
@@ -297,15 +297,15 @@ export default function DoctorLabOrdersPage() {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Patient *</label>
                   {selectedPatient ? (
-                    <div className="flex items-center justify-between p-3 bg-blue-50 border border-blue-200 rounded-xl">
+                    <div className="flex items-center justify-between p-3 bg-[var(--primary)]/10 border border-[var(--primary)]/30 rounded-xl">
                       <span className="text-sm font-medium text-gray-900">{selectedPatient.firstName} {selectedPatient.lastName}</span>
-                      <button onClick={() => setSelectedPatient(null)} className="text-xs text-blue-600">Change</button>
+                      <button onClick={() => setSelectedPatient(null)} className="text-xs text-[var(--primary)]">Change</button>
                     </div>
                   ) : (
                     <div>
                       <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                        <input type="text" value={patientSearch} onChange={(e) => setPatientSearch(e.target.value)} placeholder="Search patient..." className="w-full pl-9 pr-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm" />
+                        <input type="text" value={patientSearch} onChange={(e) => setPatientSearch(e.target.value)} placeholder="Search patient..." className="w-full pl-9 pr-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent outline-none text-sm" />
                       </div>
                       {patientSearch && (
                         <div className="mt-1 border border-gray-200 rounded-xl max-h-32 overflow-y-auto">
@@ -328,7 +328,7 @@ export default function DoctorLabOrdersPage() {
                       const test = COMMON_TESTS.find((t) => t.name === e.target.value);
                       if (test) setTestCode(test.code);
                     }}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm bg-white"
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent outline-none text-sm bg-white"
                   >
                     <option value="">Select a test...</option>
                     {COMMON_TESTS.map((t) => (
@@ -361,14 +361,14 @@ export default function DoctorLabOrdersPage() {
                     onChange={(e) => setInstructions(e.target.value)}
                     rows={2}
                     placeholder="e.g., Fasting for 8 hours required..."
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm resize-none"
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent outline-none text-sm resize-none"
                   />
                 </div>
 
                 <button
                   onClick={handleSubmitOrder}
                   disabled={!selectedPatient || !selectedTest || isSubmitting}
-                  className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="w-full py-3 bg-[var(--primary)] hover:opacity-90 text-white font-semibold rounded-xl transition disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {isSubmitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Submitting...</> : <><FlaskConical className="w-4 h-4" /> Submit Lab Order</>}
                 </button>

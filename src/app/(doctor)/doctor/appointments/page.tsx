@@ -209,7 +209,7 @@ export default function DoctorAppointmentsPage() {
 
           {loading ? (
             <div className="flex items-center justify-center py-20">
-              <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+              <Loader2 className="w-8 h-8 animate-spin text-[var(--primary)]" />
             </div>
           ) : viewMode === "list" ? (
             /* ─── List View ─── */
@@ -231,7 +231,7 @@ export default function DoctorAppointmentsPage() {
                       onClick={() => setSelectedAppointment(apt)}
                       className={cn(
                         "bg-white rounded-xl border p-5 hover:shadow-md transition-shadow cursor-pointer",
-                        selectedAppointment?.id === apt.id ? "border-blue-300 ring-1 ring-blue-200" : "border-gray-100"
+                        selectedAppointment?.id === apt.id ? "border-[var(--primary)] ring-1 ring-[var(--primary)]/30" : "border-gray-100"
                       )}
                     >
                       <div className="flex items-center gap-4">
@@ -276,7 +276,7 @@ export default function DoctorAppointmentsPage() {
                             <>
                               <button
                                 onClick={(e) => { e.stopPropagation(); handleStatusUpdate(apt.id, "IN_PROGRESS"); }}
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg transition"
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[var(--primary)] hover:opacity-90 text-white text-xs font-medium rounded-lg transition"
                               >
                                 <Play className="w-3.5 h-3.5" />
                                 Start
@@ -345,14 +345,14 @@ export default function DoctorAppointmentsPage() {
                       <div
                         className={cn(
                           "px-3 py-2 text-center border-b border-gray-100",
-                          isToday ? "bg-blue-50" : "bg-gray-50"
+                          isToday ? "bg-[var(--primary)]/10" : "bg-gray-50"
                         )}
                       >
                         <p className="text-xs text-gray-400">{format(day, "EEE")}</p>
                         <p
                           className={cn(
                             "text-sm font-semibold",
-                            isToday ? "text-blue-600" : "text-gray-900"
+                            isToday ? "text-[var(--primary)]" : "text-gray-900"
                           )}
                         >
                           {format(day, "d")}
@@ -429,8 +429,8 @@ function PatientSidebar({
           </button>
         </div>
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
-            <User className="w-6 h-6 text-blue-600" />
+          <div className="w-12 h-12 bg-[var(--primary)]/10 rounded-xl flex items-center justify-center">
+            <User className="w-6 h-6 text-[var(--primary)]" />
           </div>
           <div>
             <p className="font-semibold text-gray-900">
