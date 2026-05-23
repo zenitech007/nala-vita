@@ -80,7 +80,7 @@ export default function PatientTelemedicinePage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-        <Loader2 className="w-10 h-10 animate-spin text-blue-500" />
+        <Loader2 className="w-10 h-10 animate-spin text-[var(--primary)]" />
       </div>
     );
   }
@@ -106,7 +106,7 @@ export default function PatientTelemedicinePage() {
           <div className="flex flex-col gap-3">
             <Link
               href="/patient/dashboard"
-              className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition text-center"
+              className="w-full py-3 bg-[var(--primary)] hover:opacity-90 text-white font-semibold rounded-xl transition text-center"
             >
               Return to Dashboard
             </Link>

@@ -279,7 +279,7 @@ export default function DoctorConsultationPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-        <Loader2 className="w-10 h-10 animate-spin text-blue-500" />
+        <Loader2 className="w-10 h-10 animate-spin text-[var(--primary)]" />
       </div>
     );
   }
@@ -319,7 +319,7 @@ export default function DoctorConsultationPage() {
           <div className="flex flex-col gap-3">
             <Link
               href="/doctor/prescriptions"
-              className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition text-center"
+              className="w-full py-3 bg-[var(--primary)] hover:opacity-90 text-white font-semibold rounded-xl transition text-center"
             >
               Write Prescription
             </Link>
@@ -422,7 +422,7 @@ export default function DoctorConsultationPage() {
                 <button
                   onClick={saveNotes}
                   disabled={isSaving || !notes.trim()}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--primary)] hover:opacity-90 text-white text-xs font-medium rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isSaving ? (
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -439,7 +439,7 @@ export default function DoctorConsultationPage() {
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={4}
-              className="w-full bg-gray-900 text-gray-200 text-sm rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:outline-none resize-none placeholder-gray-600"
+              className="w-full bg-gray-900 text-gray-200 text-sm rounded-xl px-4 py-3 focus:ring-2 focus:ring-[var(--primary)] focus:outline-none resize-none placeholder-gray-600"
               placeholder="Type or dictate your consultation notes here..."
             />
             {isRecording && (
@@ -458,7 +458,7 @@ export default function DoctorConsultationPage() {
           {/* Patient Header */}
           <div className="px-5 py-4 border-b border-gray-700">
             <div className="flex items-center gap-3">
-              <div className="w-11 h-11 bg-blue-600/20 rounded-xl flex items-center justify-center">
+              <div className="w-11 h-11 bg-[var(--primary)]/20 rounded-xl flex items-center justify-center">
                 <User className="w-5 h-5 text-blue-400" />
               </div>
               <div>

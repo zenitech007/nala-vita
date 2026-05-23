@@ -329,7 +329,7 @@ export default function VideoCallPanel({
         {/* Connecting overlay */}
         {isConnecting && !isConnected && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900/80">
-            <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4" />
+            <div className="w-16 h-16 border-4 border-[var(--primary)] border-t-transparent rounded-full animate-spin mb-4" />
             <p className="text-white text-lg font-medium">
               Waiting for {isInitiator ? "patient" : "doctor"} to join...
             </p>
@@ -412,7 +412,7 @@ export default function VideoCallPanel({
           className={cn(
             "w-12 h-12 rounded-full flex items-center justify-center transition",
             isScreenSharing
-              ? "bg-blue-500 hover:bg-blue-600 text-white"
+              ? "bg-[var(--primary)] hover:opacity-90 text-white"
               : "bg-gray-700 hover:bg-gray-600 text-white"
           )}
           title={isScreenSharing ? "Stop sharing" : "Share screen"}
