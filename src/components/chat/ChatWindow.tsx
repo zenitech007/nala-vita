@@ -271,8 +271,8 @@ export default function ChatWindow({
     <div className={cn("flex flex-col bg-white rounded-2xl border border-gray-100 overflow-hidden", className)}>
       {/* Chat header */}
       <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-100">
-        <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
-          <span className="text-blue-600 font-semibold text-sm">
+        <div className="w-10 h-10 bg-[var(--primary)]/10 rounded-xl flex items-center justify-center">
+          <span className="text-[var(--primary)] font-semibold text-sm">
             {otherUserName.charAt(0)}
           </span>
         </div>
@@ -340,7 +340,7 @@ export default function ChatWindow({
                               rel="noopener noreferrer"
                               className={cn(
                                 "flex items-center gap-2 px-3 py-2 rounded-xl text-sm",
-                                isOwn ? "bg-blue-500 text-white" : "bg-gray-100 text-gray-700"
+                                isOwn ? "bg-[var(--primary)] text-white" : "bg-gray-100 text-gray-700"
                               )}
                             >
                               <File className="w-4 h-4" />
@@ -356,7 +356,7 @@ export default function ChatWindow({
                           className={cn(
                             "px-4 py-2.5 rounded-2xl text-sm",
                             isOwn
-                              ? "bg-blue-600 text-white rounded-br-md"
+                              ? "bg-[var(--primary)] text-white rounded-br-md"
                               : "bg-gray-100 text-gray-900 rounded-bl-md"
                           )}
                         >
@@ -371,7 +371,7 @@ export default function ChatWindow({
                         </span>
                         {isOwn && (
                           msg.isRead ? (
-                            <CheckCheck className="w-3.5 h-3.5 text-blue-500" />
+                            <CheckCheck className="w-3.5 h-3.5 text-[var(--primary)]" />
                           ) : (
                             <Check className="w-3.5 h-3.5 text-gray-400" />
                           )
@@ -463,14 +463,14 @@ export default function ChatWindow({
             onKeyDown={handleKeyDown}
             rows={1}
             placeholder="Type a message..."
-            className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm resize-none max-h-32"
+            className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent outline-none text-sm resize-none max-h-32"
           />
 
           {/* Send */}
           <button
             onClick={handleSend}
             disabled={isSending || (!newMessage.trim() && !attachmentFile)}
-            className="p-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+            className="p-2.5 bg-[var(--primary)] hover:opacity-90 text-white rounded-xl transition disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
           >
             {isSending ? (
               <Loader2 className="w-5 h-5 animate-spin" />

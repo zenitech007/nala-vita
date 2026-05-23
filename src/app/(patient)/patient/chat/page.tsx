@@ -33,15 +33,15 @@ export default function ChatIndexPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+        <Loader2 className="w-6 h-6 animate-spin text-[var(--primary)]" />
       </div>
     );
   }
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
-      <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center mb-4">
-        <MessageSquare className="w-8 h-8 text-blue-600" />
+      <div className="w-16 h-16 bg-[var(--primary)]/10 rounded-2xl flex items-center justify-center mb-4">
+        <MessageSquare className="w-8 h-8 text-[var(--primary)]" />
       </div>
       <h2 className="text-xl font-semibold text-gray-900 mb-2">No Conversations Yet</h2>
       <p className="text-gray-500 text-sm max-w-md">
