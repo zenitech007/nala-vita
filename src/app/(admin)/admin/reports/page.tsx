@@ -133,7 +133,7 @@ const RANGE_OPTIONS: { key: RangeKey; label: string }[] = [
 const PIE_COLORS = ["#2563eb", "#7c3aed", "#059669", "#d97706", "#dc2626"];
 
 const STATUS_COLORS: Record<string, string> = {
-  SCHEDULED: "bg-blue-100 text-blue-700",
+  SCHEDULED: "bg-[var(--primary)]/10 text-[var(--primary)]",
   CONFIRMED: "bg-emerald-100 text-emerald-700",
   COMPLETED: "bg-green-100 text-green-700",
   CANCELLED: "bg-red-100 text-red-700",
@@ -287,7 +287,7 @@ export default function AdminReportsPage() {
   if (loading) {
     return (
       <div className="flex h-[60vh] items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+        <Loader2 className="h-8 w-8 animate-spin text-[var(--primary)]" />
         <span className="ml-3 text-lg text-gray-500">Loading reports...</span>
       </div>
     );
@@ -299,7 +299,7 @@ export default function AdminReportsPage() {
         <p className="text-red-600 text-lg">{error ?? "No data available"}</p>
         <button
           onClick={() => fetchReport(range)}
-          className="rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 transition-colors"
+          className="rounded-lg bg-[var(--primary)] px-4 py-2 text-white hover:opacity-90 transition-colors"
         >
           Retry
         </button>
@@ -316,8 +316,8 @@ export default function AdminReportsPage() {
       label: "Total Patients",
       value: overview.totalPatients.toLocaleString(),
       icon: Users,
-      lightColor: "bg-blue-50",
-      textColor: "text-blue-600",
+      lightColor: "bg-[var(--primary)]/10",
+      textColor: "text-[var(--primary)]",
     },
     {
       label: "Total Doctors",
@@ -377,7 +377,7 @@ export default function AdminReportsPage() {
               className={cn(
                 "rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
                 range === opt.key
-                  ? "bg-blue-600 text-white shadow-sm"
+                  ? "bg-[var(--primary)] text-white shadow-sm"
                   : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50"
               )}
             >
@@ -429,7 +429,7 @@ export default function AdminReportsPage() {
         {/* Bar Chart — Appointments by Status */}
         <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
           <div className="mb-4 flex items-center gap-2">
-            <BarChart3 className="h-5 w-5 text-blue-600" />
+            <BarChart3 className="h-5 w-5 text-[var(--primary)]" />
             <h2 className="text-base font-semibold text-gray-900">
               Appointments by Status
             </h2>
@@ -467,7 +467,7 @@ export default function AdminReportsPage() {
         {/* Pie Chart — Consultation Type Breakdown */}
         <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
           <div className="mb-4 flex items-center gap-2">
-            <PieChartIcon className="h-5 w-5 text-blue-600" />
+            <PieChartIcon className="h-5 w-5 text-[var(--primary)]" />
             <h2 className="text-base font-semibold text-gray-900">
               Consultation Type Breakdown
             </h2>
@@ -508,7 +508,7 @@ export default function AdminReportsPage() {
         {/* Area Chart — Revenue Over Months */}
         <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
           <div className="mb-4 flex items-center gap-2">
-            <TrendingUp className="h-5 w-5 text-blue-600" />
+            <TrendingUp className="h-5 w-5 text-[var(--primary)]" />
             <h2 className="text-base font-semibold text-gray-900">
               Revenue Over Time
             </h2>
@@ -551,7 +551,7 @@ export default function AdminReportsPage() {
         {/* Horizontal Bar Chart — Top 5 Doctors */}
         <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
           <div className="mb-4 flex items-center gap-2">
-            <Stethoscope className="h-5 w-5 text-blue-600" />
+            <Stethoscope className="h-5 w-5 text-[var(--primary)]" />
             <h2 className="text-base font-semibold text-gray-900">
               Top 5 Doctors by Patients
             </h2>
@@ -592,7 +592,7 @@ export default function AdminReportsPage() {
         {/* Recent Payments */}
         <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
           <div className="mb-4 flex items-center gap-2">
-            <CreditCard className="h-5 w-5 text-blue-600" />
+            <CreditCard className="h-5 w-5 text-[var(--primary)]" />
             <h2 className="text-base font-semibold text-gray-900">
               Recent Payments
             </h2>
@@ -649,7 +649,7 @@ export default function AdminReportsPage() {
         {/* Recent Appointments */}
         <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
           <div className="mb-4 flex items-center gap-2">
-            <Clock className="h-5 w-5 text-blue-600" />
+            <Clock className="h-5 w-5 text-[var(--primary)]" />
             <h2 className="text-base font-semibold text-gray-900">
               Recent Appointments
             </h2>

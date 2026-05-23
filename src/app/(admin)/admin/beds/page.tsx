@@ -427,7 +427,7 @@ export default function AdminBedsPage() {
                     value={assignPatient}
                     onChange={(e) => setAssignPatient(e.target.value)}
                     placeholder="Enter patient name or ID"
-                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
                   />
                 </div>
                 <div>
@@ -439,7 +439,7 @@ export default function AdminBedsPage() {
                     onChange={(e) => setAssignNotes(e.target.value)}
                     placeholder="Reason for admission, special instructions..."
                     rows={3}
-                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] resize-none"
                   />
                 </div>
 
@@ -457,7 +457,7 @@ export default function AdminBedsPage() {
                   <button
                     onClick={handleAssign}
                     disabled={saving || !assignPatient.trim()}
-                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-white bg-[var(--primary)] hover:opacity-90 transition disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {saving ? (
                       <Loader2 className="w-4 h-4 animate-spin" />

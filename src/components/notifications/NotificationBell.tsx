@@ -26,7 +26,7 @@ interface NotificationBellProps {
 // ─── Notification type styling ──────────────────────────
 
 const TYPE_COLORS: Record<string, string> = {
-  APPOINTMENT: "bg-blue-500",
+  APPOINTMENT: "bg-[var(--primary)]",
   PAYMENT: "bg-green-500",
   MESSAGE: "bg-purple-500",
   VITAL_ALERT: "bg-red-500",
@@ -211,7 +211,7 @@ export default function NotificationBell({
               {unreadCount > 0 && (
                 <button
                   onClick={markAllAsRead}
-                  className="text-xs text-blue-600 hover:text-blue-700 font-medium px-2 py-1 rounded-lg hover:bg-blue-50 transition"
+                  className="text-xs text-[var(--primary)] hover:opacity-80 font-medium px-2 py-1 rounded-lg hover:bg-[var(--primary)]/10 transition"
                 >
                   Mark all read
                 </button>
@@ -243,7 +243,7 @@ export default function NotificationBell({
                   onClick={() => handleNotificationClick(notification)}
                   className={cn(
                     "w-full text-left px-5 py-3.5 border-b border-gray-50 hover:bg-gray-50/80 transition flex gap-3",
-                    !notification.isRead && "bg-blue-50/40"
+                    !notification.isRead && "bg-[var(--primary)]/10/40"
                   )}
                 >
                   {/* Type indicator */}
@@ -293,7 +293,7 @@ export default function NotificationBell({
                   window.location.href = "/notifications";
                   setIsOpen(false);
                 }}
-                className="text-xs text-blue-600 hover:text-blue-700 font-medium"
+                className="text-xs text-[var(--primary)] hover:opacity-80 font-medium"
               >
                 View all notifications
               </button>

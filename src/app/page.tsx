@@ -24,15 +24,15 @@ export default function Home() {
   }, [router]);
 
   if (checking) {
-    return <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50" />;
+    return <div className="min-h-screen bg-gradient-to-br from-[var(--bg-tint)] via-white to-white" />;
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 font-[family-name:var(--font-geist-sans)]">
+    <div className="min-h-screen bg-gradient-to-br from-[var(--bg-tint)] via-white to-white font-[family-name:var(--font-geist-sans)]">
       {/* Header */}
       <header className="px-6 py-4 flex items-center justify-between max-w-7xl mx-auto">
         <div className="flex items-center gap-2">
-          <Heart className="w-7 h-7 text-blue-600" />
+          <Heart className="w-7 h-7 text-[var(--primary)]" />
           <span className="text-xl font-bold text-gray-900">Nala Vita</span>
         </div>
         <div className="flex items-center gap-3">
@@ -44,7 +44,7 @@ export default function Home() {
           </Link>
           <Link
             href="/register"
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition"
+            className="px-4 py-2 text-sm font-medium text-white bg-[var(--primary)] hover:opacity-90 rounded-lg transition"
           >
             Get Started
           </Link>
@@ -56,7 +56,7 @@ export default function Home() {
         <h1 className="text-5xl sm:text-6xl font-bold text-gray-900 leading-tight">
           Healthcare Management
           <br />
-          <span className="text-blue-600">Made Simple</span>
+          <span className="text-[var(--primary)]">Made Simple</span>
         </h1>
         <p className="mt-6 text-lg text-gray-600 max-w-2xl mx-auto">
           A complete platform connecting patients, doctors, and administrators.
@@ -66,7 +66,7 @@ export default function Home() {
         <div className="mt-10 flex gap-4 justify-center">
           <Link
             href="/register"
-            className="px-8 py-3 text-base font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition shadow-lg shadow-blue-200"
+            className="px-8 py-3 text-base font-semibold text-white bg-[var(--primary)] hover:opacity-90 rounded-xl transition shadow-lg shadow-[var(--primary)]/30"
           >
             Create Account
           </Link>
@@ -81,8 +81,8 @@ export default function Home() {
         {/* Features */}
         <div className="mt-24 grid grid-cols-1 sm:grid-cols-3 gap-8 text-left">
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-            <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center mb-4">
-              <Calendar className="w-5 h-5 text-blue-600" />
+            <div className="w-10 h-10 bg-[var(--primary)]/10 rounded-xl flex items-center justify-center mb-4">
+              <Calendar className="w-5 h-5 text-[var(--primary)]" />
             </div>
             <h3 className="font-semibold text-gray-900">Smart Scheduling</h3>
             <p className="mt-2 text-sm text-gray-600">

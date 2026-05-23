@@ -175,7 +175,7 @@ export default function AdminStaffPage() {
             </div>
             <button
               onClick={() => setShowAddForm(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl transition text-sm"
+              className="flex items-center gap-2 px-4 py-2 bg-[var(--primary)] hover:opacity-90 text-white font-medium rounded-xl transition text-sm"
             >
               <UserPlus className="w-4 h-4" />
               Add Staff
@@ -194,7 +194,7 @@ export default function AdminStaffPage() {
               placeholder="Search by name, email, or speciality..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent"
             />
           </div>
           <div className="flex gap-1 bg-gray-100 p-0.5 rounded-lg self-start">
@@ -270,7 +270,7 @@ export default function AdminStaffPage() {
                           className={cn(
                             "inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium",
                             staff.role === "DOCTOR"
-                              ? "bg-blue-100 text-blue-700"
+                              ? "bg-[var(--primary)]/10 text-[var(--primary)]"
                               : "bg-purple-100 text-purple-700"
                           )}
                         >
@@ -294,7 +294,7 @@ export default function AdminStaffPage() {
                             setDeptModalId(staff.id);
                             setDeptModalValue(staff.department);
                           }}
-                          className="inline-flex items-center gap-1 text-sm text-gray-600 hover:text-blue-600 transition"
+                          className="inline-flex items-center gap-1 text-sm text-gray-600 hover:text-[var(--primary)] transition"
                         >
                           <Building2 className="w-3.5 h-3.5" />
                           {staff.department}
@@ -304,7 +304,7 @@ export default function AdminStaffPage() {
                         {/* Toggle Switch */}
                         <button
                           onClick={() => toggleActive(staff.id)}
-                          className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                          className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:ring-offset-2"
                           style={{
                             backgroundColor: staff.isActive
                               ? "#3B82F6"
@@ -372,7 +372,7 @@ export default function AdminStaffPage() {
                   value={formName}
                   onChange={(e) => setFormName(e.target.value)}
                   placeholder="e.g. Sarah Chen"
-                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
                 />
               </div>
 
@@ -386,7 +386,7 @@ export default function AdminStaffPage() {
                   value={formEmail}
                   onChange={(e) => setFormEmail(e.target.value)}
                   placeholder="e.g. s.chen@mediconnect.io"
-                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
                 />
               </div>
 
@@ -403,7 +403,7 @@ export default function AdminStaffPage() {
                       className={cn(
                         "flex-1 py-2.5 rounded-xl text-sm font-medium border transition",
                         formRole === r
-                          ? "bg-blue-50 border-blue-300 text-blue-700"
+                          ? "bg-[var(--primary)]/10 border-blue-300 text-[var(--primary)]"
                           : "border-gray-200 text-gray-600 hover:bg-gray-50"
                       )}
                     >
@@ -421,7 +421,7 @@ export default function AdminStaffPage() {
                 <select
                   value={formSpeciality}
                   onChange={(e) => setFormSpeciality(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] bg-white"
                 >
                   <option value="">Select speciality...</option>
                   {SPECIALITIES.map((s) => (
@@ -442,7 +442,7 @@ export default function AdminStaffPage() {
                   value={formLicence}
                   onChange={(e) => setFormLicence(e.target.value)}
                   placeholder="e.g. MD-2024-1006"
-                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
                 />
               </div>
 
@@ -454,7 +454,7 @@ export default function AdminStaffPage() {
                 <select
                   value={formDepartment}
                   onChange={(e) => setFormDepartment(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] bg-white"
                 >
                   <option value="">Select department...</option>
                   {DEPARTMENTS.map((d) => (
@@ -483,7 +483,7 @@ export default function AdminStaffPage() {
                   !formLicence ||
                   !formDepartment
                 }
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium text-white bg-[var(--primary)] hover:opacity-90 transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {saving && <Loader2 className="w-4 h-4 animate-spin" />}
                 {saving ? "Adding..." : "Add Staff"}
@@ -511,7 +511,7 @@ export default function AdminStaffPage() {
             <select
               value={deptModalValue}
               onChange={(e) => setDeptModalValue(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white mb-4"
+              className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] bg-white mb-4"
             >
               {DEPARTMENTS.map((d) => (
                 <option key={d} value={d}>
@@ -528,7 +528,7 @@ export default function AdminStaffPage() {
               </button>
               <button
                 onClick={() => assignDepartment(deptModalId, deptModalValue)}
-                className="px-4 py-2 rounded-xl text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 transition"
+                className="px-4 py-2 rounded-xl text-sm font-medium text-white bg-[var(--primary)] hover:opacity-90 transition"
               >
                 Save
               </button>

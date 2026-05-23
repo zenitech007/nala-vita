@@ -50,8 +50,8 @@ export default function AdminDashboard() {
       label: "Active Patients",
       value: 1248,
       icon: Users,
-      lightColor: "bg-blue-50",
-      textColor: "text-blue-600",
+      lightColor: "bg-[var(--primary)]/10",
+      textColor: "text-[var(--primary)]",
       change: "+24 this week",
       changeUp: true,
     },
@@ -92,7 +92,7 @@ export default function AdminDashboard() {
       description: "Manage doctors and nurses",
       icon: UserCog,
       href: "/admin/staff",
-      color: "bg-blue-100 text-blue-600",
+      color: "bg-[var(--primary)]/10 text-[var(--primary)]",
     },
     {
       label: "Bed Management",
@@ -180,16 +180,16 @@ export default function AdminDashboard() {
       badge: "bg-amber-100 text-amber-700",
     },
     info: {
-      bg: "bg-blue-50",
-      border: "border-blue-200",
-      badge: "bg-blue-100 text-blue-700",
+      bg: "bg-[var(--primary)]/10",
+      border: "border-[var(--primary)]/30",
+      badge: "bg-[var(--primary)]/10 text-[var(--primary)]",
     },
   };
 
   // ─── Live stats (bottom row) ───────────────────────────
 
   const liveStats = [
-    { label: "Beds Occupied", value: "42 / 60", pct: 70, color: "bg-blue-500" },
+    { label: "Beds Occupied", value: "42 / 60", pct: 70, color: "bg-[var(--primary)]/100" },
     { label: "Avg Wait Time", value: "18 min", pct: 36, color: "bg-amber-500" },
     { label: "Consultations Active", value: 7, pct: 58, color: "bg-emerald-500" },
     { label: "Pending Lab Orders", value: 23, pct: 45, color: "bg-violet-500" },
@@ -229,7 +229,7 @@ export default function AdminDashboard() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
         {loading ? (
           <div className="flex items-center justify-center py-20">
-            <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+            <Loader2 className="w-8 h-8 animate-spin text-[var(--primary)]" />
           </div>
         ) : (
           <>

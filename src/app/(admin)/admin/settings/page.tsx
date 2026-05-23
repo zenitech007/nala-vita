@@ -125,7 +125,7 @@ export default function AdminSettingsPage() {
       {/* ── Page Header ────────────────────────────────────── */}
       <div>
         <div className="flex items-center gap-2">
-          <Settings className="h-6 w-6 text-blue-600" />
+          <Settings className="h-6 w-6 text-[var(--primary)]" />
           <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
         </div>
         <p className="mt-1 text-sm text-gray-500">
@@ -145,8 +145,8 @@ export default function AdminSettingsPage() {
               className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm"
             >
               <div className="flex items-start gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-50">
-                  <item.icon className="h-5 w-5 text-blue-600" />
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--primary)]/10">
+                  <item.icon className="h-5 w-5 text-[var(--primary)]" />
                 </div>
                 <div className="min-w-0">
                   <p className="text-xs font-medium text-gray-500">

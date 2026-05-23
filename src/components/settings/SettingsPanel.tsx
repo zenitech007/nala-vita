@@ -179,8 +179,8 @@ export default function SettingsPanel({
         {/* ── Language Selection ───────────────────────── */}
         <section className="bg-white rounded-2xl border border-gray-100 p-6">
           <div className="flex items-center gap-3 mb-5">
-            <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
-              <Globe className="w-5 h-5 text-blue-600" />
+            <div className="w-10 h-10 bg-[var(--primary)]/10 rounded-xl flex items-center justify-center">
+              <Globe className="w-5 h-5 text-[var(--primary)]" />
             </div>
             <div>
               <h2 className="text-base font-semibold text-gray-900">
@@ -189,7 +189,7 @@ export default function SettingsPanel({
               <p className="text-sm text-gray-500">{t("selectLanguage")}</p>
             </div>
             {saving && (
-              <Loader2 className="w-4 h-4 animate-spin text-blue-500 ml-auto" />
+              <Loader2 className="w-4 h-4 animate-spin text-[var(--primary)] ml-auto" />
             )}
           </div>
 
@@ -203,7 +203,7 @@ export default function SettingsPanel({
                 className={cn(
                   "flex items-center justify-between p-4 rounded-xl border-2 transition text-left",
                   currentLocale === lang.code
-                    ? "border-blue-500 bg-blue-50"
+                    ? "border-[var(--primary)] bg-[var(--primary)]/10"
                     : "border-gray-100 hover:border-gray-200 hover:bg-gray-50"
                 )}
               >
@@ -214,7 +214,7 @@ export default function SettingsPanel({
                   <p className="text-xs text-gray-500">{lang.name}</p>
                 </div>
                 {currentLocale === lang.code && (
-                  <Check className="w-5 h-5 text-blue-600" />
+                  <Check className="w-5 h-5 text-[var(--primary)]" />
                 )}
               </button>
             ))}

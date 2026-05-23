@@ -20,7 +20,7 @@ export default function UnauthorizedPage() {
         <div className="flex gap-3 justify-center">
           <Link
             href="/login"
-            className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl transition text-sm"
+            className="px-5 py-2.5 bg-[var(--primary)] hover:opacity-90 text-white font-medium rounded-xl transition text-sm"
           >
             Go to Login
           </Link>

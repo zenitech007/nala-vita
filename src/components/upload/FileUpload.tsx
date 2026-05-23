@@ -175,7 +175,7 @@ export default function FileUpload({
         className={cn(
           "relative flex flex-col items-center justify-center p-8 rounded-2xl border-2 border-dashed transition cursor-pointer",
           isDragging
-            ? "border-blue-400 bg-blue-50"
+            ? "border-[var(--primary)] bg-[var(--primary)]/10"
             : "border-gray-200 bg-gray-50 hover:border-gray-300 hover:bg-gray-100"
         )}
       >
@@ -192,12 +192,12 @@ export default function FileUpload({
         />
 
         {uploading ? (
-          <Loader2 className="w-10 h-10 text-blue-500 animate-spin mb-3" />
+          <Loader2 className="w-10 h-10 text-[var(--primary)] animate-spin mb-3" />
         ) : (
           <Upload
             className={cn(
               "w-10 h-10 mb-3",
-              isDragging ? "text-blue-500" : "text-gray-400"
+              isDragging ? "text-[var(--primary)]" : "text-gray-400"
             )}
           />
         )}
@@ -218,7 +218,7 @@ export default function FileUpload({
           <div className="w-full max-w-xs mt-4">
             <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
               <div
-                className="h-full bg-blue-500 rounded-full transition-all duration-300"
+                className="h-full bg-[var(--primary)] rounded-full transition-all duration-300"
                 style={{ width: `${progress}%` }}
               />
             </div>
