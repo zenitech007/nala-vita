@@ -60,9 +60,26 @@ deferrals. Each has a rationale in the original task / phase plan.
     `cmd //c "taskkill /F /IM node.exe" && rm -rf .next` before re-building.
     Likely a Next.js + Windows interaction; not Nala-Vita-specific.
 
+11. **Benign `next-intl` webpack cache warning.** Every `npm run dev`
+    prints:
+    ```
+    <w> [webpack.cache.PackFileCacheStrategy/webpack.FileSystemInfo]
+        Parsing of …/next-intl/dist/esm/production/extractor/format/index.js
+        for build dependencies failed at 'import(t)'.
+    <w> Build dependencies behind this expression are ignored and might
+        cause incorrect cache invalidation.
+    ```
+    This is an upstream issue in `next-intl`'s build output — it uses a
+    dynamic `import(t)` that webpack's cache strategy can't statically
+    analyse. **No runtime impact.** The warning is purely about webpack's
+    cache being unable to track that one internal file for invalidation.
+    Worst-case symptom (rare): after upgrading `next-intl`, the dev cache
+    might serve a stale module. Workaround if that ever happens:
+    `rm -rf .next && npm run dev`. Not worth suppressing.
+
 ## Documentation
 
-11. **Per-route ownership doc.** No `docs/ARCHITECTURE.md` exists. Useful
+12. **Per-route ownership doc.** No `docs/ARCHITECTURE.md` exists. Useful
     if more than one developer joins. Should cover: route groups, the
     server-component layout pattern, the SidebarShell composition, the
     Phase 1 theming system, and the realtime subscription topology.
