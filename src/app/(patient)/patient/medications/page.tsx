@@ -526,6 +526,15 @@ export default function PatientMedicationsPage() {
                         </>
                       )}
                     </button>
+
+                    {/* Order from pharmacy (Spec Step 12) */}
+                    <Link
+                      href="/patient/pharmacy"
+                      onClick={(e) => e.stopPropagation()}
+                      className="mt-2 w-full inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-[var(--primary)] hover:bg-[var(--primary)]/10 rounded-xl transition"
+                    >
+                      Order from pharmacy →
+                    </Link>
                   </div>
                 );
               })}
