@@ -91,8 +91,8 @@ export default function DoctorDashboardClient({ data }: { data: DashboardData })
       label: "Patients Today",
       value: data.todaysAppointments.length,
       icon: Users,
-      lightColor: "bg-blue-50",
-      textColor: "text-blue-600",
+      lightColor: "bg-[var(--primary)]/10",
+      textColor: "text-[var(--primary)]",
       change: `${data.totalPatients} total patients`,
     },
     {
@@ -132,7 +132,7 @@ export default function DoctorDashboardClient({ data }: { data: DashboardData })
               </h1>
               <p className="text-gray-500 mt-1">
                 {format(new Date(), "EEEE, MMMM d, yyyy")} &middot; You have{" "}
-                <span className="font-semibold text-blue-600">
+                <span className="font-semibold text-[var(--primary)]">
                   {data.todaysAppointments.length} patients
                 </span>{" "}
                 today
@@ -141,7 +141,7 @@ export default function DoctorDashboardClient({ data }: { data: DashboardData })
             <div className="flex items-center gap-3">
               <Link
                 href="/doctor/appointments"
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl transition text-sm flex items-center gap-2"
+                className="px-4 py-2 bg-[var(--primary)] hover:opacity-90 text-white font-medium rounded-xl transition text-sm flex items-center gap-2"
               >
                 <CalendarDays className="w-4 h-4" />
                 View Schedule
@@ -177,7 +177,7 @@ export default function DoctorDashboardClient({ data }: { data: DashboardData })
               </div>
               <Link
                 href="/doctor/appointments"
-                className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
+                className="text-sm text-[var(--primary)] hover:opacity-80 font-medium flex items-center gap-1"
               >
                 View all <ChevronRight className="w-4 h-4" />
               </Link>
@@ -224,7 +224,7 @@ export default function DoctorDashboardClient({ data }: { data: DashboardData })
                       </div>
                       <Link
                         href={`/doctor/consultation/${apt.id}`}
-                        className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg transition flex-shrink-0"
+                        className="px-3 py-1.5 bg-[var(--primary)] hover:opacity-90 text-white text-xs font-medium rounded-lg transition flex-shrink-0"
                       >
                         Start
                       </Link>
