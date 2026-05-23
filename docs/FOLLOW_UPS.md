@@ -60,7 +60,24 @@ deferrals. Each has a rationale in the original task / phase plan.
     `cmd //c "taskkill /F /IM node.exe" && rm -rf .next` before re-building.
     Likely a Next.js + Windows interaction; not Nala-Vita-specific.
 
-11. **Benign `next-intl` webpack cache warning.** Every `npm run dev`
+12. **Benign Chrome "CSS preloaded but not used" warning (dev only).**
+    Browser console sometimes prints:
+    ```
+    The resource http://localhost:3000/_next/static/css/app/layout.css?v=…
+    was preloaded using link preload but not used within a few seconds
+    from the window's load event.
+    ```
+    This is a Next.js dev-server artifact. In dev mode, Next emits a
+    `<link rel="preload" as="style">` for the CSS chunk, but Hot Module
+    Reload sometimes rewrites the `?v=<timestamp>` cache-buster between
+    the preload tag and the matching `<link rel="stylesheet">` tag. URLs
+    don't match → Chrome thinks the preload was unused → warning fires.
+    **Verified absent in production:** curling a `npm start` page shows
+    the CSS arriving as a plain `<link rel="stylesheet">` with no
+    preload, so the warning literally can't fire under `npm start`
+    (let alone in a real deployment). Not worth suppressing for dev.
+
+13. **Benign `next-intl` webpack cache warning.** Every `npm run dev`
     prints:
     ```
     <w> [webpack.cache.PackFileCacheStrategy/webpack.FileSystemInfo]
