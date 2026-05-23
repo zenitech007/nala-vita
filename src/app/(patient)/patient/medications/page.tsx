@@ -228,7 +228,7 @@ export default function PatientMedicationsPage() {
           </div>
         </header>
         <div className="flex items-center justify-center py-20">
-          <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+          <Loader2 className="w-8 h-8 animate-spin text-[var(--primary)]" />
         </div>
       </div>
     );
@@ -397,7 +397,7 @@ export default function PatientMedicationsPage() {
             <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
               Active Medications
             </h2>
-            <span className="px-2.5 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded-full">
+            <span className="px-2.5 py-0.5 bg-[var(--primary)]/10 text-[var(--primary)] text-xs font-medium rounded-full">
               {activeMedications.length}
             </span>
           </div>
@@ -423,7 +423,7 @@ export default function PatientMedicationsPage() {
                   <div
                     key={med.id}
                     onClick={() => setSelectedMedication(med)}
-                    className="bg-white rounded-2xl border border-gray-100 p-5 hover:shadow-md hover:border-blue-200 transition-all cursor-pointer"
+                    className="bg-white rounded-2xl border border-gray-100 p-5 hover:shadow-md hover:border-[var(--primary)]/40 transition-all cursor-pointer"
                   >
                     {/* Header row */}
                     <div className="flex items-start justify-between mb-3">
@@ -431,7 +431,7 @@ export default function PatientMedicationsPage() {
                         <h3 className="text-lg font-bold text-gray-900">
                           {med.medication}
                         </h3>
-                        <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-semibold rounded-full">
+                        <span className="px-2 py-0.5 bg-[var(--primary)]/10 text-[var(--primary)] text-xs font-semibold rounded-full">
                           {med.dosage}
                         </span>
                       </div>
@@ -466,7 +466,7 @@ export default function PatientMedicationsPage() {
                         "flex items-center gap-2 px-3 py-2 rounded-lg mb-4 text-sm font-medium",
                         doseInfo.isOverdue
                           ? "bg-red-50 text-red-700"
-                          : "bg-blue-50 text-blue-700"
+                          : "bg-[var(--primary)]/10 text-[var(--primary)]"
                       )}
                     >
                       <Timer className="w-4 h-4" />
@@ -509,7 +509,7 @@ export default function PatientMedicationsPage() {
                         "w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-xl transition",
                         refillsRemaining <= 0
                           ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                          : "bg-blue-600 hover:bg-blue-700 text-white"
+                          : "bg-[var(--primary)] hover:opacity-90 text-white"
                       )}
                     >
                       {refillLoadingId === med.id ? (
@@ -632,7 +632,7 @@ export default function PatientMedicationsPage() {
                     className={cn(
                       "w-11 h-11 rounded-xl flex items-center justify-center",
                       selectedMedication.isActive
-                        ? "bg-blue-100"
+                        ? "bg-[var(--primary)]/10"
                         : "bg-gray-100"
                     )}
                   >
@@ -640,7 +640,7 @@ export default function PatientMedicationsPage() {
                       className={cn(
                         "w-5 h-5",
                         selectedMedication.isActive
-                          ? "text-blue-600"
+                          ? "text-[var(--primary)]"
                           : "text-gray-400"
                       )}
                     />
@@ -716,8 +716,8 @@ export default function PatientMedicationsPage() {
                   Prescribing Doctor
                 </h4>
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                    <User className="w-5 h-5 text-blue-600" />
+                  <div className="w-10 h-10 bg-[var(--primary)]/10 rounded-full flex items-center justify-center">
+                    <User className="w-5 h-5 text-[var(--primary)]" />
                   </div>
                   <div>
                     <p className="text-sm font-semibold text-gray-900">
