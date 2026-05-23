@@ -95,7 +95,7 @@ function Field({
 }
 
 const inputCls =
-  "w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent outline-none transition";
+  "w-full px-4 py-2.5 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent outline-none transition";
 
 // ─── Page ─────────────────────────────────────────────────
 

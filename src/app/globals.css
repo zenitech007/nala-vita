@@ -43,13 +43,16 @@
   --text-on-tint: #064E3B;
 }
 
-/* Dark mode flips chrome only; theme tint stays for brand colour continuity */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+/*
+  Dark mode is controlled by next-themes via the `html.dark` class, NOT by
+  the OS @media (prefers-color-scheme: dark) query.
+
+  We do NOT honour prefers-color-scheme because the app's UI cards are
+  hardcoded `bg-white`/`bg-gray-50`. If the OS dark-mode preference flipped
+  --foreground to near-white, inputs and other text would inherit white
+  text and become invisible on the white cards (the form bug a user hit
+  on 2026-05-22). Dark theme stays opt-in via the theme switcher.
+*/
 
 html.dark {
   --background: #0a0a0a;
