@@ -95,7 +95,7 @@ function Field({
 }
 
 const inputCls =
-  "w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition";
+  "w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent outline-none transition";
 
 // ─── Page ─────────────────────────────────────────────────
 
@@ -168,11 +168,11 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-cyan-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-[var(--bg-tint)] via-white to-white flex items-center justify-center p-4">
       <div className="w-full max-w-lg">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-2xl mb-4">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-[var(--primary)] rounded-2xl mb-4">
             <Heart className="w-8 h-8 text-white" />
           </div>
           <h1 className="text-3xl font-bold text-gray-900">Nala Vita</h1>
@@ -204,7 +204,7 @@ export default function RegisterPage() {
                     className={cn(
                       "flex items-center justify-center p-3 rounded-xl border-2 cursor-pointer transition-all",
                       selectedRole === role
-                        ? "border-blue-600 bg-blue-50 text-blue-700"
+                        ? "border-[var(--primary)] bg-[var(--primary)]/10 text-[var(--primary)]"
                         : "border-gray-200 hover:border-gray-300 text-gray-600"
                     )}
                   >
@@ -348,7 +348,7 @@ export default function RegisterPage() {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="w-full py-3 bg-[var(--primary)] hover:opacity-90 text-white font-semibold rounded-xl transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {isSubmitting ? (
                 <>
@@ -364,7 +364,7 @@ export default function RegisterPage() {
           {/* Footer */}
           <p className="text-center text-sm text-gray-500 mt-6">
             Already have an account?{" "}
-            <Link href="/login" className="text-blue-600 hover:text-blue-700 font-medium">
+            <Link href="/login" className="text-[var(--primary)] hover:opacity-80 font-medium">
               Sign in
             </Link>
           </p>
