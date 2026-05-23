@@ -317,8 +317,10 @@ export default function DoctorMonitoringPage() {
                 <TrendingUp className="w-3.5 h-3.5" />
                 {activeDetailConfig.label} — 30 Day Trend
               </h4>
-              <div className="h-[200px]">
-                <ResponsiveContainer width="100%" height="100%">
+              {/* Fixed pixel height on ResponsiveContainer avoids the
+                  recharts "width(-1)/height(-1)" measurement-race warning. */}
+              <div className="w-full">
+                <ResponsiveContainer width="100%" height={200}>
                   <LineChart data={historyData} margin={{ top: 5, right: 5, bottom: 5, left: -15 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
                     <XAxis dataKey="date" tick={{ fontSize: 9, fill: "#9ca3af" }} tickLine={false} interval={6} />

@@ -434,8 +434,10 @@ export default function AdminReportsPage() {
               Appointments by Status
             </h2>
           </div>
-          <div className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
+          {/* h-72 = 288px. Pass fixed pixel height to ResponsiveContainer
+              to avoid the "width(-1)/height(-1)" measurement-race warning. */}
+          <div className="w-full">
+            <ResponsiveContainer width="100%" height={288}>
               <BarChart data={data.appointmentsByStatus}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis
@@ -472,8 +474,8 @@ export default function AdminReportsPage() {
               Consultation Type Breakdown
             </h2>
           </div>
-          <div className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="w-full">
+            <ResponsiveContainer width="100%" height={288}>
               <PieChart>
                 <Pie
                   data={data.appointmentsByType}
@@ -513,8 +515,8 @@ export default function AdminReportsPage() {
               Revenue Over Time
             </h2>
           </div>
-          <div className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="w-full">
+            <ResponsiveContainer width="100%" height={288}>
               <AreaChart data={data.revenueByMonth}>
                 <defs>
                   <linearGradient id="revenueGrad" x1="0" y1="0" x2="0" y2="1">
@@ -556,8 +558,8 @@ export default function AdminReportsPage() {
               Top 5 Doctors by Patients
             </h2>
           </div>
-          <div className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="w-full">
+            <ResponsiveContainer width="100%" height={288}>
               <BarChart
                 data={data.topDoctors.slice(0, 5)}
                 layout="vertical"

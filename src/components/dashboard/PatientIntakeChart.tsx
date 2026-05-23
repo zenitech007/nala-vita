@@ -24,8 +24,12 @@ interface Props {
 
 export default function PatientIntakeChart({ data }: Props) {
   return (
-    <div className="h-64 w-full">
-      <ResponsiveContainer width="100%" height="100%">
+    // Pass fixed pixel height (256px = h-64) directly to ResponsiveContainer.
+    // Using <div className="h-64"> + height="100%" makes recharts initialise
+    // its width/height state to -1 and only update after ResizeObserver fires —
+    // the first render then logs "The width(-1) and height(-1) of chart..."
+    <div className="w-full">
+      <ResponsiveContainer width="100%" height={256}>
         <LineChart data={data} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#374151" strokeOpacity={0.2} />
 

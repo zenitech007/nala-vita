@@ -254,8 +254,20 @@ export default function PatientVitalsPage() {
             )}
           </div>
 
-          <div className="h-[320px]">
-            <ResponsiveContainer width="100%" height="100%">
+          {/*
+            ✅ FIX: pass fixed pixel height directly to ResponsiveContainer.
+            Previously we used <div className="h-[320px]"> + height="100%",
+            which makes recharts initialise width/height state to -1 and
+            measure the parent via ResizeObserver. If the first render
+            happens before that measurement settles (common with empty
+            initial data + post-mount useEffect populating chartData),
+            recharts logs:
+              "The width(-1) and height(-1) of chart should be greater than 0"
+            Passing height={320} as a pixel number skips the measurement
+            race entirely.
+          */}
+          <div className="w-full">
+            <ResponsiveContainer width="100%" height={320}>
               <LineChart data={activeData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
                 <XAxis dataKey="date" tick={{ fontSize: 11, fill: "#9ca3af" }} tickLine={false} axisLine={{ stroke: "#e5e7eb" }} />
