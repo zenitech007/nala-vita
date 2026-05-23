@@ -197,7 +197,7 @@ export default function PatientVitalsPage() {
             </div>
             <button
               onClick={() => setShowForm(true)}
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition"
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-[var(--primary)] hover:opacity-90 text-white font-semibold rounded-xl transition"
             >
               <Plus className="w-4 h-4" />
               Record Vital
@@ -219,13 +219,13 @@ export default function PatientVitalsPage() {
                 onClick={() => setSelectedVital(config.key)}
                 className={cn(
                   "flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition",
-                  isActive ? "border-blue-600 bg-blue-50" : "border-gray-100 bg-white hover:border-gray-300"
+                  isActive ? "border-[var(--primary)] bg-[var(--primary)]/10" : "border-gray-100 bg-white hover:border-gray-300"
                 )}
               >
-                <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center", isActive ? "bg-blue-100" : "bg-gray-100")}>
-                  <Icon className={cn("w-5 h-5", isActive ? "text-blue-600" : "text-gray-400")} />
+                <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center", isActive ? "bg-[var(--primary)]/10" : "bg-gray-100")}>
+                  <Icon className={cn("w-5 h-5", isActive ? "text-[var(--primary)]" : "text-gray-400")} />
                 </div>
-                <span className={cn("text-xs font-medium", isActive ? "text-blue-700" : "text-gray-600")}>{config.label}</span>
+                <span className={cn("text-xs font-medium", isActive ? "text-[var(--primary)]" : "text-gray-600")}>{config.label}</span>
                 {reading && (
                   <span className={cn("text-sm font-bold", reading.isAbnormal ? "text-red-600" : "text-gray-900")}>
                     {reading.value} <span className="text-xs font-normal text-gray-400">{config.unit}</span>
@@ -331,7 +331,7 @@ export default function PatientVitalsPage() {
                   <select
                     value={selectedVital}
                     onChange={(e) => setSelectedVital(e.target.value as VitalType)}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none bg-white text-sm"
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent outline-none bg-white text-sm"
                   >
                     {VITAL_CONFIGS.map((c) => (
                       <option key={c.key} value={c.key}>{c.label} ({c.unit})</option>
@@ -347,7 +347,7 @@ export default function PatientVitalsPage() {
                     value={inputValue}
                     onChange={(e) => setInputValue(e.target.value)}
                     placeholder={activeConfig.placeholder}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm"
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent outline-none text-sm"
                   />
                   <p className="text-xs text-gray-400 mt-1">
                     Normal: {activeConfig.normalMin}–{activeConfig.normalMax} {activeConfig.unit}
@@ -364,7 +364,7 @@ export default function PatientVitalsPage() {
                         onClick={() => setInputSource(src)}
                         className={cn(
                           "px-4 py-2.5 rounded-xl text-sm font-medium border-2 transition capitalize",
-                          inputSource === src ? "border-blue-600 bg-blue-50 text-blue-700" : "border-gray-200 text-gray-600 hover:border-gray-300"
+                          inputSource === src ? "border-[var(--primary)] bg-[var(--primary)]/10 text-[var(--primary)]" : "border-gray-200 text-gray-600 hover:border-gray-300"
                         )}
                       >
                         {src}
@@ -376,7 +376,7 @@ export default function PatientVitalsPage() {
                 <button
                   onClick={handleSubmit}
                   disabled={!inputValue || isSubmitting}
-                  className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="w-full py-3 bg-[var(--primary)] hover:opacity-90 text-white font-semibold rounded-xl transition disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {isSubmitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</> : "Save Reading"}
                 </button>
