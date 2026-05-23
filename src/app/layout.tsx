@@ -55,6 +55,12 @@ export const metadata: Metadata = {
     statusBarStyle: "default",
     title: "Nala Vita",
   },
+  // Modern (Chrome-compatible) equivalent of apple-mobile-web-app-capable.
+  // Apple's tag is deprecated by Chrome devtools but still respected by iOS Safari.
+  // We emit both so neither browser warns AND iOS standalone still works.
+  other: {
+    "mobile-web-app-capable": "yes",
+  },
   robots: {
     index: true,
     follow: true,
