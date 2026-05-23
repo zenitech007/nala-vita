@@ -28,6 +28,10 @@ const config = {
       },
       moduleNameMapper: {
         "^@/(.*)$": "<rootDir>/src/$1",
+        // react-markdown and remark-gfm are ESM-only; mock them in tests so jest's CJS loader
+        // doesn't choke on the `export` syntax. Real markdown rendering works at runtime.
+        "^react-markdown$": "<rootDir>/src/__mocks__/react-markdown.tsx",
+        "^remark-gfm$": "<rootDir>/src/__mocks__/remark-gfm.ts",
       },
       setupFilesAfterEnv: ["@testing-library/jest-dom"],
     },
