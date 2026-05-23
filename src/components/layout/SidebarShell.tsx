@@ -215,7 +215,7 @@ export function SidebarShell({ role, roleLabel, brand = "Nala Vita", user, nav }
                     key={item.href}
                     href={item.href}
                     onClick={() => setIsMobileOpen(false)}
-                    aria-current={pathname.startsWith(item.href) ? "page" : undefined}
+                    aria-current={pathname === item.href || pathname.startsWith(item.href + "/") ? "page" : undefined}
                     className={cn(
                       "flex items-center gap-3 px-3 py-3 rounded-xl transition-colors text-sm",
                       pathname === item.href || pathname.startsWith(item.href + "/")
@@ -238,7 +238,8 @@ export function SidebarShell({ role, roleLabel, brand = "Nala Vita", user, nav }
                   <span>Settings</span>
                 </Link>
                 <button
-                  onClick={handleSignOut}
+                  onClick={() => { setIsMobileOpen(false); handleSignOut(); }}
+                  aria-label="Sign Out"
                   className="flex items-center gap-3 w-full px-3 py-3 rounded-xl text-sm font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10"
                 >
                   <LogOut size={20} />
