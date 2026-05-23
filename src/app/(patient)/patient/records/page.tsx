@@ -125,8 +125,8 @@ function formatDateTime(iso: string) {
 
 const CATEGORY_COLORS: Record<string, string> = {
   diagnosis: "bg-red-100 text-red-700",
-  followup: "bg-blue-100 text-blue-700",
-  "follow-up": "bg-blue-100 text-blue-700",
+  followup: "bg-[var(--primary)]/10 text-[var(--primary)]",
+  "follow-up": "bg-[var(--primary)]/10 text-[var(--primary)]",
   consultation: "bg-purple-100 text-purple-700",
   procedure: "bg-amber-100 text-amber-700",
   general: "bg-gray-100 text-gray-700",
@@ -205,7 +205,7 @@ function MedicalNotesTab({ notes }: { notes: MedicalNote[] }) {
             {needsTruncate && (
               <button
                 onClick={() => toggle(note.id)}
-                className="mt-2 text-sm font-medium text-blue-600 hover:text-blue-700"
+                className="mt-2 text-sm font-medium text-[var(--primary)] hover:text-[var(--primary)]"
               >
                 {expanded ? "Show less" : "Read more"}
               </button>
@@ -337,7 +337,7 @@ function LabHistoryTab({ orders }: { orders: LabOrder[] }) {
                         href={result.reportUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 mt-2 text-xs font-medium text-blue-600 hover:text-blue-700"
+                        className="inline-flex items-center gap-1 mt-2 text-xs font-medium text-[var(--primary)] hover:text-[var(--primary)]"
                       >
                         <ExternalLink className="w-3.5 h-3.5" />
                         View Full Report
@@ -401,7 +401,7 @@ function PrescriptionsTab({ prescriptions }: { prescriptions: Prescription[] }) 
             className={cn(
               "px-4 py-1.5 rounded-full text-sm font-medium transition-colors",
               filter === f.key
-                ? "bg-blue-600 text-white"
+                ? "bg-[var(--primary)] text-white"
                 : "bg-gray-100 text-gray-600 hover:bg-gray-200"
             )}
           >
@@ -493,8 +493,8 @@ const VITAL_CARDS: VitalCardConfig[] = [
     key: "bloodPressure",
     label: "Blood Pressure",
     icon: Droplets,
-    color: "text-blue-600",
-    bgColor: "bg-blue-50",
+    color: "text-[var(--primary)]",
+    bgColor: "bg-[var(--primary)]/10",
     format: (v) => (typeof v === "string" ? v : `${v}`),
   },
   {
@@ -595,7 +595,7 @@ function VitalsSummaryTab({ vitals }: { vitals: Record<string, VitalEntry> }) {
       <div className="mt-6 text-center">
         <Link
           href="/patient/vitals"
-          className="inline-flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors"
+          className="inline-flex items-center gap-2 text-sm font-medium text-[var(--primary)] hover:text-[var(--primary)] transition-colors"
         >
           View Full History
           <ExternalLink className="w-4 h-4" />
@@ -613,7 +613,7 @@ function ReferralsTab({ referrals }: { referrals: Referral[] }) {
       case "PENDING":
         return "bg-amber-100 text-amber-700";
       case "ACCEPTED":
-        return "bg-blue-100 text-blue-700";
+        return "bg-[var(--primary)]/10 text-[var(--primary)]";
       case "COMPLETED":
         return "bg-green-100 text-green-700";
       default:
@@ -716,7 +716,7 @@ export default function PatientRecordsPage() {
                 className={cn(
                   "flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap",
                   isActive
-                    ? "border-blue-600 text-blue-600"
+                    ? "border-[var(--primary)] text-[var(--primary)]"
                     : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
                 )}
               >
@@ -731,14 +731,14 @@ export default function PatientRecordsPage() {
       {/* Content */}
       {loading ? (
         <div className="flex items-center justify-center py-24">
-          <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+          <Loader2 className="w-8 h-8 text-[var(--primary)] animate-spin" />
         </div>
       ) : error ? (
         <div className="text-center py-16">
           <p className="text-red-500 font-medium">{error}</p>
           <button
             onClick={() => window.location.reload()}
-            className="mt-3 text-sm text-blue-600 hover:text-blue-700 font-medium"
+            className="mt-3 text-sm text-[var(--primary)] hover:text-[var(--primary)] font-medium"
           >
             Try again
           </button>

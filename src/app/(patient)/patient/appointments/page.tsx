@@ -97,7 +97,7 @@ const TIME_SLOTS = [
 ];
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: typeof CheckCircle }> = {
-  SCHEDULED: { label: "Scheduled", color: "bg-blue-100 text-blue-700", icon: Clock },
+  SCHEDULED: { label: "Scheduled", color: "bg-[var(--primary)]/10 text-[var(--primary)]", icon: Clock },
   CONFIRMED: { label: "Confirmed", color: "bg-emerald-100 text-emerald-700", icon: CheckCircle },
   IN_PROGRESS: { label: "In Progress", color: "bg-violet-100 text-violet-700", icon: AlertCircle },
   COMPLETED: { label: "Completed", color: "bg-gray-100 text-gray-600", icon: CheckCircle },
@@ -214,7 +214,7 @@ export default function PatientAppointmentsPage() {
             </div>
             <button
               onClick={() => setShowBooking(true)}
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition"
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-[var(--primary)] hover:opacity-90 text-white font-semibold rounded-xl transition"
             >
               <Plus className="w-4 h-4" />
               Book New Appointment
@@ -241,7 +241,7 @@ export default function PatientAppointmentsPage() {
               <span
                 className={cn(
                   "ml-2 px-2 py-0.5 rounded-full text-xs",
-                  activeTab === tab.key ? "bg-blue-100 text-blue-700" : "bg-gray-200 text-gray-500"
+                  activeTab === tab.key ? "bg-[var(--primary)]/10 text-[var(--primary)]" : "bg-gray-200 text-gray-500"
                 )}
               >
                 {tab.count}
@@ -253,7 +253,7 @@ export default function PatientAppointmentsPage() {
         {/* Appointments List */}
         {loading ? (
           <div className="flex items-center justify-center py-20">
-            <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+            <Loader2 className="w-8 h-8 animate-spin text-[var(--primary)]" />
           </div>
         ) : displayAppointments.length === 0 ? (
           <div className="text-center py-20">
@@ -261,7 +261,7 @@ export default function PatientAppointmentsPage() {
             <p className="text-gray-500 text-lg">No {activeTab} appointments</p>
             <button
               onClick={() => setShowBooking(true)}
-              className="mt-4 text-blue-600 hover:text-blue-700 font-medium text-sm"
+              className="mt-4 text-[var(--primary)] hover:text-[var(--primary)] font-medium text-sm"
             >
               Book your first appointment
             </button>
@@ -278,8 +278,8 @@ export default function PatientAppointmentsPage() {
                 >
                   <div className="flex flex-col sm:flex-row sm:items-center gap-4">
                     {/* Doctor avatar */}
-                    <div className="w-14 h-14 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                      <User className="w-7 h-7 text-blue-600" />
+                    <div className="w-14 h-14 bg-[var(--primary)]/10 rounded-xl flex items-center justify-center flex-shrink-0">
+                      <User className="w-7 h-7 text-[var(--primary)]" />
                     </div>
 
                     {/* Info */}
@@ -305,7 +305,7 @@ export default function PatientAppointmentsPage() {
                         </span>
                         <span className="inline-flex items-center gap-1.5">
                           {apt.consultationType === "VIDEO" ? (
-                            <Video className="w-4 h-4 text-blue-500" />
+                            <Video className="w-4 h-4 text-[var(--primary)]" />
                           ) : (
                             <MapPin className="w-4 h-4 text-emerald-500" />
                           )}
@@ -320,7 +320,7 @@ export default function PatientAppointmentsPage() {
                     {/* Actions */}
                     <div className="flex items-center gap-2 flex-shrink-0">
                       {apt.status === "CONFIRMED" && apt.consultationType === "VIDEO" && (
-                        <button className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-xl transition">
+                        <button className="px-4 py-2 bg-[var(--primary)] hover:opacity-90 text-white text-sm font-medium rounded-xl transition">
                           Join Call
                         </button>
                       )}
@@ -516,7 +516,7 @@ function BookingModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
                 key={s}
                 className={cn(
                   "h-1.5 rounded-full flex-1 transition",
-                  s <= step ? "bg-blue-600" : "bg-gray-200"
+                  s <= step ? "bg-[var(--primary)]" : "bg-gray-200"
                 )}
               />
             ))}
@@ -538,7 +538,7 @@ function BookingModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search doctors by name or speciality..."
-                  className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                  className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent outline-none"
                 />
               </div>
 
@@ -551,7 +551,7 @@ function BookingModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
                     className={cn(
                       "px-3 py-1.5 rounded-lg text-xs font-medium border whitespace-nowrap transition",
                       selectedSpeciality === spec
-                        ? "bg-blue-600 text-white border-blue-600"
+                        ? "bg-[var(--primary)] text-white border-[var(--primary)]"
                         : "bg-white text-gray-600 border-gray-200 hover:border-blue-300"
                     )}
                   >
@@ -569,12 +569,12 @@ function BookingModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
                     className={cn(
                       "w-full flex items-center gap-4 p-4 rounded-xl border-2 transition text-left",
                       selectedDoctor?.id === doc.id
-                        ? "border-blue-600 bg-blue-50"
+                        ? "border-[var(--primary)] bg-[var(--primary)]/10"
                         : "border-gray-100 hover:border-gray-300"
                     )}
                   >
-                    <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                      <User className="w-6 h-6 text-blue-600" />
+                    <div className="w-12 h-12 bg-[var(--primary)]/10 rounded-xl flex items-center justify-center flex-shrink-0">
+                      <User className="w-6 h-6 text-[var(--primary)]" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-gray-900">
@@ -587,7 +587,7 @@ function BookingModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
                       </div>
                     </div>
                     {selectedDoctor?.id === doc.id && (
-                      <CheckCircle className="w-6 h-6 text-blue-600 flex-shrink-0" />
+                      <CheckCircle className="w-6 h-6 text-[var(--primary)] flex-shrink-0" />
                     )}
                   </button>
                 ))}
@@ -622,7 +622,7 @@ function BookingModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
                       className={cn(
                         "w-14 h-14 rounded-xl flex items-center justify-center",
                         consultationType === option.key
-                          ? option.color === "blue" ? "bg-blue-100" : "bg-emerald-100"
+                          ? option.color === "blue" ? "bg-[var(--primary)]/10" : "bg-emerald-100"
                           : "bg-gray-100"
                       )}
                     >
@@ -630,7 +630,7 @@ function BookingModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
                         className={cn(
                           "w-7 h-7",
                           consultationType === option.key
-                            ? option.color === "blue" ? "text-blue-600" : "text-emerald-600"
+                            ? option.color === "blue" ? "text-[var(--primary)]" : "text-emerald-600"
                             : "text-gray-400"
                         )}
                       />
@@ -664,7 +664,7 @@ function BookingModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
                         className={cn(
                           "flex flex-col items-center min-w-[72px] py-3 px-3 rounded-xl border-2 transition",
                           selectedDate === dateStr
-                            ? "border-blue-600 bg-blue-50"
+                            ? "border-[var(--primary)] bg-[var(--primary)]/10"
                             : "border-gray-100 hover:border-gray-300"
                         )}
                       >
@@ -688,7 +688,7 @@ function BookingModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
                       className={cn(
                         "py-2.5 rounded-xl text-sm font-medium border transition",
                         selectedTime === slot
-                          ? "bg-blue-600 text-white border-blue-600"
+                          ? "bg-[var(--primary)] text-white border-[var(--primary)]"
                           : "bg-white text-gray-600 border-gray-200 hover:border-blue-300"
                       )}
                     >
@@ -709,7 +709,7 @@ function BookingModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
                 rows={5}
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition resize-none"
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent outline-none transition resize-none"
                 placeholder="Describe your symptoms or reason for this appointment..."
               />
             </div>
@@ -722,8 +722,8 @@ function BookingModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
 
               <div className="bg-gray-50 rounded-xl p-5 space-y-4 mb-6">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
-                    <Stethoscope className="w-6 h-6 text-blue-600" />
+                  <div className="w-12 h-12 bg-[var(--primary)]/10 rounded-xl flex items-center justify-center">
+                    <Stethoscope className="w-6 h-6 text-[var(--primary)]" />
                   </div>
                   <div>
                     <p className="font-semibold text-gray-900">
@@ -746,7 +746,7 @@ function BookingModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
                   </div>
                   <div className="flex items-center gap-2 text-sm">
                     {consultationType === "VIDEO" ? (
-                      <Video className="w-4 h-4 text-blue-500" />
+                      <Video className="w-4 h-4 text-[var(--primary)]" />
                     ) : (
                       <MapPin className="w-4 h-4 text-emerald-500" />
                     )}
@@ -764,9 +764,9 @@ function BookingModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
               </div>
 
               {/* Payment summary */}
-              <div className="bg-blue-50 rounded-xl p-5">
+              <div className="bg-[var(--primary)]/10 rounded-xl p-5">
                 <div className="flex items-center gap-2 mb-3">
-                  <CreditCard className="w-5 h-5 text-blue-600" />
+                  <CreditCard className="w-5 h-5 text-[var(--primary)]" />
                   <span className="font-semibold text-gray-900">Payment Summary</span>
                 </div>
                 <div className="space-y-2 text-sm">
@@ -778,9 +778,9 @@ function BookingModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
                     <span className="text-gray-600">Platform fee</span>
                     <span className="text-gray-900">$2.00</span>
                   </div>
-                  <div className="flex justify-between pt-2 border-t border-blue-200 font-semibold">
+                  <div className="flex justify-between pt-2 border-t border-[var(--primary)]/30 font-semibold">
                     <span className="text-gray-900">Total</span>
-                    <span className="text-blue-700">${(selectedDoctor.consultationFee + 2).toFixed(2)}</span>
+                    <span className="text-[var(--primary)]">${(selectedDoctor.consultationFee + 2).toFixed(2)}</span>
                   </div>
                 </div>
               </div>
@@ -802,7 +802,7 @@ function BookingModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
             <button
               onClick={() => setStep((step + 1) as BookingStep)}
               disabled={!canProceed()}
-              className="inline-flex items-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition disabled:opacity-50 disabled:cursor-not-allowed"
+              className="inline-flex items-center gap-2 px-6 py-2.5 bg-[var(--primary)] hover:opacity-90 text-white font-semibold rounded-xl transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Continue
               <ArrowRight className="w-4 h-4" />
@@ -811,7 +811,7 @@ function BookingModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
             <button
               onClick={handleBook}
               disabled={isSubmitting}
-              className="inline-flex items-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition disabled:opacity-50 disabled:cursor-not-allowed"
+              className="inline-flex items-center gap-2 px-6 py-2.5 bg-[var(--primary)] hover:opacity-90 text-white font-semibold rounded-xl transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSubmitting ? (
                 <>

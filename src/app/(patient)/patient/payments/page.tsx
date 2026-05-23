@@ -195,11 +195,11 @@ export default function PatientPaymentsPage() {
     COMPLETED: { icon: CheckCircle, color: "text-green-600", bg: "bg-green-100", label: "Paid" },
     PENDING: { icon: Clock, color: "text-amber-600", bg: "bg-amber-100", label: "Pending" },
     FAILED: { icon: XCircle, color: "text-red-600", bg: "bg-red-100", label: "Failed" },
-    REFUNDED: { icon: ArrowUpRight, color: "text-blue-600", bg: "bg-blue-100", label: "Refunded" },
+    REFUNDED: { icon: ArrowUpRight, color: "text-[var(--primary)]", bg: "bg-[var(--primary)]/10", label: "Refunded" },
   };
 
   const CLAIM_STATUS_CONFIG: Record<string, { color: string; bg: string }> = {
-    SUBMITTED: { color: "text-blue-700", bg: "bg-blue-100" },
+    SUBMITTED: { color: "text-[var(--primary)]", bg: "bg-[var(--primary)]/10" },
     PROCESSING: { color: "text-amber-700", bg: "bg-amber-100" },
     APPROVED: { color: "text-green-700", bg: "bg-green-100" },
     DENIED: { color: "text-red-700", bg: "bg-red-100" },
@@ -264,8 +264,8 @@ export default function PatientPaymentsPage() {
           </div>
           <div className="bg-white rounded-2xl border border-gray-100 p-5">
             <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
-                <ShieldCheck className="w-5 h-5 text-blue-600" />
+              <div className="w-10 h-10 bg-[var(--primary)]/10 rounded-xl flex items-center justify-center">
+                <ShieldCheck className="w-5 h-5 text-[var(--primary)]" />
               </div>
               <p className="text-sm text-gray-500">Insurance Claims</p>
             </div>
@@ -291,7 +291,7 @@ export default function PatientPaymentsPage() {
 
         {loading ? (
           <div className="flex items-center justify-center py-20">
-            <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+            <Loader2 className="w-8 h-8 animate-spin text-[var(--primary)]" />
           </div>
         ) : activeTab === "insurance" ? (
           /* Insurance Claims */
@@ -420,7 +420,7 @@ export default function PatientPaymentsPage() {
                           <button
                             onClick={() => handlePay(payment)}
                             disabled={payingId === payment.id}
-                            className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-xl transition disabled:opacity-50"
+                            className="inline-flex items-center gap-1.5 px-4 py-2 bg-[var(--primary)] hover:opacity-90 text-white text-sm font-medium rounded-xl transition disabled:opacity-50"
                           >
                             {payingId === payment.id ? (
                               <Loader2 className="w-4 h-4 animate-spin" />
@@ -441,12 +441,12 @@ export default function PatientPaymentsPage() {
 
         {/* Pay All Outstanding */}
         {activeTab === "outstanding" && outstanding.length > 0 && (
-          <div className="mt-6 bg-gradient-to-r from-blue-600 to-blue-700 rounded-2xl p-6 flex items-center justify-between">
+          <div className="mt-6 bg-gradient-to-r from-[var(--primary)] to-[var(--primary)] rounded-2xl p-6 flex items-center justify-between">
             <div>
               <p className="text-white font-semibold">Pay all outstanding balances</p>
-              <p className="text-blue-200 text-sm mt-0.5">{outstanding.length} payment{outstanding.length > 1 ? "s" : ""} totaling ${totalOutstanding.toFixed(2)}</p>
+              <p className="text-white/70 text-sm mt-0.5">{outstanding.length} payment{outstanding.length > 1 ? "s" : ""} totaling ${totalOutstanding.toFixed(2)}</p>
             </div>
-            <button className="px-6 py-3 bg-white text-blue-700 font-semibold rounded-xl hover:bg-blue-50 transition flex items-center gap-2">
+            <button className="px-6 py-3 bg-white text-[var(--primary)] font-semibold rounded-xl hover:bg-[var(--primary)]/10 transition flex items-center gap-2">
               <CreditCard className="w-4 h-4" />
               Pay ${totalOutstanding.toFixed(2)}
             </button>

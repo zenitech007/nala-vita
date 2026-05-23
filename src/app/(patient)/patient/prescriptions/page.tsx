@@ -250,7 +250,7 @@ export default function PatientPrescriptionsPage() {
         {/* Prescription List */}
         {loading ? (
           <div className="flex items-center justify-center py-20">
-            <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+            <Loader2 className="w-8 h-8 animate-spin text-[var(--primary)]" />
           </div>
         ) : displayList.length === 0 ? (
           <div className="text-center py-20">
@@ -358,10 +358,10 @@ export default function PatientPrescriptionsPage() {
                     {rx.isActive && (
                       <div className="flex flex-col items-end gap-3 flex-shrink-0 sm:min-w-[160px]">
                         {/* Next dose countdown */}
-                        <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-center w-full">
+                        <div className="bg-[var(--primary)]/10 border border-[var(--primary)]/30 rounded-xl px-4 py-3 text-center w-full">
                           <div className="flex items-center justify-center gap-1.5 mb-0.5">
-                            <Timer className="w-4 h-4 text-blue-600" />
-                            <span className="text-xs text-blue-600 font-medium">
+                            <Timer className="w-4 h-4 text-[var(--primary)]" />
+                            <span className="text-xs text-[var(--primary)] font-medium">
                               Next dose
                             </span>
                           </div>
@@ -370,7 +370,7 @@ export default function PatientPrescriptionsPage() {
                               "text-2xl font-bold",
                               doseInfo.hoursUntil === 0
                                 ? "text-red-600"
-                                : "text-blue-700"
+                                : "text-[var(--primary)]"
                             )}
                           >
                             {doseInfo.label}
@@ -389,7 +389,7 @@ export default function PatientPrescriptionsPage() {
                             Order
                           </button>
                           {refillsRemaining > 0 && (
-                            <button className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-xl transition">
+                            <button className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-[var(--primary)] hover:opacity-90 text-white text-xs font-medium rounded-xl transition">
                               <RefreshCw className="w-3.5 h-3.5" />
                               Refill
                             </button>

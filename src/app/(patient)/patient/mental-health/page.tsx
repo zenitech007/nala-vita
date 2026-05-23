@@ -201,7 +201,7 @@ function BreathingExercise() {
       <div className="relative w-32 h-32 flex items-center justify-center">
         <div
           className={cn(
-            "w-24 h-24 rounded-full bg-blue-200 flex items-center justify-center transition-all",
+            "w-24 h-24 rounded-full bg-[var(--primary)]/30 flex items-center justify-center transition-all",
             !isRunning && "scale-75 opacity-50"
           )}
           style={
@@ -218,7 +218,7 @@ function BreathingExercise() {
         </div>
       </div>
       {isRunning && (
-        <p className="text-sm font-medium text-blue-700 capitalize">
+        <p className="text-sm font-medium text-[var(--primary)] capitalize">
           {phase === "inhale"
             ? "Breathe in... (4s)"
             : phase === "hold"
@@ -232,7 +232,7 @@ function BreathingExercise() {
           "px-5 py-2 rounded-xl text-sm font-semibold transition",
           isRunning
             ? "bg-gray-200 text-gray-700 hover:bg-gray-300"
-            : "bg-blue-600 text-white hover:bg-blue-700"
+            : "bg-[var(--primary)] text-white hover:opacity-90"
         )}
       >
         {isRunning ? "Stop" : "Start Breathing Exercise"}
@@ -319,7 +319,7 @@ export default function MentalHealthPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+        <Loader2 className="w-8 h-8 text-[var(--primary)] animate-spin" />
       </div>
     );
   }
@@ -352,8 +352,8 @@ export default function MentalHealthPage() {
         {/* ─── Section 1: Daily Mood Check-in ─── */}
         <div className="bg-white rounded-2xl border border-gray-100 p-6 sm:p-8">
           <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center">
-              <SmilePlus className="w-5 h-5 text-blue-600" />
+            <div className="w-10 h-10 rounded-xl bg-[var(--primary)]/10 flex items-center justify-center">
+              <SmilePlus className="w-5 h-5 text-[var(--primary)]" />
             </div>
             <h2 className="text-xl font-semibold text-gray-900">
               How are you feeling today?
@@ -393,7 +393,7 @@ export default function MentalHealthPage() {
                         className={cn(
                           "flex flex-col items-center gap-1 p-3 rounded-xl border-2 transition hover:scale-105",
                           isSelected
-                            ? "border-blue-600 bg-blue-50 shadow-md"
+                            ? "border-[var(--primary)] bg-[var(--primary)]/10 shadow-md"
                             : "border-gray-100 bg-white hover:border-gray-300"
                         )}
                       >
@@ -401,7 +401,7 @@ export default function MentalHealthPage() {
                         <span
                           className={cn(
                             "text-xs font-medium",
-                            isSelected ? "text-blue-700" : "text-gray-500"
+                            isSelected ? "text-[var(--primary)]" : "text-gray-500"
                           )}
                         >
                           {num}
@@ -433,7 +433,7 @@ export default function MentalHealthPage() {
                   placeholder="Write about how you're feeling, what happened today..."
                   rows={3}
                   maxLength={2000}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm resize-none"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent outline-none text-sm resize-none"
                 />
               </div>
 
@@ -449,7 +449,7 @@ export default function MentalHealthPage() {
               <button
                 onClick={handleSubmit}
                 disabled={!selectedMood || isSubmitting}
-                className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="px-6 py-3 bg-[var(--primary)] hover:opacity-90 text-white font-semibold rounded-xl transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 {isSubmitting ? (
                   <>
@@ -589,7 +589,7 @@ export default function MentalHealthPage() {
               </p>
               <Link
                 href="/patient/chat"
-                className="inline-flex items-center gap-2 text-sm font-semibold text-blue-600 hover:text-blue-700 transition"
+                className="inline-flex items-center gap-2 text-sm font-semibold text-[var(--primary)] hover:text-[var(--primary)] transition"
               >
                 Start a conversation
                 <ChevronLeft className="w-4 h-4 rotate-180" />
@@ -598,8 +598,8 @@ export default function MentalHealthPage() {
 
             {/* Card 2: Breathing exercise */}
             <div className="bg-white rounded-2xl border border-gray-100 p-6 flex flex-col">
-              <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center mb-4">
-                <Wind className="w-5 h-5 text-blue-600" />
+              <div className="w-10 h-10 rounded-xl bg-[var(--primary)]/10 flex items-center justify-center mb-4">
+                <Wind className="w-5 h-5 text-[var(--primary)]" />
               </div>
               <h3 className="font-semibold text-gray-900 mb-1">
                 Breathing Exercise

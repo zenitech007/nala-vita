@@ -292,7 +292,7 @@ export default function PatientLabResultsPage() {
                 className={cn(
                   "text-xs px-1.5 py-0.5 rounded-full",
                   activeFilter === tab.key
-                    ? "bg-blue-100 text-blue-700"
+                    ? "bg-[var(--primary)]/10 text-[var(--primary)]"
                     : "bg-gray-200 text-gray-500"
                 )}
               >
@@ -305,7 +305,7 @@ export default function PatientLabResultsPage() {
         {/* Orders list */}
         {loading ? (
           <div className="flex items-center justify-center py-20">
-            <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+            <Loader2 className="w-8 h-8 animate-spin text-[var(--primary)]" />
           </div>
         ) : filteredOrders.length === 0 ? (
           <div className="text-center py-20">
@@ -321,7 +321,7 @@ export default function PatientLabResultsPage() {
                 <button
                   key={order.id}
                   onClick={() => handleViewResult(order)}
-                  className="w-full text-left bg-white rounded-2xl border border-gray-100 p-6 hover:border-blue-200 hover:shadow-sm transition"
+                  className="w-full text-left bg-white rounded-2xl border border-gray-100 p-6 hover:border-[var(--primary)]/40 hover:shadow-sm transition"
                 >
                   <div className="flex items-start gap-4">
                     <div
@@ -468,8 +468,8 @@ export default function PatientLabResultsPage() {
               </div>
 
               {selectedOrder.instructions && (
-                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-                  <p className="text-xs text-blue-600 font-medium mb-1">
+                <div className="bg-[var(--primary)]/10 border border-[var(--primary)]/30 rounded-xl p-4">
+                  <p className="text-xs text-[var(--primary)] font-medium mb-1">
                     Instructions
                   </p>
                   <p className="text-sm text-blue-800">
@@ -538,7 +538,7 @@ export default function PatientLabResultsPage() {
                           href={result.reportUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1.5 mt-3 text-xs text-blue-600 hover:text-blue-700 font-medium"
+                          className="inline-flex items-center gap-1.5 mt-3 text-xs text-[var(--primary)] hover:text-[var(--primary)] font-medium"
                         >
                           <Download className="w-3.5 h-3.5" />
                           Download full report

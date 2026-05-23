@@ -575,7 +575,7 @@ export default function SymptomCheckerPage() {
             <div className="flex flex-col sm:flex-row gap-4">
               <Link
                 href="/patient/appointments?action=book"
-                className="flex-1 inline-flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition"
+                className="flex-1 inline-flex items-center justify-center gap-2 px-6 py-3 bg-[var(--primary)] hover:opacity-90 text-white font-semibold rounded-xl transition"
               >
                 <Calendar className="w-5 h-5" />
                 Book Appointment Now
