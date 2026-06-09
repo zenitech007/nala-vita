@@ -75,3 +75,23 @@ export async function getMemoriesForGrounding(patientId: string): Promise<Ground
   }
   return { known, toConfirm };
 }
+
+export async function listMemories(patientId: string): Promise<AmeliaMemoryFact[]> {
+  const all = await prisma.ameliaMemory.findMany({
+    where: { patientId },
+    orderBy: [{ kind: "asc" }, { createdAt: "desc" }],
+  });
+  return all.map((m) => ({ id: m.id, kind: m.kind as MemoryKind, value: m.value, confirmedByUser: m.confirmedByUser }));
+}
+
+export async function confirmMemory(id: string, patientId: string): Promise<void> {
+  await prisma.ameliaMemory.updateMany({ where: { id, patientId }, data: { confirmedByUser: true } });
+}
+
+export async function updateMemory(id: string, patientId: string, value: string): Promise<void> {
+  await prisma.ameliaMemory.updateMany({ where: { id, patientId }, data: { value } });
+}
+
+export async function deleteMemory(id: string, patientId: string): Promise<void> {
+  await prisma.ameliaMemory.deleteMany({ where: { id, patientId } });
+}
