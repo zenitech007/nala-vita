@@ -5,12 +5,14 @@ import { Sparkles } from "lucide-react";
 import ChatMessage from "@/components/chat/ChatMessage";
 import ChatInput from "@/components/chat/ChatInput";
 import TypingIndicator from "@/components/chat/TypingIndicator";
+import ReminderCard, { type ReminderSuggestionUI } from "@/components/amelia/ReminderCard";
 import { PATIENT_DISCLAIMER } from "@/lib/amelia/safety";
 
 interface UiMessage {
   role: "user" | "assistant";
   content: string;
   sentAt: string;
+  reminderSuggestion?: ReminderSuggestionUI;
 }
 
 export default function AmeliaChat() {
@@ -36,7 +38,10 @@ export default function AmeliaChat() {
       if (res.ok) {
         setConversationId(data.conversationId);
         setEmergency(data.reply.urgency === "emergency");
-        setMessages((m) => [...m, { role: "assistant", content: data.reply.content, sentAt: new Date().toISOString() }]);
+        setMessages((m) => [
+          ...m,
+          { role: "assistant", content: data.reply.content, sentAt: new Date().toISOString(), reminderSuggestion: data.reminderSuggestion ?? undefined },
+        ]);
       } else {
         setMessages((m) => [...m, { role: "assistant", content: data.error ?? "Amelia is unavailable.", sentAt: new Date().toISOString() }]);
       }
@@ -62,7 +67,10 @@ export default function AmeliaChat() {
           </div>
         )}
         {messages.map((m, i) => (
-          <ChatMessage key={i} isMine={m.role === "user"} content={m.content} sentAt={m.sentAt} otherInitials="A" />
+          <div key={i}>
+            <ChatMessage isMine={m.role === "user"} content={m.content} sentAt={m.sentAt} otherInitials="A" />
+            {m.reminderSuggestion && <ReminderCard suggestion={m.reminderSuggestion} />}
+          </div>
         ))}
         {sending && <TypingIndicator />}
       </div>
