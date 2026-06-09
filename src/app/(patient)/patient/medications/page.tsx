@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format, formatDistanceToNow } from "date-fns";
+import MedSafetyPanel from "@/components/amelia/MedSafetyPanel";
 
 // ─── Types ───────────────────────────────────────────────
 
@@ -324,6 +325,7 @@ export default function PatientMedicationsPage() {
       </header>
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
+        <MedSafetyPanel />
         {/* ────────────────────────────────────────────────── */}
         {/* Section 1: Medication Schedule (Today's Doses)     */}
         {/* ────────────────────────────────────────────────── */}
