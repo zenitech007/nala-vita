@@ -69,3 +69,28 @@ export async function detectReminder(userText: string, assistantText: string): P
   }
   return candidate;
 }
+
+export async function createReminder(
+  patientId: string,
+  data: { kind: ReminderKind; label: string; frequency: ReminderFrequency; nextFireAt: Date }
+): Promise<void> {
+  await prisma.reminder.create({
+    data: { patientId, kind: data.kind, label: data.label, frequency: data.frequency, nextFireAt: data.nextFireAt },
+  });
+}
+
+export async function listReminders(patientId: string): Promise<ReminderRecord[]> {
+  const rows = await prisma.reminder.findMany({ where: { patientId, active: true }, orderBy: { nextFireAt: "asc" } });
+  return rows.map((r) => ({
+    id: r.id,
+    kind: r.kind as ReminderKind,
+    label: r.label,
+    frequency: r.frequency as ReminderFrequency,
+    nextFireAt: r.nextFireAt.toISOString(),
+    schedule: describeSchedule(r.frequency as ReminderFrequency, r.nextFireAt),
+  }));
+}
+
+export async function cancelReminder(id: string, patientId: string): Promise<void> {
+  await prisma.reminder.updateMany({ where: { id, patientId }, data: { active: false } });
+}
