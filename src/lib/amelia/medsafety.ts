@@ -97,3 +97,34 @@ export async function getCachedOrAnalyze(patientId: string, meds: MedInput[], al
   cache.set(patientId, { hash, result });
   return result;
 }
+
+export async function checkNewPrescriptionSafety(patientId: string, newMedName: string): Promise<void> {
+  const patient = await prisma.patient.findUnique({
+    where: { id: patientId },
+    include: { prescriptions: { where: { isActive: true } } },
+  });
+  if (!patient) return;
+
+  const meds: MedInput[] = patient.prescriptions.map((p) => ({ medication: p.medication, dosage: p.dosage }));
+  const result = await analyzeMedications(meds, patient.allergies);
+
+  const newLower = newMedName.toLowerCase();
+  const involvesNew = (name: string) => {
+    const n = name.toLowerCase();
+    return n.includes(newLower) || newLower.includes(n);
+  };
+  const relevant =
+    result.interactions.some(
+      (i) => (i.severity === "high" || i.severity === "moderate") && i.drugs.some((d) => involvesNew(d))
+    ) || result.allergyConflicts.some((c) => involvesNew(c.medication));
+
+  if (relevant) {
+    await createNotification(
+      patient.userId,
+      "Medication safety",
+      "Amelia flagged a possible interaction with your new medication — review it.",
+      "MED_SAFETY",
+      { link: "/patient/medications" }
+    );
+  }
+}
