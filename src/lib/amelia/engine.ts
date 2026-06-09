@@ -1,5 +1,6 @@
 // src/lib/amelia/engine.ts
 import { getPatientContext } from "./context";
+import { getMemoriesForGrounding } from "./memory";
 import { patientAdvisorPrompt } from "./prompts";
 import { detectRedFlags, urgencyFromRedFlags, PATIENT_DISCLAIMER, EMERGENCY_MESSAGE } from "./safety";
 import { chat, type ChatTurn } from "./llm";
@@ -14,9 +15,13 @@ export async function runAmeliaTurn(input: AmeliaTurnInput): Promise<AmeliaReply
     return { content: EMERGENCY_MESSAGE, urgency: "emergency", redFlags, disclaimer: PATIENT_DISCLAIMER };
   }
 
-  const ctx = await getPatientContext(input.patientId);
+  const [ctx, memories] = await Promise.all([
+    getPatientContext(input.patientId),
+    getMemoriesForGrounding(input.patientId),
+  ]);
+
   const turns: ChatTurn[] = [
-    { role: "system", content: patientAdvisorPrompt(ctx) },
+    { role: "system", content: patientAdvisorPrompt(ctx, memories) },
     ...input.messages.map((m) => ({ role: m.role, content: m.content })),
   ];
 
