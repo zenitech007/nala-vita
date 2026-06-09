@@ -1,4 +1,4 @@
-import AmeliaChat from "@/components/amelia/AmeliaChat";
+import AmeliaTabs from "@/components/amelia/AmeliaTabs";
 
 export const metadata = { title: "Amelia" };
 
@@ -9,8 +9,8 @@ export default function PatientAmeliaPage() {
         <h1 className="text-2xl font-bold text-gray-900">Amelia</h1>
         <p className="text-gray-500 text-sm">Your AI health assistant — ask anything, anytime.</p>
       </div>
-      <div className="h-[calc(100%-4rem)] rounded-2xl border border-gray-100 overflow-hidden">
-        <AmeliaChat />
+      <div className="h-[calc(100%-4rem)]">
+        <AmeliaTabs />
       </div>
     </div>
   );
