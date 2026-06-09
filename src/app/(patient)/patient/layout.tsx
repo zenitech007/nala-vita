@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/auth-helpers-nextjs";
 import { redirect } from "next/navigation";
 import PatientSidebar from "@/components/layout/PatientSidebar";
+import AmeliaLauncher from "@/components/amelia/AmeliaLauncher";
 import { prisma } from "@/lib/prisma";
 
 export default async function PatientLayout({ children }: { children: React.ReactNode }) {
@@ -24,6 +25,7 @@ export default async function PatientLayout({ children }: { children: React.Reac
     <div className="flex min-h-screen bg-gray-50">
       <PatientSidebar user={user} />
       <div className="flex-1 min-w-0">{children}</div>
+      <AmeliaLauncher />
     </div>
   );
 }
