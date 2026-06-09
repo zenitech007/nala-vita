@@ -49,6 +49,29 @@ deferrals. Each has a rationale in the original task / phase plan.
    [`docs/decisions/2026-05-22-paystack-over-stripe.md`](decisions/2026-05-22-paystack-over-stripe.md). Spec says Stripe; we use Paystack
    (better fit for NGN market). Future maintainers should reference the ADR.
 
+## Amelia AI assistant
+
+Design spec: `docs/superpowers/specs/2026-06-08-amelia-ai-assistant-design.md`.
+Phase 1 plan: `docs/superpowers/plans/2026-06-08-amelia-phase-1.md`.
+
+**Phase 1 — ✅ code complete** (branch `feat/amelia-phase-1`, tag
+`amelia-phase-1-complete`). Grounded patient chat engine (`src/lib/amelia/`),
+`/api/amelia/chat`, the lab-summary route (which fixed a broken UI button),
+the floating launcher + `/patient/amelia` page. 97 tests green, prod build
+passes. **Two runtime steps remain before it works live:**
+   - `npx prisma db push` to create `amelia_conversations` + `amelia_messages`
+     (needs the Supabase project restored — it was DNS-down on 2026-06-08).
+   - A valid `OPENAI_API_KEY` in `.env` for real model calls.
+   Then smoke `/patient/amelia` (normal + emergency phrasing) and the
+   lab-results "Explain my results" button.
+
+**Phase 2 (next):** long-term memory + "What Amelia knows" panel, reminders,
+medication coach + interaction warnings, lab-photo OCR, proactive dashboard
+card, dynamic tool-calling, streaming responses.
+
+**Phase 3:** doctor copilot — pre-visit summary, SOAP-note drafting,
+differential support, prescription safety net.
+
 ## Operational
 
 9. **18 npm audit vulnerabilities** (1 low, 11 moderate, 6 high) noted
