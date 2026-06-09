@@ -61,4 +61,12 @@ describe("memory API", () => {
     expect(res.status).toBe(200);
     expect(deleteMemory).toHaveBeenCalledWith("m1", "pat1");
   });
+
+  it("DELETE returns 500 when the delete fails", async () => {
+    getUser.mockResolvedValue({ data: { user: { id: "sub1" } } });
+    userFindUnique.mockResolvedValue({ id: "u1", patient: { id: "pat1" } });
+    deleteMemory.mockRejectedValue(new Error("db down"));
+    const res = await DELETE(req(), ctx("m1"));
+    expect(res.status).toBe(500);
+  });
 });

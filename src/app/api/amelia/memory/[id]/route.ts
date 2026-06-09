@@ -39,8 +39,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 }
 
 export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
-  const patientId = await getPatientId();
-  if (!patientId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  await deleteMemory(params.id, patientId);
-  return NextResponse.json({ ok: true });
+  try {
+    const patientId = await getPatientId();
+    if (!patientId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    await deleteMemory(params.id, patientId);
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    console.error("Memory DELETE error:", error);
+    return NextResponse.json({ error: "Failed to delete memory." }, { status: 500 });
+  }
 }
