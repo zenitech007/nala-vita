@@ -35,3 +35,22 @@ export interface AmeliaReply {
   redFlags: RedFlag[];
   disclaimer: string;
 }
+
+export type MemoryKind = "ALLERGY" | "CONDITION" | "MEDICATION" | "PREFERENCE" | "LIFESTYLE" | "OTHER";
+
+export interface MemoryCandidate {
+  kind: MemoryKind;
+  value: string;
+}
+
+export interface AmeliaMemoryFact {
+  id: string;
+  kind: MemoryKind;
+  value: string;
+  confirmedByUser: boolean;
+}
+
+export interface GroundingMemories {
+  known: AmeliaMemoryFact[];
+  toConfirm: AmeliaMemoryFact[];
+}
