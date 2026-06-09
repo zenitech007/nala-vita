@@ -42,3 +42,36 @@ export async function extractMemories(userText: string, assistantText: string): 
     .map((c) => ({ kind: c.kind, value: c.value.trim() }))
     .filter((c) => c.value.length > 0);
 }
+
+export async function saveMemories(
+  patientId: string,
+  candidates: MemoryCandidate[],
+  sourceMessageId?: string
+): Promise<void> {
+  if (candidates.length === 0) return;
+  const existing = await prisma.ameliaMemory.findMany({ where: { patientId }, select: { kind: true, value: true } });
+  const seen = new Set(existing.map((e) => `${e.kind}::${e.value.toLowerCase()}`));
+  const fresh = candidates.filter((c) => !seen.has(`${c.kind}::${c.value.toLowerCase()}`));
+  if (fresh.length === 0) return;
+  await prisma.ameliaMemory.createMany({
+    data: fresh.map((c) => ({
+      patientId,
+      kind: c.kind,
+      value: c.value,
+      confirmedByUser: !isHighStakes(c.kind),
+      sourceMessageId: sourceMessageId ?? null,
+    })),
+  });
+}
+
+export async function getMemoriesForGrounding(patientId: string): Promise<GroundingMemories> {
+  const all = await prisma.ameliaMemory.findMany({ where: { patientId }, orderBy: { createdAt: "desc" } });
+  const known: AmeliaMemoryFact[] = [];
+  const toConfirm: AmeliaMemoryFact[] = [];
+  for (const m of all) {
+    const fact: AmeliaMemoryFact = { id: m.id, kind: m.kind as MemoryKind, value: m.value, confirmedByUser: m.confirmedByUser };
+    if (!isHighStakes(m.kind) || m.confirmedByUser) known.push(fact);
+    else toConfirm.push(fact);
+  }
+  return { known, toConfirm };
+}
