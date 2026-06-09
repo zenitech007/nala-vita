@@ -3,6 +3,34 @@
 Documented gaps from Phases 1–5 that are NOT bugs — they're conscious
 deferrals. Each has a rationale in the original task / phase plan.
 
+## Amelia AI assistant
+
+Phase 1 (grounded patient chat + triage + emergency safety + lab-summary fix)
+and Phase 2 (long-term memory) are complete. See
+`docs/superpowers/specs/2026-06-08-amelia-ai-assistant-design.md` and
+`docs/superpowers/specs/2026-06-09-amelia-phase-2-memory-design.md`.
+
+**Runtime verification still pending** (Supabase was DNS-down during the build):
+- `npx prisma db push` to create the `amelia_*` tables once the project is
+  restored.
+- Live smoke with a valid `OPENAI_API_KEY`: chat grounding, emergency
+  hard-stop, lab-summary, memory extract → confirm in the panel.
+
+**Memory polish** (Phase 2 review, agreed non-blocking):
+- `AmeliaMemoryPanel` has no per-action loading/toast feedback on
+  confirm/delete (UI just reloads).
+- Memory extraction model is hardcoded to `gpt-4o-mini` in `memory.ts`.
+- The post-turn extraction LLM call rides the chat route's rate limit but has
+  no separate budget; cheap today, revisit if extraction cost grows.
+
+**Remaining Amelia phases (designed at a high level, not yet built):**
+- Phase 2 sub-features still to do: reminders, medication coach, lab-photo OCR,
+  proactive dashboard card.
+- Phase 3 — doctor copilot: catch-me-up summary, SOAP-note drafting,
+  differential support, prescription safety net; plus doctor-visible memory.
+- Standout extras: multilingual replies (yo/ha/ig), locally-tuned triage,
+  voice, proactive guardian.
+
 ## Code-level
 
 1. **Wire `HealthDashboard.onUpdate` to a real API.** Currently the inline
