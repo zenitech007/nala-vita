@@ -25,6 +25,12 @@ jest.mock("@/lib/amelia/memory", () => ({
   extractMemories: (...a: unknown[]) => extractMemories(...a),
   saveMemories: (...a: unknown[]) => saveMemories(...a),
 }));
+const detectReminder = jest.fn();
+jest.mock("@/lib/amelia/reminders", () => ({
+  detectReminder: (...a: unknown[]) => detectReminder(...a),
+  computeNextFireAt: () => new Date(2026, 5, 12, 8, 0),
+  describeSchedule: () => "every day at 8:00 AM",
+}));
 jest.mock("@/lib/amelia/audit", () => ({ logAmeliaAudit: async () => undefined }));
 
 import { POST } from "@/app/api/amelia/chat/route";
@@ -34,9 +40,10 @@ function req(body: unknown) {
 }
 
 beforeEach(() => {
-  [getUser, userFindUnique, convoFindFirst, convoCreate, msgCreate, msgFindMany, runAmeliaTurn, extractMemories, saveMemories].forEach((m) => m.mockReset());
+  [getUser, userFindUnique, convoFindFirst, convoCreate, msgCreate, msgFindMany, runAmeliaTurn, extractMemories, saveMemories, detectReminder].forEach((m) => m.mockReset());
   extractMemories.mockResolvedValue([{ kind: "PREFERENCE", value: "mornings" }]);
   saveMemories.mockResolvedValue(undefined);
+  detectReminder.mockResolvedValue(null);
 });
 
 describe("POST /api/amelia/chat", () => {
@@ -61,5 +68,22 @@ describe("POST /api/amelia/chat", () => {
     expect(json.reply.content).toMatch(/Advice/);
     expect(extractMemories).toHaveBeenCalledTimes(1);
     expect(saveMemories).toHaveBeenCalledTimes(1);
+  });
+
+  it("includes a reminderSuggestion when a reminder is detected", async () => {
+    getUser.mockResolvedValue({ data: { user: { id: "sub-1" } } });
+    userFindUnique.mockResolvedValue({ id: "u1", patient: { id: "pat1" } });
+    convoCreate.mockResolvedValue({ id: "c1" });
+    msgCreate.mockResolvedValue({ id: "um1" });
+    msgFindMany.mockResolvedValue([{ role: "user", content: "remind me to take meds at 8" }]);
+    runAmeliaTurn.mockResolvedValue({ content: "Sure!", urgency: "routine", redFlags: [], disclaimer: "d" });
+    detectReminder.mockResolvedValue({ kind: "MEDICATION", label: "take meds", frequency: "DAILY", hour: 8, minute: 0 });
+
+    const res = await POST(req({ message: "remind me to take meds at 8" }));
+    const json = await res.json();
+    expect(res.status).toBe(200);
+    expect(json.reminderSuggestion).toBeTruthy();
+    expect(json.reminderSuggestion.label).toBe("take meds");
+    expect(json.reminderSuggestion.schedule).toBe("every day at 8:00 AM");
   });
 });

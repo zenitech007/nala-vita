@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { checkRateLimitAsync } from "@/lib/rate-limit";
 import { runAmeliaTurn } from "@/lib/amelia/engine";
 import { extractMemories, saveMemories } from "@/lib/amelia/memory";
+import { detectReminder, computeNextFireAt, describeSchedule } from "@/lib/amelia/reminders";
 import { logAmeliaAudit } from "@/lib/amelia/audit";
 
 const bodySchema = z.object({
@@ -63,6 +64,26 @@ export async function POST(req: NextRequest) {
       console.error("Amelia memory extraction failed:", memErr);
     }
 
+    // Phase 2 reminders: detect a reminder request and propose it (patient confirms).
+    let reminderSuggestion: {
+      kind: string; label: string; frequency: string; nextFireAt: string; schedule: string;
+    } | null = null;
+    try {
+      const candidate = await detectReminder(message, reply.content);
+      if (candidate) {
+        const nextFireAt = computeNextFireAt(candidate, new Date());
+        reminderSuggestion = {
+          kind: candidate.kind,
+          label: candidate.label,
+          frequency: candidate.frequency,
+          nextFireAt: nextFireAt.toISOString(),
+          schedule: describeSchedule(candidate.frequency, nextFireAt),
+        };
+      }
+    } catch (remErr) {
+      console.error("Amelia reminder detection failed:", remErr);
+    }
+
     await logAmeliaAudit({
       userId: user.id,
       action: "amelia.chat",
@@ -70,7 +91,7 @@ export async function POST(req: NextRequest) {
       summary: `urgency=${reply.urgency} redFlags=${reply.redFlags.length}`,
     });
 
-    return NextResponse.json({ conversationId: convo.id, reply });
+    return NextResponse.json({ conversationId: convo.id, reply, reminderSuggestion });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: "Validation failed", details: error.issues }, { status: 422 });
