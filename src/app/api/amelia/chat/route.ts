@@ -4,6 +4,7 @@ import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { prisma } from "@/lib/prisma";
 import { checkRateLimitAsync } from "@/lib/rate-limit";
 import { runAmeliaTurn } from "@/lib/amelia/engine";
+import { extractMemories, saveMemories } from "@/lib/amelia/memory";
 import { logAmeliaAudit } from "@/lib/amelia/audit";
 
 const bodySchema = z.object({
@@ -37,7 +38,7 @@ export async function POST(req: NextRequest) {
       convo = await prisma.ameliaConversation.create({ data: { patientId: user.patient.id, audience: "patient" } });
     }
 
-    await prisma.ameliaMessage.create({ data: { conversationId: convo.id, role: "user", content: message } });
+    const userMsg = await prisma.ameliaMessage.create({ data: { conversationId: convo.id, role: "user", content: message } });
 
     const history = await prisma.ameliaMessage.findMany({
       where: { conversationId: convo.id },
@@ -52,6 +53,15 @@ export async function POST(req: NextRequest) {
     });
 
     await prisma.ameliaMessage.create({ data: { conversationId: convo.id, role: "assistant", content: reply.content } });
+
+    // Phase 2: extract + persist durable memories from this exchange (best-effort;
+    // never let memory failure break the chat response).
+    try {
+      const candidates = await extractMemories(message, reply.content);
+      await saveMemories(user.patient.id, candidates, userMsg.id);
+    } catch (memErr) {
+      console.error("Amelia memory extraction failed:", memErr);
+    }
 
     await logAmeliaAudit({
       userId: user.id,

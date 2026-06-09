@@ -19,6 +19,12 @@ jest.mock("@/lib/prisma", () => ({
 jest.mock("@/lib/rate-limit", () => ({ checkRateLimitAsync: async () => ({ allowed: true, remaining: 19, resetAt: Date.now() + 60000 }) }));
 const runAmeliaTurn = jest.fn();
 jest.mock("@/lib/amelia/engine", () => ({ runAmeliaTurn: (...a: unknown[]) => runAmeliaTurn(...a) }));
+const extractMemories = jest.fn();
+const saveMemories = jest.fn();
+jest.mock("@/lib/amelia/memory", () => ({
+  extractMemories: (...a: unknown[]) => extractMemories(...a),
+  saveMemories: (...a: unknown[]) => saveMemories(...a),
+}));
 jest.mock("@/lib/amelia/audit", () => ({ logAmeliaAudit: async () => undefined }));
 
 import { POST } from "@/app/api/amelia/chat/route";
@@ -28,7 +34,9 @@ function req(body: unknown) {
 }
 
 beforeEach(() => {
-  [getUser, userFindUnique, convoFindFirst, convoCreate, msgCreate, msgFindMany, runAmeliaTurn].forEach((m) => m.mockReset());
+  [getUser, userFindUnique, convoFindFirst, convoCreate, msgCreate, msgFindMany, runAmeliaTurn, extractMemories, saveMemories].forEach((m) => m.mockReset());
+  extractMemories.mockResolvedValue([{ kind: "PREFERENCE", value: "mornings" }]);
+  saveMemories.mockResolvedValue(undefined);
 });
 
 describe("POST /api/amelia/chat", () => {
@@ -42,7 +50,7 @@ describe("POST /api/amelia/chat", () => {
     getUser.mockResolvedValue({ data: { user: { id: "sub-1" } } });
     userFindUnique.mockResolvedValue({ id: "u1", patient: { id: "pat1" } });
     convoCreate.mockResolvedValue({ id: "c1" });
-    msgCreate.mockResolvedValue({});
+    msgCreate.mockResolvedValue({ id: "um1" });
     msgFindMany.mockResolvedValue([{ role: "user", content: "I have a sore throat" }]);
     runAmeliaTurn.mockResolvedValue({ content: "Advice. Confirm with a doctor.", urgency: "routine", redFlags: [], disclaimer: "d" });
 
@@ -51,5 +59,7 @@ describe("POST /api/amelia/chat", () => {
     expect(res.status).toBe(200);
     expect(json.conversationId).toBe("c1");
     expect(json.reply.content).toMatch(/Advice/);
+    expect(extractMemories).toHaveBeenCalledTimes(1);
+    expect(saveMemories).toHaveBeenCalledTimes(1);
   });
 });
