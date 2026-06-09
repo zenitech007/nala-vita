@@ -6,25 +6,31 @@ deferrals. Each has a rationale in the original task / phase plan.
 ## Amelia AI assistant
 
 Phase 1 (grounded patient chat + triage + emergency safety + lab-summary fix)
-and Phase 2 (long-term memory) are complete. See
-`docs/superpowers/specs/2026-06-08-amelia-ai-assistant-design.md` and
-`docs/superpowers/specs/2026-06-09-amelia-phase-2-memory-design.md`.
+and Phase 2 (long-term memory + reminders) are complete. See
+`docs/superpowers/specs/2026-06-08-amelia-ai-assistant-design.md`,
+`…2026-06-09-amelia-phase-2-memory-design.md`, and
+`…2026-06-09-amelia-phase-2-reminders-design.md`.
 
 **Runtime verification still pending** (Supabase was DNS-down during the build):
-- `npx prisma db push` to create the `amelia_*` tables once the project is
-  restored.
+- `npx prisma db push` to create the `amelia_*` + `reminders` tables once the
+  project is restored.
 - Live smoke with a valid `OPENAI_API_KEY`: chat grounding, emergency
-  hard-stop, lab-summary, memory extract → confirm in the panel.
+  hard-stop, lab-summary, memory extract → confirm; reminder propose → confirm
+  → fires into the notification bell on next poll.
 
-**Memory polish** (Phase 2 review, agreed non-blocking):
-- `AmeliaMemoryPanel` has no per-action loading/toast feedback on
-  confirm/delete (UI just reloads).
-- Memory extraction model is hardcoded to `gpt-4o-mini` in `memory.ts`.
-- The post-turn extraction LLM call rides the chat route's rate limit but has
-  no separate budget; cheap today, revisit if extraction cost grows.
+**Polish** (Phase 2 reviews, agreed non-blocking):
+- `AmeliaMemoryPanel` / `AmeliaRemindersPanel` have no per-action loading/toast
+  feedback or load-error state (UI just reloads / shows empty).
+- Extraction + reminder-detection models are hardcoded to `gpt-4o-mini`.
+- Reminder "Not now" dismissal is session-only (not persisted server-side).
+- **Amelia tables lack FK relations to `Patient`** — `AmeliaConversation`,
+  `AmeliaMessage`, `AmeliaMemory`, and `Reminder` all use a loose
+  `patientId String` + index (no `@relation`/cascade). Consistent within the
+  subsystem, but inconsistent with the rest of the schema; add FK relations
+  + `onDelete: Cascade` across all Amelia tables in one pass.
 
 **Remaining Amelia phases (designed at a high level, not yet built):**
-- Phase 2 sub-features still to do: reminders, medication coach, lab-photo OCR,
+- Phase 2 sub-features still to do: medication coach, lab-photo OCR,
   proactive dashboard card.
 - Phase 3 — doctor copilot: catch-me-up summary, SOAP-note drafting,
   differential support, prescription safety net; plus doctor-visible memory.
