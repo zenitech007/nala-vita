@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { checkNewPrescriptionSafety } from "@/lib/amelia/medsafety";
 
 // ─── GET: Return prescriptions by role ───────────────────
 
@@ -161,6 +162,14 @@ export async function POST(req: NextRequest) {
 
       return { prescription, notification };
     });
+
+    // Phase 2 med-coach: best-effort safety check on the new medication
+    // (never block or break prescribing).
+    try {
+      await checkNewPrescriptionSafety(validated.patientId, validated.medication);
+    } catch (safetyErr) {
+      console.error("Medication safety check failed:", safetyErr);
+    }
 
     return NextResponse.json(
       {
