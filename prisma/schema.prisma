@@ -364,3 +364,31 @@ model AuditLog {
   @@index([createdAt])
   @@map("audit_logs")
 }
+
+model AmeliaConversation {
+  id        String          @id @default(cuid())
+  patientId String?         @map("patient_id")
+  doctorId  String?         @map("doctor_id")
+  audience  String
+  createdAt DateTime        @default(now()) @map("created_at")
+  updatedAt DateTime        @updatedAt @map("updated_at")
+
+  messages  AmeliaMessage[]
+
+  @@index([patientId])
+  @@index([doctorId])
+  @@map("amelia_conversations")
+}
+
+model AmeliaMessage {
+  id             String             @id @default(cuid())
+  conversationId String             @map("conversation_id")
+  role           String
+  content        String
+  createdAt      DateTime           @default(now()) @map("created_at")
+
+  conversation   AmeliaConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+  @@map("amelia_messages")
+}
