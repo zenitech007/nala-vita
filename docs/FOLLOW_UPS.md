@@ -6,17 +6,24 @@ deferrals. Each has a rationale in the original task / phase plan.
 ## Amelia AI assistant
 
 Phase 1 (grounded patient chat + triage + emergency safety + lab-summary fix)
-and Phase 2 (long-term memory + reminders) are complete. See
-`docs/superpowers/specs/2026-06-08-amelia-ai-assistant-design.md`,
-`…2026-06-09-amelia-phase-2-memory-design.md`, and
-`…2026-06-09-amelia-phase-2-reminders-design.md`.
+and Phase 2 (long-term memory + reminders + medication coach) are complete.
+See `docs/superpowers/specs/2026-06-08-amelia-ai-assistant-design.md` and the
+`…2026-06-09-amelia-phase-2-{memory,reminders,medication-coach}-design.md`
+specs.
 
 **Runtime verification still pending** (Supabase was DNS-down during the build):
 - `npx prisma db push` to create the `amelia_*` + `reminders` tables once the
-  project is restored.
+  project is restored. (The medication coach adds NO tables — in-memory cache.)
 - Live smoke with a valid `OPENAI_API_KEY`: chat grounding, emergency
   hard-stop, lab-summary, memory extract → confirm; reminder propose → confirm
-  → fires into the notification bell on next poll.
+  → fires into the bell; medications page shows the safety panel + a new risky
+  prescription notifies the patient.
+
+**Medication-coach polish** (Phase 2 review, agreed non-blocking):
+- `checkNewPrescriptionSafety` logs failures without patient/med context.
+- `MedSafetyPanel` treats 401/404 the same as a generic error (no "you're
+  logged out" distinction); uses array-index React keys.
+- In-memory analysis cache has no TTL/size cap (fine for current deploy).
 
 **Polish** (Phase 2 reviews, agreed non-blocking):
 - `AmeliaMemoryPanel` / `AmeliaRemindersPanel` have no per-action loading/toast
@@ -30,8 +37,7 @@ and Phase 2 (long-term memory + reminders) are complete. See
   + `onDelete: Cascade` across all Amelia tables in one pass.
 
 **Remaining Amelia phases (designed at a high level, not yet built):**
-- Phase 2 sub-features still to do: medication coach, lab-photo OCR,
-  proactive dashboard card.
+- Phase 2 sub-features still to do: lab-photo OCR, proactive dashboard card.
 - Phase 3 — doctor copilot: catch-me-up summary, SOAP-note drafting,
   differential support, prescription safety net; plus doctor-visible memory.
 - Standout extras: multilingual replies (yo/ha/ig), locally-tuned triage,
