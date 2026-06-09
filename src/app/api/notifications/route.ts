@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { fireDueReminders } from "@/lib/amelia/reminders";
 
 // ─── GET: Return notifications for the current user ──────
 
@@ -18,10 +19,20 @@ export async function GET(req: NextRequest) {
 
     const user = await prisma.user.findUnique({
       where: { supabaseId: authUser.id },
+      include: { patient: true },
     });
 
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+
+    // Lazily fire any due reminders for patients before listing notifications.
+    if (user.patient) {
+      try {
+        await fireDueReminders(user.patient.id, user.id);
+      } catch (remErr) {
+        console.error("fireDueReminders failed:", remErr);
+      }
     }
 
     const { searchParams } = new URL(req.url);
