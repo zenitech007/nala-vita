@@ -20,3 +20,25 @@ export async function chat(
   });
   return completion.choices[0]?.message?.content?.trim() ?? "";
 }
+
+export async function visionChat(
+  prompt: string,
+  imageDataUrl: string,
+  opts?: { temperature?: number; maxTokens?: number }
+): Promise<string> {
+  const completion = await openai.chat.completions.create({
+    model: "gpt-4o",
+    messages: [
+      {
+        role: "user",
+        content: [
+          { type: "text", text: prompt },
+          { type: "image_url", image_url: { url: imageDataUrl } },
+        ],
+      },
+    ],
+    temperature: opts?.temperature ?? 0.2,
+    max_tokens: opts?.maxTokens ?? 900,
+  });
+  return completion.choices[0]?.message?.content?.trim() ?? "";
+}
