@@ -94,3 +94,18 @@ export async function listReminders(patientId: string): Promise<ReminderRecord[]
 export async function cancelReminder(id: string, patientId: string): Promise<void> {
   await prisma.reminder.updateMany({ where: { id, patientId }, data: { active: false } });
 }
+
+export async function fireDueReminders(patientId: string, userId: string, now: Date = new Date()): Promise<number> {
+  const due = await prisma.reminder.findMany({ where: { patientId, active: true, nextFireAt: { lte: now } } });
+  for (const r of due) {
+    await createNotification(userId, "Reminder", r.label, "REMINDER", { link: "/patient/amelia" });
+    if (r.frequency === "DAILY") {
+      const next = new Date(r.nextFireAt);
+      while (next.getTime() <= now.getTime()) next.setDate(next.getDate() + 1);
+      await prisma.reminder.update({ where: { id: r.id }, data: { nextFireAt: next } });
+    } else {
+      await prisma.reminder.update({ where: { id: r.id }, data: { active: false } });
+    }
+  }
+  return due.length;
+}
