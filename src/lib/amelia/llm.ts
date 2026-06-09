@@ -8,9 +8,12 @@ export interface ChatTurn {
   content: string;
 }
 
-export async function chat(messages: ChatTurn[], opts?: { temperature?: number; maxTokens?: number }): Promise<string> {
+export async function chat(
+  messages: ChatTurn[],
+  opts?: { temperature?: number; maxTokens?: number; model?: string }
+): Promise<string> {
   const completion = await openai.chat.completions.create({
-    model: "gpt-4o",
+    model: opts?.model ?? "gpt-4o",
     messages,
     temperature: opts?.temperature ?? 0.4,
     max_tokens: opts?.maxTokens ?? 800,
