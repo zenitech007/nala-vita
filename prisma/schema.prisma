@@ -406,3 +406,19 @@ model AmeliaMemory {
   @@index([patientId])
   @@map("amelia_memories")
 }
+
+model Reminder {
+  id         String   @id @default(cuid())
+  patientId  String   @map("patient_id")
+  kind       String   // MEDICATION | APPOINTMENT | VITALS | OTHER
+  label      String
+  frequency  String   // ONCE | DAILY
+  nextFireAt DateTime @map("next_fire_at")
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@index([patientId])
+  @@index([active, nextFireAt])
+  @@map("reminders")
+}
