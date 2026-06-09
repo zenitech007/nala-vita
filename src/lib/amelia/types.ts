@@ -54,3 +54,32 @@ export interface GroundingMemories {
   known: AmeliaMemoryFact[];
   toConfirm: AmeliaMemoryFact[];
 }
+
+export type ReminderKind = "MEDICATION" | "APPOINTMENT" | "VITALS" | "OTHER";
+export type ReminderFrequency = "ONCE" | "DAILY";
+
+export interface ReminderCandidate {
+  kind: ReminderKind;
+  label: string;
+  frequency: ReminderFrequency;
+  hour?: number;        // DAILY
+  minute?: number;      // DAILY
+  isoDateTime?: string; // ONCE
+}
+
+export interface ReminderSuggestion {
+  kind: ReminderKind;
+  label: string;
+  frequency: ReminderFrequency;
+  nextFireAt: string; // ISO
+  schedule: string;   // human-readable
+}
+
+export interface ReminderRecord {
+  id: string;
+  kind: ReminderKind;
+  label: string;
+  frequency: ReminderFrequency;
+  nextFireAt: string; // ISO
+  schedule: string;
+}
