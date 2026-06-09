@@ -392,3 +392,17 @@ model AmeliaMessage {
   @@index([conversationId])
   @@map("amelia_messages")
 }
+
+model AmeliaMemory {
+  id              String   @id @default(cuid())
+  patientId       String   @map("patient_id")
+  kind            String   // ALLERGY | CONDITION | MEDICATION | PREFERENCE | LIFESTYLE | OTHER
+  value           String
+  confirmedByUser Boolean  @default(false) @map("confirmed_by_user")
+  sourceMessageId String?  @map("source_message_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@index([patientId])
+  @@map("amelia_memories")
+}
