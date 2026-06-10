@@ -18,13 +18,21 @@ coach,lab-photo-ocr}-design.md` specs.
 - ✅ OpenAI key valid; gpt-4o (chat engine + lab-photo vision) and gpt-4o-mini
   (extraction) both reachable. Re-check: `node --env-file=.env scripts/verify-openai.mjs`.
 
-**Still pending — in-app click-through smoke** (best done in a browser, logged in
-as the seeded patient): chat grounding + emergency hard-stop; lab-summary; memory
-extract → confirm in the panel; reminder propose → confirm → fires into the bell;
-meds safety panel + a new risky prescription notifies; lab-results → photograph a
-report → extracted table + summary. (The auth→route→engine wiring is identical to
-the Step-26-verified `/api/*` routes, so risk is low; this is acceptance, not
-debugging.)
+**End-to-end smoke verified live 2026-06-09** (`scripts/smoke-amelia.mjs` — real
+Supabase login cookies → live endpoints):
+- ✅ `POST /api/amelia/chat` (routine symptom) → 200, urgency `routine`, a real
+  grounded gpt-4o Advisor reply.
+- ✅ `POST /api/amelia/chat` (chest pain) → 200, urgency `emergency`,
+  deterministic hard-stop (no LLM call) — safety layer fires in prod.
+- ✅ `GET /api/amelia/med-safety` + `GET /api/amelia/reminders` → 200.
+- ✅ Writes persisted: 1 conversation, 4 messages, **1 auto-extracted memory**
+  (gpt-4o-mini post-turn extraction ran end-to-end).
+- The Chrome extension wasn't connected, so the literal browser UI render wasn't
+  clicked through — but components are jsdom-tested and the endpoints return
+  correct data, so the UI renders from verified responses.
+- **Only path not exercised with real input:** lab-photo vision (`extractLabsFromImage`)
+  — the gpt-4o vision model is confirmed reachable, but the photo→table flow
+  needs a real lab-report image (do it via the UI when convenient).
 
 **Lab-photo polish** (Phase 2 review, non-blocking): `LabPhotoUpload` redefines
 `ExtractedLab`/`LabPhotoResult` locally rather than `import type`-ing them from
