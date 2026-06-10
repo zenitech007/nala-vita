@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
+import LabPhotoUpload from "@/components/amelia/LabPhotoUpload";
 
 // ─── Types ───────────────────────────────────────────────
 
@@ -274,6 +275,7 @@ export default function PatientLabResultsPage() {
       </header>
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
+        <LabPhotoUpload />
         {/* Filter tabs */}
         <div className="flex gap-1 bg-gray-100 p-1 rounded-xl mb-6 w-fit">
           {filterTabs.map((tab) => (
