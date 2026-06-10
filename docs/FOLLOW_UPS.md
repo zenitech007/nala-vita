@@ -11,14 +11,20 @@ are complete. See `docs/superpowers/specs/2026-06-08-amelia-ai-assistant-
 design.md` and the `…2026-06-09-amelia-phase-2-{memory,reminders,medication-
 coach,lab-photo-ocr}-design.md` specs.
 
-**Runtime verification still pending** (Supabase was DNS-down during the build):
-- `npx prisma db push` to create the `amelia_*` + `reminders` tables once the
-  project is restored. (Med coach + lab-photo add NO tables.)
-- Live smoke with a valid `OPENAI_API_KEY` (lab-photo needs **gpt-4o vision**):
-  chat grounding, emergency hard-stop, lab-summary, memory extract → confirm;
-  reminder propose → confirm → fires into the bell; meds safety panel + new-rx
-  notification; lab-results page → photograph a report → extracted table +
-  summary.
+**Runtime infrastructure verified 2026-06-09** (Supabase restored from its pause):
+- ✅ `npx prisma db push` applied — the 4 new Amelia tables exist and are
+  queryable; existing data (3 users, 1 patient `test.patient@nalavita.test`)
+  survived. Re-check anytime: `node --env-file=.env scripts/verify-amelia-db.mjs`.
+- ✅ OpenAI key valid; gpt-4o (chat engine + lab-photo vision) and gpt-4o-mini
+  (extraction) both reachable. Re-check: `node --env-file=.env scripts/verify-openai.mjs`.
+
+**Still pending — in-app click-through smoke** (best done in a browser, logged in
+as the seeded patient): chat grounding + emergency hard-stop; lab-summary; memory
+extract → confirm in the panel; reminder propose → confirm → fires into the bell;
+meds safety panel + a new risky prescription notifies; lab-results → photograph a
+report → extracted table + summary. (The auth→route→engine wiring is identical to
+the Step-26-verified `/api/*` routes, so risk is low; this is acceptance, not
+debugging.)
 
 **Lab-photo polish** (Phase 2 review, non-blocking): `LabPhotoUpload` redefines
 `ExtractedLab`/`LabPhotoResult` locally rather than `import type`-ing them from
