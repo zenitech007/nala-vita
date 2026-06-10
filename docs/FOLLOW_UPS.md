@@ -6,18 +6,23 @@ deferrals. Each has a rationale in the original task / phase plan.
 ## Amelia AI assistant
 
 Phase 1 (grounded patient chat + triage + emergency safety + lab-summary fix)
-and Phase 2 (long-term memory + reminders + medication coach) are complete.
-See `docs/superpowers/specs/2026-06-08-amelia-ai-assistant-design.md` and the
-`…2026-06-09-amelia-phase-2-{memory,reminders,medication-coach}-design.md`
-specs.
+and Phase 2 (long-term memory + reminders + medication coach + lab-photo OCR)
+are complete. See `docs/superpowers/specs/2026-06-08-amelia-ai-assistant-
+design.md` and the `…2026-06-09-amelia-phase-2-{memory,reminders,medication-
+coach,lab-photo-ocr}-design.md` specs.
 
 **Runtime verification still pending** (Supabase was DNS-down during the build):
 - `npx prisma db push` to create the `amelia_*` + `reminders` tables once the
-  project is restored. (The medication coach adds NO tables — in-memory cache.)
-- Live smoke with a valid `OPENAI_API_KEY`: chat grounding, emergency
-  hard-stop, lab-summary, memory extract → confirm; reminder propose → confirm
-  → fires into the bell; medications page shows the safety panel + a new risky
-  prescription notifies the patient.
+  project is restored. (Med coach + lab-photo add NO tables.)
+- Live smoke with a valid `OPENAI_API_KEY` (lab-photo needs **gpt-4o vision**):
+  chat grounding, emergency hard-stop, lab-summary, memory extract → confirm;
+  reminder propose → confirm → fires into the bell; meds safety panel + new-rx
+  notification; lab-results page → photograph a report → extracted table +
+  summary.
+
+**Lab-photo polish** (Phase 2 review, non-blocking): `LabPhotoUpload` redefines
+`ExtractedLab`/`LabPhotoResult` locally rather than `import type`-ing them from
+`labvision` (a deliberate client/server decoupling — revisit if it drifts).
 
 **Medication-coach polish** (Phase 2 review, agreed non-blocking):
 - `checkNewPrescriptionSafety` logs failures without patient/med context.
@@ -37,7 +42,7 @@ specs.
   + `onDelete: Cascade` across all Amelia tables in one pass.
 
 **Remaining Amelia phases (designed at a high level, not yet built):**
-- Phase 2 sub-features still to do: lab-photo OCR, proactive dashboard card.
+- Phase 2 sub-feature still to do: proactive dashboard card.
 - Phase 3 — doctor copilot: catch-me-up summary, SOAP-note drafting,
   differential support, prescription safety net; plus doctor-visible memory.
 - Standout extras: multilingual replies (yo/ha/ig), locally-tuned triage,
