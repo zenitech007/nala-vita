@@ -48,3 +48,6 @@ next-env.d.ts
 
 # recovered Amelia source — reference only, do not check into the new git tree
 /.amelia-source/
+
+# local Claude Code launch config
+/.claude/
