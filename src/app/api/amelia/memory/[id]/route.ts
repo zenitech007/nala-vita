@@ -17,16 +17,17 @@ async function getPatientId(): Promise<string | null> {
   return user?.patient?.id ?? null;
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
     const patientId = await getPatientId();
     if (!patientId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const body = patchSchema.parse(await req.json());
     if ("action" in body) {
-      await confirmMemory(params.id, patientId);
+      await confirmMemory(id, patientId);
     } else {
-      await updateMemory(params.id, patientId, body.value);
+      await updateMemory(id, patientId, body.value);
     }
     return NextResponse.json({ ok: true });
   } catch (error) {
@@ -38,11 +39,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
     const patientId = await getPatientId();
     if (!patientId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    await deleteMemory(params.id, patientId);
+    await deleteMemory(id, patientId);
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error("Memory DELETE error:", error);

@@ -17,8 +17,8 @@ export async function getPatientContext(patientId: string): Promise<AmeliaContex
       prescriptions: { where: { isActive: true }, orderBy: { prescribedAt: "desc" }, take: 10 },
       labOrders: { orderBy: { orderedAt: "desc" }, take: 5, include: { results: true } },
       appointments: {
-        where: { startTime: { gte: now }, status: { in: ["CONFIRMED", "SCHEDULED"] } },
-        orderBy: { startTime: "asc" },
+        where: { scheduledAt: { gte: now }, status: { in: ["CONFIRMED", "SCHEDULED"] } },
+        orderBy: { scheduledAt: "asc" },
         take: 3,
         include: {
           doctor: {
@@ -48,13 +48,13 @@ export async function getPatientContext(patientId: string): Promise<AmeliaContex
   const upcomingAppointments = (patient.appointments || []).map((a) => ({
     doctorName: `${a.doctor.user.firstName} ${a.doctor.user.lastName}`,
     specialization: a.doctor.specialization,
-    date: a.startTime.toISOString().split("T")[0],
+    date: a.scheduledAt.toISOString().split("T")[0],
     reason: a.reason,
   }));
 
   const recentDiagnosesOrNotes = (patient.medicalNotes || []).map((n) => ({
     title: n.title,
-    category: n.category,
+    category: n.category ?? undefined,
     date: n.createdAt.toISOString().split("T")[0],
   }));
 

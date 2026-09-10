@@ -14,12 +14,13 @@ async function getPatientId(): Promise<string | null> {
   return user?.patient?.id ?? null;
 }
 
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
     const patientId = await getPatientId();
     if (!patientId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const conversation = await getConversation(params.id, patientId);
+    const conversation = await getConversation(id, patientId);
     if (!conversation) return NextResponse.json({ error: "Conversation not found" }, { status: 404 });
 
     return NextResponse.json({ conversation });
@@ -29,12 +30,13 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   }
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
     const patientId = await getPatientId();
     if (!patientId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    await deleteConversation(params.id, patientId);
+    await deleteConversation(id, patientId);
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error("Amelia conversation DELETE error:", error);

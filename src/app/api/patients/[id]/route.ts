@@ -4,9 +4,10 @@ import { createServerSupabaseClient } from "@/lib/supabase-server";
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const supabase = createServerSupabaseClient();
     const {
       data: { user: authUser },
@@ -26,7 +27,7 @@ export async function GET(
     }
 
     const doctorId = user.doctor.id;
-    const patientId = params.id;
+    const patientId = id;
 
     const hasAppointment = await prisma.appointment.findFirst({
       where: { doctorId, patientId },

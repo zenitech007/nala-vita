@@ -11,11 +11,12 @@ async function getPatientId(): Promise<string | null> {
   return user?.patient?.id ?? null;
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
     const patientId = await getPatientId();
     if (!patientId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    await cancelReminder(params.id, patientId);
+    await cancelReminder(id, patientId);
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error("Reminder DELETE error:", error);

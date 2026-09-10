@@ -1,8 +1,7 @@
 // Server Component. Data is fetched on the server before HTML is sent
 // to the browser — users see a populated page on first paint.
 
-import { cookies } from "next/headers";
-import { createServerClient } from "@supabase/auth-helpers-nextjs";
+import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import PatientDashboardClient from "./_components/PatientDashboardClient";
@@ -70,18 +69,7 @@ async function getPatientDashboardData(supabaseUserId: string) {
 }
 
 export default async function PatientDashboardPage() {
-  // Read session from cookie — no network call
-  const cookieStore = cookies();
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll: () => cookieStore.getAll(),
-        setAll: () => {},
-      },
-    }
-  );
+  const supabase = createServerSupabaseClient();
 
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) redirect("/login");

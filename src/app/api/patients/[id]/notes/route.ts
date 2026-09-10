@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 
 interface RouteParams {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }
 
 const createNoteSchema = z.object({
@@ -16,6 +16,7 @@ const createNoteSchema = z.object({
 
 export async function POST(req: NextRequest, { params }: RouteParams) {
   try {
+    const { id } = await params;
     const supabase = createServerSupabaseClient();
     const {
       data: { user: authUser },
@@ -36,7 +37,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
 
     // Verify the patient exists
     const patient = await prisma.patient.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
 
     if (!patient) {
@@ -48,7 +49,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
 
     const note = await prisma.medicalNote.create({
       data: {
-        patientId: params.id,
+        patientId: id,
         doctorId: user.doctor.id,
         title: validated.title,
         content: validated.content,

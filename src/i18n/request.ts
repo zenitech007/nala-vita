@@ -10,7 +10,7 @@ function isSupported(locale: string): locale is SupportedLocale {
 
 export default getRequestConfig(async () => {
   // Read preferred locale from cookie; default to English
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const raw = cookieStore.get("NEXT_LOCALE")?.value ?? "en";
   const locale: SupportedLocale = isSupported(raw) ? raw : "en";
 

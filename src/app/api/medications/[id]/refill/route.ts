@@ -5,9 +5,10 @@ import { createNotification } from "@/lib/notifications";
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } | Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id: prescriptionId } = await params;
     const supabase = createServerSupabaseClient();
     const {
       data: { user: authUser },
@@ -25,9 +26,6 @@ export async function PATCH(
     if (!user || !user.patient) {
       return NextResponse.json({ error: "Patient not found" }, { status: 404 });
     }
-
-    const resolvedParams = await Promise.resolve(params);
-    const prescriptionId = resolvedParams.id;
 
     const prescription = await prisma.prescription.findUnique({
       where: { id: prescriptionId },

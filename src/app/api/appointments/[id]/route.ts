@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 
 interface RouteParams {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }
 
 // ─── Helper: Authenticate and get user ───────────────────
@@ -27,13 +27,14 @@ async function getAuthenticatedUser() {
 
 export async function GET(req: NextRequest, { params }: RouteParams) {
   try {
+    const { id } = await params;
     const user = await getAuthenticatedUser();
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const appointment = await prisma.appointment.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         doctor: {
           include: {
@@ -109,13 +110,14 @@ const updateSchema = z.object({
 
 export async function PATCH(req: NextRequest, { params }: RouteParams) {
   try {
+    const { id } = await params;
     const user = await getAuthenticatedUser();
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const appointment = await prisma.appointment.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
 
     if (!appointment) {
@@ -151,7 +153,7 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
     }
 
     const updated = await prisma.appointment.update({
-      where: { id: params.id },
+      where: { id },
       data: updateData,
       include: {
         doctor: {
@@ -192,13 +194,14 @@ const deleteSchema = z.object({
 
 export async function DELETE(req: NextRequest, { params }: RouteParams) {
   try {
+    const { id } = await params;
     const user = await getAuthenticatedUser();
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const appointment = await prisma.appointment.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
 
     if (!appointment) {
@@ -226,7 +229,7 @@ export async function DELETE(req: NextRequest, { params }: RouteParams) {
     const validated = deleteSchema.parse(body);
 
     const cancelled = await prisma.appointment.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         status: "CANCELLED",
         cancellationReason: validated.cancellationReason,

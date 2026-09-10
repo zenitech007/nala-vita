@@ -10,7 +10,7 @@ import {
 } from "../shared";
 
 interface RouteParams {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }
 
 async function findAuthorizedAttachment(userId: string, fileId: string) {
@@ -41,12 +41,13 @@ async function findAuthorizedAttachment(userId: string, fileId: string) {
 
 export async function GET(_req: NextRequest, { params }: RouteParams) {
   try {
+    const { id } = await params;
     const currentUser = await getAuthenticatedMessagingUser();
     if (!currentUser) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const file = await findAuthorizedAttachment(currentUser.id, params.id);
+    const file = await findAuthorizedAttachment(currentUser.id, id);
     if (!file) {
       return NextResponse.json(
         { error: "Attachment not found" },
@@ -92,13 +93,14 @@ export async function GET(_req: NextRequest, { params }: RouteParams) {
 
 export async function DELETE(_req: NextRequest, { params }: RouteParams) {
   try {
+    const { id } = await params;
     const currentUser = await getAuthenticatedMessagingUser();
     if (!currentUser) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const file = await prisma.fileUpload.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
     if (
       !file ||
