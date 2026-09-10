@@ -147,10 +147,10 @@ export default function PatientDashboardClient({ data }: Props) {
                 key={action.label}
                 href={action.href}
                 className={cn(
-                  "flex flex-col items-center gap-3 p-5 rounded-2xl transition-transform hover:scale-[1.02]",
+                  "flex flex-col items-center gap-3 p-5 rounded-2xl transition-all duration-200 shadow-2xs hover:shadow-md hover:-translate-y-1",
                   action.primary
-                    ? "bg-[var(--primary)] text-white hover:opacity-90"
-                    : "bg-white border border-gray-100 text-gray-700 hover:bg-gray-50"
+                    ? "bg-[var(--primary)] text-white hover:opacity-95"
+                    : "bg-white border border-gray-100 text-gray-700 hover:bg-gray-50/80 hover:border-gray-200"
                 )}
               >
                 <action.icon className="w-7 h-7" />

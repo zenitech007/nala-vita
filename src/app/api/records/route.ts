@@ -27,7 +27,7 @@ export async function GET(_req: NextRequest) {
     const [medicalNotes, labOrders, prescriptions, vitals, referrals] =
       await Promise.all([
         prisma.medicalNote.findMany({
-          where: { patientId, isPrivate: false },
+          where: { patientId },
           orderBy: { createdAt: "desc" },
           include: {
             doctor: {

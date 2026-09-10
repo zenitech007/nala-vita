@@ -11,7 +11,12 @@ import {
   AlertTriangle,
   ClipboardList,
   CalendarPlus,
+  UserPlus,
+  X,
+  CheckCircle2,
+  ShieldCheck,
 } from "lucide-react";
+import { TableRowsSkeleton } from "@/components/ui/Skeleton";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 
@@ -89,6 +94,262 @@ function formatStatus(status: string): string {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+function IntakePatientModal({
+  isOpen,
+  onClose,
+  onSuccess,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onSuccess: (message: string) => void;
+}) {
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [dateOfBirth, setDateOfBirth] = useState("");
+  const [gender, setGender] = useState("male");
+  const [bloodType, setBloodType] = useState("");
+  const [allergies, setAllergies] = useState("");
+  const [initialNotes, setInitialNotes] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  if (!isOpen) return null;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    setError(null);
+
+    try {
+      const res = await fetch("/api/patients", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
+          email: email.trim().toLowerCase(),
+          phone: phone.trim() || undefined,
+          dateOfBirth,
+          gender,
+          bloodType: bloodType.trim() || undefined,
+          allergies: allergies
+            ? allergies.split(",").map((s) => s.trim()).filter(Boolean)
+            : [],
+          initialNotes: initialNotes.trim() || undefined,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to intake patient");
+      }
+
+      onSuccess(data.message || "Patient successfully registered in clinic directory");
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Registration error");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fadeIn">
+      <div className="bg-white rounded-2xl max-w-xl w-full shadow-2xl overflow-hidden border border-gray-100 flex flex-col max-h-[90vh]">
+        {/* Header */}
+        <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 bg-[var(--primary)]/10 text-[var(--primary)] rounded-xl">
+              <UserPlus className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-gray-900">Intake / Register In-Person Patient</h2>
+              <p className="text-xs text-gray-500">Record clinical history for a patient prior to self-registration</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-4">
+          {error && (
+            <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
+
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-3.5 flex items-start gap-2.5">
+            <ShieldCheck className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
+            <p className="text-xs text-blue-800 leading-relaxed">
+              <strong>Seamless Patient Claiming:</strong> When the patient signs up online with this email or phone number, their account will automatically claim all their clinical notes, vitals, prescriptions, and lab orders created here.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                First Name <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                placeholder="e.g. John"
+                className="w-full px-3.5 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-[var(--primary)] outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                Last Name <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                placeholder="e.g. Doe"
+                className="w-full px-3.5 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-[var(--primary)] outline-none"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                Email Address <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="patient@example.com"
+                className="w-full px-3.5 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-[var(--primary)] outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                Phone Number
+              </label>
+              <input
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="+1 555-0199"
+                className="w-full px-3.5 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-[var(--primary)] outline-none"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                Date of Birth <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="date"
+                required
+                value={dateOfBirth}
+                onChange={(e) => setDateOfBirth(e.target.value)}
+                className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-[var(--primary)] outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                Gender <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={gender}
+                onChange={(e) => setGender(e.target.value)}
+                className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-[var(--primary)] outline-none"
+              >
+                <option value="male">Male</option>
+                <option value="female">Female</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                Blood Type
+              </label>
+              <input
+                type="text"
+                value={bloodType}
+                onChange={(e) => setBloodType(e.target.value)}
+                placeholder="O+, A+, etc."
+                className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-[var(--primary)] outline-none"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+              Known Allergies (Comma-separated)
+            </label>
+            <input
+              type="text"
+              value={allergies}
+              onChange={(e) => setAllergies(e.target.value)}
+              placeholder="e.g. Penicillin, Peanuts"
+              className="w-full px-3.5 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-[var(--primary)] outline-none"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+              Initial Clinical Notes / Chief Complaint
+            </label>
+            <textarea
+              rows={3}
+              value={initialNotes}
+              onChange={(e) => setInitialNotes(e.target.value)}
+              placeholder="Record chief complaint, past medical history, or visit rationale..."
+              className="w-full px-3.5 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-[var(--primary)] outline-none"
+            />
+          </div>
+
+          {/* Footer */}
+          <div className="pt-3 flex items-center justify-end gap-2 border-t border-gray-100">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-xl transition"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="inline-flex items-center gap-2 px-5 py-2 bg-[var(--primary)] hover:opacity-95 text-white text-sm font-semibold rounded-xl shadow-sm transition disabled:opacity-50"
+            >
+              {submitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Registering...
+                </>
+              ) : (
+                <>
+                  <UserPlus className="w-4 h-4" />
+                  Register Patient
+                </>
+              )}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 // ─── Component ───────────────────────────────────────────
 
 export default function DoctorPatientsPage() {
@@ -96,6 +357,8 @@ export default function DoctorPatientsPage() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [showIntakeModal, setShowIntakeModal] = useState(false);
+  const [bannerMessage, setBannerMessage] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const fetchPatients = useCallback(async (query: string) => {
@@ -140,7 +403,7 @@ export default function DoctorPatientsPage() {
               </p>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               {/* Search */}
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -149,7 +412,7 @@ export default function DoctorPatientsPage() {
                   value={search}
                   onChange={(e) => handleSearchChange(e.target.value)}
                   placeholder="Search patients..."
-                  className="pl-9 pr-4 py-2 w-64 border border-gray-200 rounded-xl text-sm bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent transition"
+                  className="pl-9 pr-4 py-2 w-56 sm:w-64 border border-gray-200 rounded-xl text-sm bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent transition"
                 />
               </div>
 
@@ -158,16 +421,40 @@ export default function DoctorPatientsPage() {
                 <Users className="w-4 h-4" />
                 {total} {total === 1 ? "patient" : "patients"}
               </span>
+
+              {/* Register In-Person Patient button */}
+              <button
+                onClick={() => setShowIntakeModal(true)}
+                className="inline-flex items-center gap-2 px-3.5 py-2 bg-[var(--primary)] hover:opacity-95 text-white text-sm font-semibold rounded-xl shadow-sm transition"
+              >
+                <UserPlus className="w-4 h-4" />
+                Intake Patient
+              </button>
             </div>
           </div>
         </div>
       </header>
 
+      {/* Banner */}
+      {bannerMessage && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4">
+          <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-sm flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+              <span>{bannerMessage}</span>
+            </div>
+            <button onClick={() => setBannerMessage(null)} className="text-gray-400 hover:text-gray-600">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ─── Content ─── */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <Loader2 className="w-8 h-8 animate-spin text-[var(--primary)]" />
+          <div className="py-4">
+            <TableRowsSkeleton rows={6} />
           </div>
         ) : patients.length === 0 ? (
           /* ─── Empty State ─── */
@@ -295,6 +582,16 @@ export default function DoctorPatientsPage() {
           </div>
         )}
       </div>
+
+      {/* Intake Patient Modal */}
+      <IntakePatientModal
+        isOpen={showIntakeModal}
+        onClose={() => setShowIntakeModal(false)}
+        onSuccess={(msg) => {
+          setBannerMessage(msg);
+          fetchPatients("");
+        }}
+      />
     </div>
   );
 }

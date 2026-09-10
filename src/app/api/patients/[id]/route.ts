@@ -28,13 +28,27 @@ export async function GET(
     const doctorId = user.doctor.id;
     const patientId = params.id;
 
-    const hasRelationship = await prisma.appointment.findFirst({
+    const hasAppointment = await prisma.appointment.findFirst({
       where: { doctorId, patientId },
       select: { id: true },
     });
 
-    if (!hasRelationship) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    const hasApprovedReferral = hasAppointment
+      ? true
+      : await prisma.referral.findFirst({
+          where: {
+            patientId,
+            referredDoctorId: doctorId,
+            status: "ACCEPTED",
+          },
+          select: { id: true },
+        });
+
+    if (!hasAppointment && !hasApprovedReferral) {
+      return NextResponse.json(
+        { error: "Forbidden: No authorized care relationship or approved record transfer" },
+        { status: 403 }
+      );
     }
 
     const [patient, vitals, prescriptions, labOrders, medicalNotes, referrals] =
@@ -59,7 +73,13 @@ export async function GET(
           take: 10,
         }),
         prisma.prescription.findMany({
-          where: { patientId, isActive: true },
+          where: {
+            patientId,
+            OR: [
+              { addedBy: "DOCTOR" },
+              { isSharedWithDoctor: true },
+            ],
+          },
           include: {
             doctor: {
               include: {
@@ -67,6 +87,7 @@ export async function GET(
               },
             },
           },
+          orderBy: { prescribedAt: "desc" },
         }),
         prisma.labOrder.findMany({
           where: { patientId },

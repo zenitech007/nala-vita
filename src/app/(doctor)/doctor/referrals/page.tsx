@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   ChevronLeft,
@@ -83,92 +83,87 @@ export default function DoctorReferralsPage() {
   // ─── Incoming referrals state ──────────────────────────
   const [processing, setProcessing] = useState<string | null>(null);
 
-  // ─── Placeholder data ──────────────────────────────────
+  // ─── Real Data State ──────────────────────────────────
+  const [allDoctors, setAllDoctors] = useState<DoctorOption[]>([]);
+  const [allPatients, setAllPatients] = useState<PatientOption[]>([]);
+  const [incomingReferrals, setIncomingReferrals] = useState<IncomingReferral[]>([]);
+  const [sentReferrals, setSentReferrals] = useState<SentReferral[]>([]);
+  const [loadingData, setLoadingData] = useState(true);
 
-  const allDoctors: DoctorOption[] = [
-    { id: "d1", name: "Dr. Sarah Chen", specialization: "Cardiology" },
-    { id: "d2", name: "Dr. Michael Ross", specialization: "Neurology" },
-    { id: "d3", name: "Dr. Emily Taylor", specialization: "Pediatrics" },
-    { id: "d4", name: "Dr. David Kim", specialization: "Orthopedics" },
-    { id: "d5", name: "Dr. James Cooper", specialization: "Oncology" },
-    { id: "d6", name: "Dr. Lisa Park", specialization: "Dermatology" },
-    { id: "d7", name: "Dr. Rachel Green", specialization: "Psychiatry" },
-    { id: "d8", name: "Dr. Mark Johnson", specialization: "Cardiology" },
-    { id: "d9", name: "Dr. Nina Patel", specialization: "Endocrinology" },
-  ];
+  const fetchData = async () => {
+    setLoadingData(true);
+    try {
+      const [doctorsRes, patientsRes, referralsRes] = await Promise.all([
+        fetch("/api/doctors?limit=50"),
+        fetch("/api/patients?all=true&limit=50"),
+        fetch("/api/referrals"),
+      ]);
 
-  const allPatients: PatientOption[] = [
-    { id: "p1", name: "Alice Brown" },
-    { id: "p2", name: "Robert Smith" },
-    { id: "p3", name: "Diana Lee" },
-    { id: "p4", name: "James Wilson" },
-    { id: "p5", name: "Maria Garcia" },
-    { id: "p6", name: "Kevin Thompson" },
-  ];
+      if (doctorsRes.ok) {
+        const dData = await doctorsRes.json();
+        if (Array.isArray(dData.doctors)) {
+          setAllDoctors(
+            dData.doctors.map((d: { id: string; user?: { firstName?: string; lastName?: string }; specialization?: string }) => ({
+              id: d.id,
+              name: `Dr. ${d.user?.firstName || ""} ${d.user?.lastName || ""}`.trim(),
+              specialization: d.specialization || "General Practice",
+            }))
+          );
+        }
+      }
 
-  const [incomingReferrals, setIncomingReferrals] = useState<IncomingReferral[]>([
-    {
-      id: "r1",
-      patientName: "Alice Brown",
-      referringDoctorName: "Dr. Michael Ross",
-      referringDoctorSpeciality: "Neurology",
-      reason: "Suspected cardiac arrhythmia alongside neurological symptoms",
-      notes: "Patient has a history of fainting episodes. ECG recommended before neurological follow-up.",
-      status: "PENDING",
-      createdAt: new Date(Date.now() - 3600000).toISOString(),
-    },
-    {
-      id: "r2",
-      patientName: "James Wilson",
-      referringDoctorName: "Dr. Emily Taylor",
-      referringDoctorSpeciality: "Pediatrics",
-      reason: "Adult patient transferred from pediatrics — ongoing asthma management",
-      notes: null,
-      status: "PENDING",
-      createdAt: new Date(Date.now() - 86400000).toISOString(),
-    },
-    {
-      id: "r3",
-      patientName: "Maria Garcia",
-      referringDoctorName: "Dr. David Kim",
-      referringDoctorSpeciality: "Orthopedics",
-      reason: "Post-fracture cardiac clearance for surgery",
-      notes: "Surgery planned for next week. Needs cardiac clearance ASAP.",
-      status: "PENDING",
-      createdAt: new Date(Date.now() - 172800000).toISOString(),
-    },
-    {
-      id: "r4",
-      patientName: "Robert Smith",
-      referringDoctorName: "Dr. Lisa Park",
-      referringDoctorSpeciality: "Dermatology",
-      reason: "Skin lesion biopsy showed deeper tissue involvement",
-      notes: "Biopsy report attached. Possible surgical intervention needed.",
-      status: "ACCEPTED",
-      createdAt: new Date(Date.now() - 604800000).toISOString(),
-    },
-  ]);
+      if (patientsRes.ok) {
+        const pData = await patientsRes.json();
+        if (Array.isArray(pData.patients)) {
+          setAllPatients(
+            pData.patients.map((p: { id: string; user?: { firstName?: string; lastName?: string } }) => ({
+              id: p.id,
+              name: `${p.user?.firstName || ""} ${p.user?.lastName || ""}`.trim() || "Patient",
+            }))
+          );
+        }
+      }
 
-  const [sentReferrals] = useState<SentReferral[]>([
-    {
-      id: "sr1",
-      patientName: "Diana Lee",
-      referredDoctorName: "Dr. Michael Ross",
-      referredDoctorSpeciality: "Neurology",
-      reason: "Recurring headaches with visual aura — needs neurological evaluation",
-      status: "ACCEPTED",
-      createdAt: new Date(Date.now() - 259200000).toISOString(),
-    },
-    {
-      id: "sr2",
-      patientName: "Kevin Thompson",
-      referredDoctorName: "Dr. Nina Patel",
-      referredDoctorSpeciality: "Endocrinology",
-      reason: "Uncontrolled blood sugar despite medication adjustments",
-      status: "PENDING",
-      createdAt: new Date(Date.now() - 86400000).toISOString(),
-    },
-  ]);
+      if (referralsRes.ok) {
+        const rData = await referralsRes.json();
+        if (Array.isArray(rData.received)) {
+          setIncomingReferrals(
+            rData.received.map((r: { id: string; patient?: { user?: { firstName?: string; lastName?: string } }; referringDoctor?: { user?: { firstName?: string; lastName?: string }; specialization?: string }; reason: string; notes?: string | null; status: string; createdAt: string }) => ({
+              id: r.id,
+              patientName: `${r.patient?.user?.firstName || ""} ${r.patient?.user?.lastName || ""}`.trim() || "Patient",
+              referringDoctorName: `Dr. ${r.referringDoctor?.user?.firstName || ""} ${r.referringDoctor?.user?.lastName || ""}`.trim(),
+              referringDoctorSpeciality: r.referringDoctor?.specialization || "General Practice",
+              reason: r.reason,
+              notes: r.notes ?? null,
+              status: r.status,
+              createdAt: r.createdAt,
+            }))
+          );
+        }
+        if (Array.isArray(rData.sent)) {
+          setSentReferrals(
+            rData.sent.map((r: { id: string; patient?: { user?: { firstName?: string; lastName?: string } }; referredDoctor?: { user?: { firstName?: string; lastName?: string }; specialization?: string }; reason: string; status: string; createdAt: string }) => ({
+              id: r.id,
+              patientName: `${r.patient?.user?.firstName || ""} ${r.patient?.user?.lastName || ""}`.trim() || "Patient",
+              referredDoctorName: `Dr. ${r.referredDoctor?.user?.firstName || ""} ${r.referredDoctor?.user?.lastName || ""}`.trim(),
+              referredDoctorSpeciality: r.referredDoctor?.specialization || "General Practice",
+              reason: r.reason,
+              status: r.status,
+              createdAt: r.createdAt,
+            }))
+          );
+        }
+      }
+    } catch (err) {
+      console.error("Failed to load referral data:", err);
+    } finally {
+      setLoadingData(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
 
   // ─── Filtered doctors ─────────────────────────────────
 
@@ -186,14 +181,29 @@ export default function DoctorReferralsPage() {
 
   // ─── Handlers ──────────────────────────────────────────
 
-  function handleCreateReferral() {
+  async function handleCreateReferral() {
     if (!selectedDoctor || !selectedPatient || !reason.trim()) return;
     setSubmitting(true);
     setSubmitError(null);
     setSubmitSuccess(false);
 
-    setTimeout(() => {
-      setSubmitting(false);
+    try {
+      const res = await fetch("/api/referrals", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          patientId: selectedPatient.id,
+          referredDoctorId: selectedDoctor.id,
+          reason: reason.trim(),
+          notes: notes.trim() || undefined,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to create referral");
+      }
+
       setSubmitSuccess(true);
       setSelectedDoctor(null);
       setSelectedPatient(null);
@@ -202,18 +212,37 @@ export default function DoctorReferralsPage() {
       setSpecialityFilter("");
       setDoctorSearch("");
       setPatientSearch("");
+      fetchData();
       setTimeout(() => setSubmitSuccess(false), 3000);
-    }, 800);
+    } catch (err: unknown) {
+      setSubmitError(err instanceof Error ? err.message : "Failed to create referral");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
-  function handleReferralAction(referralId: string, action: "ACCEPTED" | "DECLINED") {
+  async function handleReferralAction(referralId: string, action: "ACCEPTED" | "DECLINED") {
     setProcessing(referralId);
-    setTimeout(() => {
-      setIncomingReferrals((prev) =>
-        prev.map((r) => (r.id === referralId ? { ...r, status: action } : r))
-      );
+    try {
+      const res = await fetch("/api/referrals", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          referralId,
+          action,
+        }),
+      });
+
+      if (res.ok) {
+        setIncomingReferrals((prev) =>
+          prev.map((r) => (r.id === referralId ? { ...r, status: action } : r))
+        );
+      }
+    } catch (err) {
+      console.error("Failed to update referral status:", err);
+    } finally {
       setProcessing(null);
-    }, 600);
+    }
   }
 
   // ─── Tabs ──────────────────────────────────────────────

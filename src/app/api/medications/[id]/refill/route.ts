@@ -5,7 +5,7 @@ import { createNotification } from "@/lib/notifications";
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: { id: string } | Promise<{ id: string }> }
 ) {
   try {
     const supabase = createServerSupabaseClient();
@@ -26,8 +26,11 @@ export async function PATCH(
       return NextResponse.json({ error: "Patient not found" }, { status: 404 });
     }
 
+    const resolvedParams = await Promise.resolve(params);
+    const prescriptionId = resolvedParams.id;
+
     const prescription = await prisma.prescription.findUnique({
-      where: { id: params.id },
+      where: { id: prescriptionId },
       include: {
         doctor: {
           include: { user: { select: { id: true, firstName: true, lastName: true } } },
@@ -37,6 +40,13 @@ export async function PATCH(
 
     if (!prescription || prescription.patientId !== user.patient.id) {
       return NextResponse.json({ error: "Prescription not found" }, { status: 404 });
+    }
+
+    if (!prescription.doctor) {
+      return NextResponse.json(
+        { error: "Cannot request refill for self-added medications without a prescribing doctor" },
+        { status: 400 }
+      );
     }
 
     if (prescription.refillsUsed >= prescription.refillsAllowed) {

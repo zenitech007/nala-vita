@@ -18,6 +18,15 @@ import {
   Droplets,
   Weight,
   Candy,
+  Lock,
+  Unlock,
+  Share2,
+  CheckCircle2,
+  XCircle,
+  ShieldCheck,
+  AlertCircle,
+  X,
+  UserPlus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
@@ -139,8 +148,15 @@ function categoryStyle(cat: string | null) {
 
 // ─── Medical Notes Tab ───────────────────────────────────
 
-function MedicalNotesTab({ notes }: { notes: MedicalNote[] }) {
+function MedicalNotesTab({
+  notes,
+  onTogglePrivacy,
+}: {
+  notes: MedicalNote[];
+  onTogglePrivacy: (noteId: string, isPrivate: boolean) => Promise<void>;
+}) {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
 
   const toggle = (id: string) => {
     setExpandedIds((prev) => {
@@ -149,6 +165,15 @@ function MedicalNotesTab({ notes }: { notes: MedicalNote[] }) {
       else next.add(id);
       return next;
     });
+  };
+
+  const handlePrivacyToggle = async (note: MedicalNote) => {
+    setUpdatingId(note.id);
+    try {
+      await onTogglePrivacy(note.id, !note.isPrivate);
+    } finally {
+      setUpdatingId(null);
+    }
   };
 
   if (notes.length === 0) {
@@ -163,6 +188,14 @@ function MedicalNotesTab({ notes }: { notes: MedicalNote[] }) {
 
   return (
     <div className="space-y-4">
+      {/* Privacy Information Banner */}
+      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-start gap-3">
+        <ShieldCheck className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
+        <div className="text-sm text-blue-800">
+          <span className="font-semibold">Privacy & Access Controls:</span> You have full authority over which medical notes are shared. Restricted (private) notes remain visible only to you and are withheld from transferred healthcare providers and external doctors.
+        </div>
+      </div>
+
       {notes.map((note) => {
         const expanded = expandedIds.has(note.id);
         const needsTruncate = note.content.length > 200;
@@ -170,26 +203,75 @@ function MedicalNotesTab({ notes }: { notes: MedicalNote[] }) {
           expanded || !needsTruncate
             ? note.content
             : note.content.slice(0, 200) + "...";
+        const isUpdating = updatingId === note.id;
 
         return (
           <div
             key={note.id}
-            className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm"
+            className={cn(
+              "bg-white rounded-xl border p-5 shadow-sm transition-all",
+              note.isPrivate ? "border-amber-200 bg-amber-50/20" : "border-gray-200"
+            )}
           >
-            <div className="flex items-start justify-between gap-3 mb-2">
-              <h3 className="text-base font-semibold text-gray-900">
-                {note.title}
-              </h3>
-              {note.category && (
-                <span
-                  className={cn(
-                    "text-xs font-medium px-2.5 py-0.5 rounded-full whitespace-nowrap",
-                    categoryStyle(note.category)
-                  )}
-                >
-                  {note.category}
-                </span>
-              )}
+            <div className="flex items-start justify-between gap-3 mb-2 flex-wrap">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-base font-semibold text-gray-900">
+                  {note.title}
+                </h3>
+                {note.category && (
+                  <span
+                    className={cn(
+                      "text-xs font-medium px-2.5 py-0.5 rounded-full whitespace-nowrap",
+                      categoryStyle(note.category)
+                    )}
+                  >
+                    {note.category}
+                  </span>
+                )}
+                {/* Privacy Badge */}
+                {note.isPrivate ? (
+                  <span className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
+                    <Lock className="w-3 h-3 text-amber-600" />
+                    Restricted (Private)
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                    <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                    Shared with Care Team
+                  </span>
+                )}
+              </div>
+
+              {/* Privacy Toggle Button */}
+              <button
+                disabled={isUpdating}
+                onClick={() => handlePrivacyToggle(note)}
+                className={cn(
+                  "inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors",
+                  note.isPrivate
+                    ? "bg-white border-amber-300 text-amber-800 hover:bg-amber-50"
+                    : "bg-white border-gray-300 text-gray-700 hover:bg-gray-50 hover:text-red-700 hover:border-red-300"
+                )}
+                title={
+                  note.isPrivate
+                    ? "Allow authorized doctors to view this note"
+                    : "Restrict access - hide this note from external doctors"
+                }
+              >
+                {isUpdating ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : note.isPrivate ? (
+                  <>
+                    <Unlock className="w-3.5 h-3.5 text-amber-600" />
+                    Make Shared
+                  </>
+                ) : (
+                  <>
+                    <Lock className="w-3.5 h-3.5 text-gray-500" />
+                    Restrict Access
+                  </>
+                )}
+              </button>
             </div>
 
             <div className="flex items-center gap-3 text-sm text-gray-500 mb-3">
@@ -209,6 +291,13 @@ function MedicalNotesTab({ notes }: { notes: MedicalNote[] }) {
               >
                 {expanded ? "Show less" : "Read more"}
               </button>
+            )}
+
+            {note.isPrivate && (
+              <p className="text-xs text-amber-700 mt-3 pt-3 border-t border-amber-100 flex items-center gap-1.5">
+                <Lock className="w-3.5 h-3.5 text-amber-600" />
+                This note is restricted. External or transferred healthcare providers cannot view this note.
+              </p>
             )}
           </div>
         );
@@ -605,62 +694,390 @@ function VitalsSummaryTab({ vitals }: { vitals: Record<string, VitalEntry> }) {
   );
 }
 
-// ─── Referrals Tab ───────────────────────────────────────
+// ─── Referrals Tab (Doctor-to-Doctor Transfers with Patient Approval) ──
 
-function ReferralsTab({ referrals }: { referrals: Referral[] }) {
+function ReferralsTab({
+  referrals,
+  onApproveTransfer,
+  onDeclineTransfer,
+}: {
+  referrals: Referral[];
+  onApproveTransfer: (id: string) => Promise<void>;
+  onDeclineTransfer: (id: string) => Promise<void>;
+}) {
+  const [actioningId, setActioningId] = useState<string | null>(null);
+
   function statusStyle(status: string) {
     switch (status.toUpperCase()) {
       case "PENDING":
-        return "bg-amber-100 text-amber-700";
+        return "bg-amber-100 text-amber-700 border-amber-200";
       case "ACCEPTED":
-        return "bg-[var(--primary)]/10 text-[var(--primary)]";
+        return "bg-emerald-100 text-emerald-700 border-emerald-200";
+      case "DECLINED":
+        return "bg-rose-100 text-rose-700 border-rose-200";
       case "COMPLETED":
-        return "bg-green-100 text-green-700";
+        return "bg-blue-100 text-blue-700 border-blue-200";
       default:
-        return "bg-gray-100 text-gray-600";
+        return "bg-gray-100 text-gray-600 border-gray-200";
     }
   }
+
+  const handleAction = async (id: string, action: "ACCEPTED" | "DECLINED") => {
+    setActioningId(id);
+    try {
+      if (action === "ACCEPTED") {
+        await onApproveTransfer(id);
+      } else {
+        await onDeclineTransfer(id);
+      }
+    } finally {
+      setActioningId(null);
+    }
+  };
 
   if (referrals.length === 0) {
     return (
       <div className="text-center py-16 text-gray-500">
         <UserCheck className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-        <p className="text-lg font-medium">No referrals</p>
-        <p className="text-sm mt-1">Doctor referrals will appear here.</p>
+        <p className="text-lg font-medium">No referrals or transfers</p>
+        <p className="text-sm mt-1">Doctor transfers and care referrals will appear here.</p>
       </div>
     );
   }
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm divide-y divide-gray-100">
-      {referrals.map((ref) => (
-        <div key={ref.id} className="px-5 py-4">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-gray-900">
-                {doctorName(ref.referredDoctor)}
-              </p>
-              <p className="text-xs text-gray-500 mt-0.5">
-                {ref.referredDoctor.specialization}
-              </p>
-              <p className="text-sm text-gray-600 mt-2">{ref.reason}</p>
+    <div className="space-y-4">
+      {/* Transfer Information Banner */}
+      <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 flex items-start gap-3">
+        <ShieldCheck className="w-5 h-5 text-indigo-600 shrink-0 mt-0.5" />
+        <div className="text-sm text-indigo-800">
+          <span className="font-semibold">Doctor-to-Doctor Transfers & Patient Approval:</span> When a doctor initiates a referral or transfer to another specialist/hospital, your clinical records are strictly protected. The receiving doctor cannot access your medical file until you approve the transfer below.
+        </div>
+      </div>
+
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm divide-y divide-gray-100">
+        {referrals.map((ref) => {
+          const isPending = ref.status.toUpperCase() === "PENDING";
+          const isAccepted = ref.status.toUpperCase() === "ACCEPTED";
+          const isDeclined = ref.status.toUpperCase() === "DECLINED";
+          const isProcessing = actioningId === ref.id;
+
+          return (
+            <div key={ref.id} className="px-6 py-5">
+              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap mb-1">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">
+                      Transfer of Care
+                    </span>
+                    <span className="text-gray-300">•</span>
+                    <span className="text-xs text-gray-500">
+                      Initiated by {doctorName(ref.referringDoctor)} ({ref.referringDoctor.specialization})
+                    </span>
+                  </div>
+
+                  <h3 className="text-base font-semibold text-gray-900 mt-1">
+                    Referred to: {doctorName(ref.referredDoctor)}
+                  </h3>
+                  <p className="text-xs text-indigo-600 font-medium">
+                    Specialty: {ref.referredDoctor.specialization}
+                  </p>
+
+                  <div className="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-100 text-sm text-gray-700">
+                    <span className="font-medium text-gray-900 block mb-0.5">Reason for Transfer:</span>
+                    {ref.reason}
+                  </div>
+                </div>
+
+                <div className="flex flex-col items-start sm:items-end gap-2 shrink-0">
+                  <span
+                    className={cn(
+                      "text-xs font-medium px-3 py-1 rounded-full border whitespace-nowrap",
+                      statusStyle(ref.status)
+                    )}
+                  >
+                    {ref.status}
+                  </span>
+                  <span className="text-xs text-gray-400">
+                    {formatDate(ref.createdAt)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Action area for pending patient approval */}
+              {isPending && (
+                <div className="mt-4 pt-4 border-t border-amber-100 bg-amber-50/50 -mx-6 -mb-5 px-6 py-4 rounded-b-xl">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
+                      <p className="text-xs text-amber-900">
+                        <span className="font-semibold">Action Required:</span> Do you authorize {doctorName(ref.referredDoctor)} to access your medical records and care history?
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+                      <button
+                        disabled={isProcessing}
+                        onClick={() => handleAction(ref.id, "DECLINED")}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-700 hover:bg-gray-100 text-xs font-medium rounded-lg transition disabled:opacity-50"
+                      >
+                        <XCircle className="w-4 h-4 text-red-500" />
+                        Decline
+                      </button>
+                      <button
+                        disabled={isProcessing}
+                        onClick={() => handleAction(ref.id, "ACCEPTED")}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium rounded-lg shadow-sm transition disabled:opacity-50"
+                      >
+                        {isProcessing ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <CheckCircle2 className="w-4 h-4" />
+                        )}
+                        Approve Transfer & Share Records
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {isAccepted && (
+                <div className="mt-3 pt-3 border-t border-gray-100 flex items-center gap-2 text-xs text-emerald-700">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>
+                    Transfer approved by you. {doctorName(ref.referredDoctor)} has authorized access to your shared records.
+                  </span>
+                </div>
+              )}
+
+              {isDeclined && (
+                <div className="mt-3 pt-3 border-t border-gray-100 flex items-center gap-2 text-xs text-rose-700">
+                  <XCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                  <span>
+                    Transfer declined. Record access was withheld from {doctorName(ref.referredDoctor)}.
+                  </span>
+                </div>
+              )}
             </div>
-            <div className="flex flex-col items-end gap-2 ml-4">
-              <span
-                className={cn(
-                  "text-xs font-medium px-2.5 py-0.5 rounded-full whitespace-nowrap",
-                  statusStyle(ref.status)
-                )}
-              >
-                {ref.status}
-              </span>
-              <span className="text-xs text-gray-400">
-                {formatDate(ref.createdAt)}
-              </span>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── Modal: Patient Self-Initiated Data Share to Doctor/Hospital ─
+
+interface AvailableDoctor {
+  id: string;
+  specialization: string;
+  rating: number;
+  user: {
+    firstName: string;
+    lastName: string;
+    avatarUrl: string | null;
+  };
+}
+
+function ShareRecordsModal({
+  isOpen,
+  onClose,
+  onSuccess,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onSuccess: (message: string) => void;
+}) {
+  const [doctors, setDoctors] = useState<AvailableDoctor[]>([]);
+  const [selectedDoctorId, setSelectedDoctorId] = useState("");
+  const [reason, setReason] = useState("");
+  const [notes, setNotes] = useState("");
+  const [loadingDoctors, setLoadingDoctors] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    async function loadDoctors() {
+      setLoadingDoctors(true);
+      setError(null);
+      try {
+        const res = await fetch("/api/doctors?limit=30");
+        if (res.ok) {
+          const json = await res.json();
+          setDoctors(json.doctors || []);
+        }
+      } catch {
+        setError("Failed to load doctor directory");
+      } finally {
+        setLoadingDoctors(false);
+      }
+    }
+    loadDoctors();
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedDoctorId) {
+      setError("Please select a healthcare provider");
+      return;
+    }
+
+    setSubmitting(true);
+    setError(null);
+
+    try {
+      const res = await fetch("/api/patients/share", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          doctorId: selectedDoctorId,
+          reason: reason.trim() || "Patient Direct Medical Record Share",
+          notes: notes.trim() || undefined,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to share medical records");
+      }
+
+      onSuccess(data.message || "Medical records shared successfully");
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error sharing records");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fadeIn">
+      <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden border border-gray-100 flex flex-col max-h-[90vh]">
+        {/* Modal Header */}
+        <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 bg-[var(--primary)]/10 text-[var(--primary)] rounded-xl">
+              <Share2 className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-gray-900">Share Records with Doctor</h2>
+              <p className="text-xs text-gray-500">Authorize a healthcare provider to review your medical history</p>
             </div>
           </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
-      ))}
+
+        {/* Modal Body */}
+        <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-4">
+          {error && (
+            <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
+              Select Healthcare Provider <span className="text-red-500">*</span>
+            </label>
+            {loadingDoctors ? (
+              <div className="flex items-center gap-2 p-3 text-sm text-gray-500 bg-gray-50 rounded-xl">
+                <Loader2 className="w-4 h-4 animate-spin text-[var(--primary)]" />
+                Loading doctors...
+              </div>
+            ) : (
+              <select
+                value={selectedDoctorId}
+                onChange={(e) => setSelectedDoctorId(e.target.value)}
+                required
+                className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[var(--primary)] transition"
+              >
+                <option value="">-- Choose a doctor or specialist --</option>
+                {doctors.map((doc) => (
+                  <option key={doc.id} value={doc.id}>
+                    Dr. {doc.user.firstName} {doc.user.lastName} — {doc.specialization}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
+              Reason for Sharing
+            </label>
+            <input
+              type="text"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="e.g., Second opinion, new primary physician, specialist consult"
+              className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[var(--primary)] transition"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
+              Message or Clinical Context (Optional)
+            </label>
+            <textarea
+              rows={3}
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Provide any specific symptoms or questions for the doctor to review..."
+              className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[var(--primary)] transition"
+            />
+          </div>
+
+          {/* Sharing Security Notice */}
+          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3.5">
+            <div className="flex items-center gap-2 mb-1">
+              <ShieldCheck className="w-4 h-4 text-emerald-700" />
+              <span className="text-xs font-semibold text-emerald-900">Protected Health Data Sharing</span>
+            </div>
+            <ul className="text-xs text-emerald-800 space-y-1 list-disc list-inside">
+              <li>Shares your active prescriptions, vitals, and lab results</li>
+              <li>Shares clinical visit notes, <strong>excluding notes you marked as Restricted (Private)</strong></li>
+              <li>Directly links the provider to your record in accordance with patient authorization</li>
+            </ul>
+          </div>
+
+          {/* Footer actions */}
+          <div className="pt-3 flex items-center justify-end gap-2 border-t border-gray-100">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-xl transition"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="inline-flex items-center gap-2 px-5 py-2 bg-[var(--primary)] hover:opacity-95 text-white text-sm font-semibold rounded-xl shadow-sm transition disabled:opacity-50"
+            >
+              {submitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Authorizing...
+                </>
+              ) : (
+                <>
+                  <Share2 className="w-4 h-4" />
+                  Authorize & Share Records
+                </>
+              )}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }
@@ -672,35 +1089,185 @@ export default function PatientRecordsPage() {
   const [data, setData] = useState<RecordsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [showShareModal, setShowShareModal] = useState(false);
+
+  async function fetchRecords() {
+    try {
+      setLoading(true);
+      setError(null);
+      const res = await fetch("/api/records");
+      if (!res.ok) throw new Error("Failed to load records");
+      const json: RecordsData = await res.json();
+      setData(json);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
-    async function fetchRecords() {
-      try {
-        setLoading(true);
-        setError(null);
-        const res = await fetch("/api/records");
-        if (!res.ok) throw new Error("Failed to load records");
-        const json: RecordsData = await res.json();
-        setData(json);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Something went wrong");
-      } finally {
-        setLoading(false);
-      }
-    }
-
     fetchRecords();
   }, []);
 
+  const handleTogglePrivacy = async (noteId: string, isPrivate: boolean) => {
+    try {
+      const res = await fetch("/api/patients/privacy", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ noteId, isPrivate }),
+      });
+
+      const resData = await res.json();
+      if (!res.ok) {
+        throw new Error(resData.error || "Failed to update record privacy");
+      }
+
+      // Update state locally
+      setData((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          medicalNotes: prev.medicalNotes.map((n) =>
+            n.id === noteId ? { ...n, isPrivate } : n
+          ),
+        };
+      });
+
+      setFeedback({
+        type: "success",
+        text: resData.message || (isPrivate ? "Record restricted (private)." : "Record shared with care team."),
+      });
+      setTimeout(() => setFeedback(null), 4000);
+    } catch (err) {
+      setFeedback({
+        type: "error",
+        text: err instanceof Error ? err.message : "Failed to update privacy setting",
+      });
+      setTimeout(() => setFeedback(null), 4000);
+    }
+  };
+
+  const handleApproveTransfer = async (referralId: string) => {
+    try {
+      const res = await fetch("/api/referrals", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ referralId, action: "ACCEPTED" }),
+      });
+
+      const resData = await res.json();
+      if (!res.ok) {
+        throw new Error(resData.error || "Failed to approve transfer");
+      }
+
+      setData((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          referrals: prev.referrals.map((r) =>
+            r.id === referralId ? { ...r, status: "ACCEPTED" } : r
+          ),
+        };
+      });
+
+      setFeedback({
+        type: "success",
+        text: "Transfer approved. The receiving doctor now has access to your medical records.",
+      });
+      setTimeout(() => setFeedback(null), 5000);
+    } catch (err) {
+      setFeedback({
+        type: "error",
+        text: err instanceof Error ? err.message : "Failed to approve transfer",
+      });
+      setTimeout(() => setFeedback(null), 4000);
+    }
+  };
+
+  const handleDeclineTransfer = async (referralId: string) => {
+    try {
+      const res = await fetch("/api/referrals", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ referralId, action: "DECLINED" }),
+      });
+
+      const resData = await res.json();
+      if (!res.ok) {
+        throw new Error(resData.error || "Failed to decline transfer");
+      }
+
+      setData((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          referrals: prev.referrals.map((r) =>
+            r.id === referralId ? { ...r, status: "DECLINED" } : r
+          ),
+        };
+      });
+
+      setFeedback({
+        type: "success",
+        text: "Transfer declined. Record access was withheld.",
+      });
+      setTimeout(() => setFeedback(null), 4000);
+    } catch (err) {
+      setFeedback({
+        type: "error",
+        text: err instanceof Error ? err.message : "Failed to decline transfer",
+      });
+      setTimeout(() => setFeedback(null), 4000);
+    }
+  };
+
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Medical Records</h1>
-        <p className="text-sm text-gray-500 mt-1">
-          View your complete medical history, lab results, and more.
-        </p>
+      {/* Header with Share Records Action */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Medical Records</h1>
+          <p className="text-sm text-gray-500 mt-1">
+            View your complete medical history, manage privacy, and authorize doctor transfers.
+          </p>
+        </div>
+        <button
+          onClick={() => setShowShareModal(true)}
+          className="inline-flex items-center gap-2 px-4 py-2.5 bg-[var(--primary)] text-white text-sm font-semibold rounded-xl hover:opacity-95 shadow-sm transition-all self-start sm:self-auto"
+        >
+          <Share2 className="w-4 h-4" />
+          Share Records with Doctor
+        </button>
       </div>
+
+      {/* Floating feedback alert */}
+      {feedback && (
+        <div
+          className={cn(
+            "mb-6 p-4 rounded-xl text-sm flex items-center justify-between border animate-fadeIn",
+            feedback.type === "success"
+              ? "bg-emerald-50 border-emerald-200 text-emerald-800"
+              : "bg-red-50 border-red-200 text-red-800"
+          )}
+        >
+          <div className="flex items-center gap-2">
+            {feedback.type === "success" ? (
+              <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+            ) : (
+              <AlertCircle className="w-5 h-5 text-red-600 shrink-0" />
+            )}
+            <span>{feedback.text}</span>
+          </div>
+          <button
+            onClick={() => setFeedback(null)}
+            className="text-gray-400 hover:text-gray-600 p-1"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {/* Tab Bar */}
       <div className="border-b border-gray-200 mb-6">
@@ -746,7 +1313,10 @@ export default function PatientRecordsPage() {
       ) : data ? (
         <>
           {activeTab === "notes" && (
-            <MedicalNotesTab notes={data.medicalNotes} />
+            <MedicalNotesTab
+              notes={data.medicalNotes}
+              onTogglePrivacy={handleTogglePrivacy}
+            />
           )}
           {activeTab === "labs" && (
             <LabHistoryTab orders={data.labOrders} />
@@ -758,10 +1328,24 @@ export default function PatientRecordsPage() {
             <VitalsSummaryTab vitals={data.vitals} />
           )}
           {activeTab === "referrals" && (
-            <ReferralsTab referrals={data.referrals} />
+            <ReferralsTab
+              referrals={data.referrals}
+              onApproveTransfer={handleApproveTransfer}
+              onDeclineTransfer={handleDeclineTransfer}
+            />
           )}
         </>
       ) : null}
+
+      {/* Share Modal */}
+      <ShareRecordsModal
+        isOpen={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        onSuccess={(msg) => {
+          setFeedback({ type: "success", text: msg });
+          fetchRecords();
+        }}
+      />
     </div>
   );
 }

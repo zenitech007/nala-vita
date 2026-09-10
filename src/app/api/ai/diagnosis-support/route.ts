@@ -1,13 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import OpenAI from "openai";
+import { ai, GEMINI_MODEL } from "@/lib/gemini";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { prisma } from "@/lib/prisma";
 import { checkRateLimitAsync } from "@/lib/rate-limit";
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
 
 // ─── Input schema ────────────────────────────────────────
 
@@ -160,22 +156,18 @@ Guidelines:
 - If no drug interactions exist, return an empty array for drugInteractions.
 - If no red flags, return an empty array for redFlags.`;
 
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o",
-      messages: [
-        {
-          role: "system",
-          content:
-            "You are an expert clinical decision support AI. You assist licensed physicians by providing evidence-based differential diagnoses, drug interaction checks, test recommendations, treatment options, and red flag alerts. You always return valid JSON. This is a decision support tool, not a replacement for clinical judgment.",
-        },
-        { role: "user", content: prompt },
-      ],
+    const interaction = await ai.interactions.create({
+      model: GEMINI_MODEL,
+      system_instruction:
+        "You are an expert clinical decision support AI. You assist licensed physicians by providing evidence-based differential diagnoses, drug interaction checks, test recommendations, treatment options, and red flag alerts. You always return valid JSON. This is a decision support tool, not a replacement for clinical judgment.",
+      input: prompt,
+      generation_config: {
+        max_output_tokens: 2000,
+      },
       response_format: { type: "json_object" },
-      temperature: 0.2,
-      max_tokens: 2000,
     });
 
-    const responseText = completion.choices[0]?.message?.content?.trim();
+    const responseText = interaction.output_text?.trim();
 
     if (!responseText) {
       return NextResponse.json(
@@ -184,7 +176,12 @@ Guidelines:
       );
     }
 
-    const result = JSON.parse(responseText);
+    const cleaned = responseText
+      .replace(/^```json\s*/i, "")
+      .replace(/```\s*$/, "")
+      .trim();
+
+    const result = JSON.parse(cleaned);
 
     return NextResponse.json({
       ...result,

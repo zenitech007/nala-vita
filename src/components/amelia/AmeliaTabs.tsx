@@ -31,7 +31,7 @@ export default function AmeliaTabs() {
         {tabBtn("reminders", "Reminders")}
       </div>
       <div className="flex-1 min-h-0 rounded-2xl border border-gray-100 overflow-hidden">
-        {tab === "chat" && <AmeliaChat />}
+        {tab === "chat" && <AmeliaChat collapsibleHistory />}
         {tab === "memory" && <AmeliaMemoryPanel />}
         {tab === "reminders" && <AmeliaRemindersPanel />}
       </div>

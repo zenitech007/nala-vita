@@ -154,7 +154,7 @@ export default function DoctorDashboardClient({ data }: { data: DashboardData })
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {metrics.map((m) => (
-            <div key={m.label} className="bg-white rounded-2xl border border-gray-100 p-6">
+            <div key={m.label} className="bg-white rounded-2xl border border-gray-100 p-6 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer">
               <div className="flex items-start justify-between mb-4">
                 <div className={cn("w-12 h-12 rounded-xl flex items-center justify-center", m.lightColor)}>
                   <m.icon className={cn("w-6 h-6", m.textColor)} />
@@ -198,7 +198,7 @@ export default function DoctorDashboardClient({ data }: { data: DashboardData })
                   return (
                     <div
                       key={apt.id}
-                      className="flex items-center gap-4 p-4 rounded-xl hover:bg-gray-50 transition border border-gray-50"
+                      className="flex items-center gap-4 p-4 rounded-xl hover:bg-gray-50/80 transition-all duration-200 border border-gray-100 hover:border-gray-200 hover:shadow-xs"
                     >
                       <div className="flex flex-col items-center gap-1">
                         <div className={cn("w-3 h-3 rounded-full", urgencyCfg.dot)} />

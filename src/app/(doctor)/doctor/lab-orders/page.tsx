@@ -69,14 +69,34 @@ export default function DoctorLabOrdersPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
 
-  // Placeholder patients
-  const patients: PatientOption[] = [
-    { id: "p1", firstName: "Alice", lastName: "Brown" },
-    { id: "p2", firstName: "Robert", lastName: "Smith" },
-    { id: "p3", firstName: "Diana", lastName: "Lee" },
-    { id: "p4", firstName: "James", lastName: "Wilson" },
-    { id: "p5", firstName: "Maria", lastName: "Garcia" },
-  ];
+  // Real patient options
+  const [patients, setPatients] = useState<PatientOption[]>([]);
+  const [loadingPatients, setLoadingPatients] = useState(true);
+
+  useEffect(() => {
+    async function loadPatients() {
+      try {
+        const res = await fetch("/api/patients?all=true&limit=50");
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data.patients)) {
+            setPatients(
+              data.patients.map((p: { id: string; user?: { firstName?: string; lastName?: string } }) => ({
+                id: p.id,
+                firstName: p.user?.firstName || "Patient",
+                lastName: p.user?.lastName || "",
+              }))
+            );
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load patients for lab orders:", err);
+      } finally {
+        setLoadingPatients(false);
+      }
+    }
+    loadPatients();
+  }, []);
 
   const filteredPatients = patients.filter((p) =>
     `${p.firstName} ${p.lastName}`.toLowerCase().includes(patientSearch.toLowerCase())
@@ -91,7 +111,7 @@ export default function DoctorLabOrdersPage() {
         setOrders(data.labOrders || []);
       }
     } catch {
-      // placeholder
+      // network error
     } finally {
       setLoading(false);
     }
@@ -100,28 +120,6 @@ export default function DoctorLabOrdersPage() {
   useEffect(() => {
     fetchOrders();
   }, [fetchOrders]);
-
-  // Placeholder orders
-  const displayOrders: LabOrder[] = orders.length > 0 ? orders : [
-    {
-      id: "lo1", testName: "Complete Blood Count (CBC)", testCode: "CBC", instructions: "Fasting for 8 hours", urgency: "HIGH",
-      orderedAt: new Date(Date.now() - 86400000).toISOString(),
-      patient: { user: { firstName: "Alice", lastName: "Brown" } },
-      results: activeTab === "completed" ? [{ id: "r1", resultValue: "WBC: 7.5, RBC: 4.8, Hgb: 14.2", isAbnormal: false, completedAt: new Date().toISOString() }] : [],
-    },
-    {
-      id: "lo2", testName: "Lipid Panel", testCode: "LIPID", instructions: "12-hour fasting required", urgency: "MEDIUM",
-      orderedAt: new Date(Date.now() - 86400000 * 2).toISOString(),
-      patient: { user: { firstName: "James", lastName: "Wilson" } },
-      results: activeTab === "completed" ? [{ id: "r2", resultValue: "Total: 245, LDL: 165, HDL: 42, Trig: 190", isAbnormal: true, completedAt: new Date().toISOString() }] : [],
-    },
-    {
-      id: "lo3", testName: "Hemoglobin A1C", testCode: "HBA1C", instructions: null, urgency: "LOW",
-      orderedAt: new Date(Date.now() - 86400000 * 3).toISOString(),
-      patient: { user: { firstName: "Maria", lastName: "Garcia" } },
-      results: activeTab === "completed" ? [{ id: "r3", resultValue: "A1C: 6.8%", isAbnormal: true, completedAt: new Date().toISOString() }] : [],
-    },
-  ];
 
   const handleSubmitOrder = async () => {
     if (!selectedPatient || !selectedTest) return;
@@ -214,14 +212,14 @@ export default function DoctorLabOrdersPage() {
           <div className="flex items-center justify-center py-20">
             <Loader2 className="w-8 h-8 animate-spin text-[var(--primary)]" />
           </div>
-        ) : displayOrders.length === 0 ? (
+        ) : orders.length === 0 ? (
           <div className="text-center py-20">
             <FlaskConical className="w-16 h-16 text-gray-300 mx-auto mb-4" />
             <p className="text-gray-500">No {activeTab} lab orders</p>
           </div>
         ) : (
           <div className="space-y-4">
-            {displayOrders.map((order) => {
+            {orders.map((order) => {
               const hasResults = order.results.length > 0;
               const hasAbnormal = order.results.some((r) => r.isAbnormal);
               return (

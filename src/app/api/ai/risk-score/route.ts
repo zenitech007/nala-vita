@@ -1,12 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import OpenAI from "openai";
+import { ai, GEMINI_MODEL } from "@/lib/gemini";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { prisma } from "@/lib/prisma";
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
 
 // ─── Input schema ────────────────────────────────────────
 
@@ -166,22 +162,18 @@ Scoring guidelines:
 
 Provide 3-6 risk factors and 3-5 recommended actions. Be specific and evidence-based.`;
 
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o",
-      messages: [
-        {
-          role: "system",
-          content:
-            "You are an expert clinical risk assessment AI. You analyze patient data to compute evidence-based health risk scores. You always return valid JSON. Your assessments are used by licensed healthcare professionals for decision support, not as a standalone diagnostic tool.",
-        },
-        { role: "user", content: prompt },
-      ],
+    const interaction = await ai.interactions.create({
+      model: GEMINI_MODEL,
+      system_instruction:
+        "You are an expert clinical risk assessment AI. You analyze patient data to compute evidence-based health risk scores. You always return valid JSON. Your assessments are used by licensed healthcare professionals for decision support, not as a standalone diagnostic tool.",
+      input: prompt,
+      generation_config: {
+        max_output_tokens: 1500,
+      },
       response_format: { type: "json_object" },
-      temperature: 0.2,
-      max_tokens: 1500,
     });
 
-    const responseText = completion.choices[0]?.message?.content?.trim();
+    const responseText = interaction.output_text?.trim();
 
     if (!responseText) {
       return NextResponse.json(
@@ -190,7 +182,12 @@ Provide 3-6 risk factors and 3-5 recommended actions. Be specific and evidence-b
       );
     }
 
-    const result = JSON.parse(responseText);
+    const cleaned = responseText
+      .replace(/^```json\s*/i, "")
+      .replace(/```\s*$/, "")
+      .trim();
+
+    const result = JSON.parse(cleaned);
 
     return NextResponse.json({
       patientId: validated.patientId,

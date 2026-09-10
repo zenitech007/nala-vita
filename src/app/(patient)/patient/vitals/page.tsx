@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import {
   ChevronLeft,
@@ -16,7 +16,7 @@ import {
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { format, subDays } from "date-fns";
+import { format } from "date-fns";
 import {
   LineChart,
   Line,
@@ -64,28 +64,6 @@ const VITAL_CONFIGS: VitalConfig[] = [
   { key: "temperature", label: "Temperature", unit: "°F", icon: Thermometer, color: "#10b981", normalMin: 97, normalMax: 99.5, placeholder: "98.6" },
 ];
 
-// ─── Generate placeholder chart data ─────────────────────
-
-function generateChartData(config: VitalConfig): VitalReading[] {
-  const data: VitalReading[] = [];
-  for (let i = 29; i >= 0; i--) {
-    const date = subDays(new Date(), i);
-    const mid = (config.normalMin + config.normalMax) / 2;
-    const range = config.normalMax - config.normalMin;
-    const value = mid + (Math.random() - 0.5) * range * 1.4;
-    const rounded = Math.round(value * 10) / 10;
-    const isAbnormal = rounded < config.normalMin || rounded > config.normalMax;
-    data.push({
-      id: `v-${i}`,
-      date: format(date, "MMM d"),
-      value: rounded,
-      isAbnormal,
-      source: Math.random() > 0.3 ? "manual" : "wearable",
-    });
-  }
-  return data;
-}
-
 // ─── Custom tooltip ──────────────────────────────────────
 
 function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: { value: number; payload: VitalReading }[]; label?: string }) {
@@ -126,15 +104,110 @@ export default function PatientVitalsPage() {
   const [inputSource, setInputSource] = useState<"manual" | "wearable">("manual");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
-  const [chartData, setChartData] = useState<Record<VitalType, VitalReading[]>>({} as Record<VitalType, VitalReading[]>);
+  const [loadingVitals, setLoadingVitals] = useState(true);
+  const [chartData, setChartData] = useState<Record<VitalType, VitalReading[]>>({
+    bloodPressure: [],
+    heartRate: [],
+    bloodSugar: [],
+    oxygenSaturation: [],
+    weight: [],
+    temperature: [],
+  });
+
+  const fetchVitals = useCallback(async () => {
+    setLoadingVitals(true);
+    try {
+      const res = await fetch("/api/vitals?limit=30");
+      if (res.ok) {
+        const data = await res.json();
+        const records = Array.isArray(data.vitals) ? data.vitals : [];
+        const mappedData: Record<VitalType, VitalReading[]> = {
+          bloodPressure: [],
+          heartRate: [],
+          bloodSugar: [],
+          oxygenSaturation: [],
+          weight: [],
+          temperature: [],
+        };
+
+        const sorted = [...records].sort(
+          (a, b) => new Date(a.recordedAt).getTime() - new Date(b.recordedAt).getTime()
+        );
+
+        for (const r of sorted) {
+          const dateStr = format(new Date(r.recordedAt), "MMM d");
+          const sourceStr = r.source || "manual";
+
+          if (r.bloodPressure) {
+            const sys = Number(String(r.bloodPressure).split("/")[0]);
+            if (!isNaN(sys)) {
+              mappedData.bloodPressure.push({
+                id: r.id,
+                date: dateStr,
+                value: sys,
+                isAbnormal: sys < 90 || sys > 140,
+                source: sourceStr,
+              });
+            }
+          }
+          if (typeof r.heartRate === "number") {
+            mappedData.heartRate.push({
+              id: r.id,
+              date: dateStr,
+              value: r.heartRate,
+              isAbnormal: r.heartRate < 60 || r.heartRate > 100,
+              source: sourceStr,
+            });
+          }
+          if (typeof r.bloodSugar === "number") {
+            mappedData.bloodSugar.push({
+              id: r.id,
+              date: dateStr,
+              value: r.bloodSugar,
+              isAbnormal: r.bloodSugar < 70 || r.bloodSugar > 140,
+              source: sourceStr,
+            });
+          }
+          if (typeof r.oxygenSaturation === "number") {
+            mappedData.oxygenSaturation.push({
+              id: r.id,
+              date: dateStr,
+              value: r.oxygenSaturation,
+              isAbnormal: r.oxygenSaturation < 95 || r.oxygenSaturation > 100,
+              source: sourceStr,
+            });
+          }
+          if (typeof r.weight === "number") {
+            mappedData.weight.push({
+              id: r.id,
+              date: dateStr,
+              value: r.weight,
+              isAbnormal: r.weight < 40 || r.weight > 150,
+              source: sourceStr,
+            });
+          }
+          if (typeof r.temperature === "number") {
+            mappedData.temperature.push({
+              id: r.id,
+              date: dateStr,
+              value: r.temperature,
+              isAbnormal: r.temperature < 97 || r.temperature > 99.5,
+              source: sourceStr,
+            });
+          }
+        }
+        setChartData(mappedData);
+      }
+    } catch (err) {
+      console.error("Failed to load patient vitals:", err);
+    } finally {
+      setLoadingVitals(false);
+    }
+  }, []);
 
   useEffect(() => {
-    const data: Record<string, VitalReading[]> = {};
-    VITAL_CONFIGS.forEach((c) => {
-      data[c.key] = generateChartData(c);
-    });
-    setChartData(data as Record<VitalType, VitalReading[]>);
-  }, []);
+    fetchVitals();
+  }, [fetchVitals]);
 
   const activeConfig = VITAL_CONFIGS.find((c) => c.key === selectedVital)!;
   const activeData = chartData[selectedVital] || [];
@@ -170,6 +243,7 @@ export default function PatientVitalsPage() {
 
       setSubmitSuccess(true);
       setInputValue("");
+      fetchVitals();
       setTimeout(() => {
         setSubmitSuccess(false);
         setShowForm(false);
@@ -266,57 +340,73 @@ export default function PatientVitalsPage() {
             Passing height={320} as a pixel number skips the measurement
             race entirely.
           */}
-          <div className="w-full">
-            <ResponsiveContainer width="100%" height={320}>
-              <LineChart data={activeData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-                <XAxis dataKey="date" tick={{ fontSize: 11, fill: "#9ca3af" }} tickLine={false} axisLine={{ stroke: "#e5e7eb" }} />
-                <YAxis tick={{ fontSize: 11, fill: "#9ca3af" }} tickLine={false} axisLine={{ stroke: "#e5e7eb" }} domain={["dataMin - 5", "dataMax + 5"]} />
-                <Tooltip content={<ChartTooltip />} />
-                <ReferenceLine y={activeConfig.normalMax} stroke="#fbbf24" strokeDasharray="5 5" label={{ value: "High", position: "right", fill: "#f59e0b", fontSize: 11 }} />
-                <ReferenceLine y={activeConfig.normalMin} stroke="#fbbf24" strokeDasharray="5 5" label={{ value: "Low", position: "right", fill: "#f59e0b", fontSize: 11 }} />
-                <Line
-                  type="monotone"
-                  dataKey="value"
-                  stroke={activeConfig.color}
-                  strokeWidth={2}
-                  dot={<CustomDot />}
-                  activeDot={{ r: 6 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
+          {loadingVitals ? (
+            <div className="flex items-center justify-center py-20">
+              <Loader2 className="w-8 h-8 animate-spin text-[var(--primary)]" />
+            </div>
+          ) : activeData.length === 0 ? (
+            <div className="text-center py-16">
+              <Activity className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+              <p className="text-gray-600 font-medium">No {activeConfig.label} readings recorded yet</p>
+              <p className="text-gray-400 text-xs mt-1">Click &quot;Record Vital&quot; above to log your first measurement</p>
+            </div>
+          ) : (
+            <div className="w-full">
+              <ResponsiveContainer width="100%" height={320}>
+                <LineChart data={activeData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+                  <XAxis dataKey="date" tick={{ fontSize: 11, fill: "#9ca3af" }} tickLine={false} axisLine={{ stroke: "#e5e7eb" }} />
+                  <YAxis tick={{ fontSize: 11, fill: "#9ca3af" }} tickLine={false} axisLine={{ stroke: "#e5e7eb" }} domain={["dataMin - 5", "dataMax + 5"]} />
+                  <Tooltip content={<ChartTooltip />} />
+                  <ReferenceLine y={activeConfig.normalMax} stroke="#fbbf24" strokeDasharray="5 5" label={{ value: "High", position: "right", fill: "#f59e0b", fontSize: 11 }} />
+                  <ReferenceLine y={activeConfig.normalMin} stroke="#fbbf24" strokeDasharray="5 5" label={{ value: "Low", position: "right", fill: "#f59e0b", fontSize: 11 }} />
+                  <Line
+                    type="monotone"
+                    dataKey="value"
+                    stroke={activeConfig.color}
+                    strokeWidth={2}
+                    dot={<CustomDot />}
+                    activeDot={{ r: 6 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          )}
         </div>
 
         {/* Readings table */}
         <div className="bg-white rounded-2xl border border-gray-100 p-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Recent Readings</h2>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-100">
-                  <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase">Date</th>
-                  <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase">Value</th>
-                  <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase">Status</th>
-                  <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase">Source</th>
-                </tr>
-              </thead>
-              <tbody>
-                {activeData.slice().reverse().slice(0, 10).map((r) => (
-                  <tr key={r.id} className="border-b border-gray-50 hover:bg-gray-50">
-                    <td className="py-3 px-4 text-gray-700">{r.date}</td>
-                    <td className="py-3 px-4 font-medium text-gray-900">{r.value} {activeConfig.unit}</td>
-                    <td className="py-3 px-4">
-                      <span className={cn("px-2 py-0.5 rounded-full text-xs font-medium", r.isAbnormal ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700")}>
-                        {r.isAbnormal ? "Abnormal" : "Normal"}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 text-gray-500 capitalize">{r.source}</td>
+          {activeData.length === 0 ? (
+            <p className="text-sm text-gray-500 py-6 text-center">No recent readings to display</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-100">
+                    <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase">Date</th>
+                    <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase">Value</th>
+                    <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase">Status</th>
+                    <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase">Source</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {activeData.slice().reverse().slice(0, 10).map((r) => (
+                    <tr key={r.id} className="border-b border-gray-50 hover:bg-gray-50">
+                      <td className="py-3 px-4 text-gray-700">{r.date}</td>
+                      <td className="py-3 px-4 font-medium text-gray-900">{r.value} {activeConfig.unit}</td>
+                      <td className="py-3 px-4">
+                        <span className={cn("px-2 py-0.5 rounded-full text-xs font-medium", r.isAbnormal ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700")}>
+                          {r.isAbnormal ? "Abnormal" : "Normal"}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-gray-500 capitalize">{r.source}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </main>
 

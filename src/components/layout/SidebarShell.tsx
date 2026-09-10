@@ -4,10 +4,11 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { Menu, LogOut, X, Heart, Settings as SettingsIcon } from "lucide-react";
+import { Menu, LogOut, X, Heart, Settings as SettingsIcon, Search as SearchIcon } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import type { NavItem } from "@/lib/nav-config";
+import { CommandPalette } from "@/components/ui/CommandPalette";
 
 export type SidebarRole = "patient" | "doctor" | "admin";
 
@@ -34,6 +35,19 @@ export function SidebarShell({ role, roleLabel, brand = "Nala Vita", user, nav }
   const router = useRouter();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [isCommandOpen, setIsCommandOpen] = useState(false);
+
+  // Global Cmd+K / Ctrl+K listener
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        setIsCommandOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY(role));
@@ -128,6 +142,28 @@ export function SidebarShell({ role, roleLabel, brand = "Nala Vita", user, nav }
           </div>
         )}
 
+        {/* Global Search / Command Palette Trigger */}
+        <div className="px-3 mb-2">
+          <button
+            onClick={() => setIsCommandOpen(true)}
+            title="Search or jump to... (Cmd+K)"
+            className={cn(
+              "w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700/80 bg-white/80 dark:bg-gray-800/60 hover:bg-white dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 text-xs transition-all shadow-sm hover:border-gray-300 dark:hover:border-gray-600",
+              isCollapsed ? "justify-center px-0" : "justify-between"
+            )}
+          >
+            <div className="flex items-center gap-2">
+              <SearchIcon size={16} className="text-gray-400 shrink-0" />
+              {!isCollapsed && <span>Search or jump to...</span>}
+            </div>
+            {!isCollapsed && (
+              <kbd className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-300 rounded border border-gray-200 dark:border-gray-600 font-mono text-[10px]">
+                ⌘K
+              </kbd>
+            )}
+          </button>
+        </div>
+
         <nav className="flex-1 overflow-y-auto py-2 px-3 space-y-1">
           {nav.map((item) => (
             <NavLink key={item.href} item={item} />
@@ -209,6 +245,26 @@ export function SidebarShell({ role, roleLabel, brand = "Nala Vita", user, nav }
                   </div>
                 </div>
               )}
+
+              {/* Mobile Search Button */}
+              <div className="px-3 py-2">
+                <button
+                  onClick={() => {
+                    setIsMobileOpen(false);
+                    setIsCommandOpen(true);
+                  }}
+                  className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 text-xs shadow-sm"
+                >
+                  <div className="flex items-center gap-2">
+                    <SearchIcon size={16} className="text-gray-400" />
+                    <span>Search or jump to...</span>
+                  </div>
+                  <kbd className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-300 rounded border border-gray-200 dark:border-gray-600 font-mono text-[10px]">
+                    ⌘K
+                  </kbd>
+                </button>
+              </div>
+
               <nav className="flex-1 overflow-y-auto py-2 px-3 space-y-1">
                 {nav.map((item) => (
                   <Link
@@ -250,6 +306,13 @@ export function SidebarShell({ role, roleLabel, brand = "Nala Vita", user, nav }
           </>
         )}
       </AnimatePresence>
+
+      {/* Global Command Palette */}
+      <CommandPalette
+        role={role}
+        isOpen={isCommandOpen}
+        onClose={() => setIsCommandOpen(false)}
+      />
     </>
   );
 }

@@ -15,20 +15,25 @@ jest.mock("@/components/chat/ChatInput", () => ({
 }));
 
 import AmeliaChat from "@/components/amelia/AmeliaChat";
+import { mockAmeliaFetch } from "../../helpers/sse";
 
 beforeEach(() => {
-  (global as unknown as { fetch: jest.Mock }).fetch = jest.fn(async () => ({
-    ok: true,
-    json: async () => ({
-      conversationId: "c1",
-      reply: { content: "Sure!", urgency: "routine", redFlags: [], disclaimer: "d" },
-      reminderSuggestion: { kind: "MEDICATION", label: "take meds", frequency: "DAILY", nextFireAt: "2026-06-12T08:00:00.000Z", schedule: "every day at 8:00 AM" },
-    }),
-  })) as unknown as jest.Mock;
+  mockAmeliaFetch({
+    frames: [
+      { type: "meta", conversationId: "c1" },
+      { type: "start", urgency: "routine", redFlags: [], disclaimer: "d" },
+      { type: "delta", text: "Sure!" },
+      {
+        type: "done",
+        conversationId: "c1",
+        reminderSuggestion: { kind: "MEDICATION", label: "take meds", frequency: "DAILY", nextFireAt: "2026-06-12T08:00:00.000Z", schedule: "every day at 8:00 AM" },
+      },
+    ],
+  });
 });
 
 describe("AmeliaChat reminder card", () => {
-  it("renders a ReminderCard when the reply carries a reminderSuggestion", async () => {
+  it("renders a ReminderCard when the done frame carries a reminderSuggestion", async () => {
     render(<AmeliaChat />);
     fireEvent.change(screen.getByLabelText("message"), { target: { value: "remind me to take meds at 8" } });
     fireEvent.click(screen.getByText("send"));

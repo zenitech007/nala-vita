@@ -34,6 +34,65 @@ Supabase login cookies → live endpoints):
   — the gpt-4o vision model is confirmed reachable, but the photo→table flow
   needs a real lab-report image (do it via the UI when convenient).
 
+### ⚠️ Pending live smoke: functional inference + SSE streaming (2026-08-06)
+
+Three fixes shipped together — **functional inference** (`src/lib/amelia/functional.ts`),
+**conversation persistence** (`src/lib/amelia/conversations.ts` + `/api/amelia/conversations`),
+and **SSE streaming** (`AmeliaChat.tsx` + `useStickToBottom.ts`). `scripts/smoke-amelia-fixes.mjs`
+exercises all three live.
+
+Ran it on **2026-08-06 — it could not complete: the `OPENAI_API_KEY` in `.env` is
+dead.** OpenAI returns `401 invalid_api_key`; confirmed independently of the app
+(a bare `GET https://api.openai.com/v1/models` with that key also 401s), so this
+is environmental, not a code defect. The key was valid on 2026-06-09 — revoked or
+expired since.
+
+What that run **did** verify (the no-LLM paths):
+- ✅ Persistence end-to-end: real Supabase login → `GET /api/amelia/conversations?latest=1`
+  → 200, conversation resumed, 6 conversations in the sidebar, derived titles present,
+  `/conversations/[id]` → 200, unknown id → **404 (no cross-patient leak)**.
+- ✅ Emergency hard-stop still fires with **no** LLM call — `urgency=emergency`,
+  reply directs the patient to seek care. Safety layer intact.
+
+**Still unproven end-to-end (do this first when a valid key is in `.env`):**
+- Functional inference against real gpt-4o — do the lipstick / sticky-lock /
+  fingerprint replies actually probe the body instead of answering cosmetically?
+  Unit-covered by 12 tests in `src/__tests__/lib/amelia/functional.test.ts`
+  (including those three cases and a "stays quiet on a plain symptom" control),
+  but unit tests assert on the prompt, not on the model's reply.
+- SSE streaming deltas arriving incrementally (`deltas > 1`, first-delta latency).
+- The `restored transcript ≥ 4 messages` assertion, which failed only because the
+  assistant turns never generated.
+
+Re-run: `npm run dev`, then `node --env-file=.env scripts/smoke-amelia-fixes.mjs`.
+Expect `ALL CHECKS PASSED`. Note the post-turn memory-extraction and
+reminder-detection calls also 401 on a dead key (logged, non-fatal).
+
+### Chat attachments moved to a private, authorized path (2026-08-06)
+
+Attachments no longer go client-side to a public Supabase URL. `POST
+/api/messages/attachments` uploads with the service role into the private
+`medical-files` bucket, verifies the file's magic bytes against its declared MIME
+type, records a `FileUpload` row categorised `chat-attachment:<receiverId>`, and
+returns an opaque `/api/messages/attachments/<id>`. `POST /api/messages` accepts
+*only* that shape (`parseChatAttachmentId`) and re-checks ownership, category and
+single-use; `GET /…/attachments/[id]` streams the bytes with `no-store` +
+`nosniff` after confirming the caller is a participant in the linked message.
+
+Caught during commit prep: the server side was hardened but `ChatWindow` was
+still uploading to Supabase and sending a public URL, which the new Zod schema
+rejected — **every attachment send returned 400.** The client is now migrated,
+covered by `src/__tests__/components/chat/ChatWindow-attachments.test.tsx` (the
+upload-contract test was confirmed to fail if the old public-URL behaviour is
+reintroduced).
+
+Two leftovers worth knowing:
+- Opaque URLs carry no file extension, so the renderer optimistically tries an
+  `<Image>` and falls back to a download link via `onError` (`isRenderableImage`).
+  Pre-migration messages with public `.png`-style URLs still render by extension.
+- Messages sent before this change still hold public storage URLs and are served
+  by the old public path. No back-fill was done.
+
 **Lab-photo polish** (Phase 2 review, non-blocking): `LabPhotoUpload` redefines
 `ExtractedLab`/`LabPhotoResult` locally rather than `import type`-ing them from
 `labvision` (a deliberate client/server decoupling — revisit if it drifts).
@@ -49,11 +108,10 @@ Supabase login cookies → live endpoints):
   feedback or load-error state (UI just reloads / shows empty).
 - Extraction + reminder-detection models are hardcoded to `gpt-4o-mini`.
 - Reminder "Not now" dismissal is session-only (not persisted server-side).
-- **Amelia tables lack FK relations to `Patient`** — `AmeliaConversation`,
-  `AmeliaMessage`, `AmeliaMemory`, and `Reminder` all use a loose
-  `patientId String` + index (no `@relation`/cascade). Consistent within the
-  subsystem, but inconsistent with the rest of the schema; add FK relations
-  + `onDelete: Cascade` across all Amelia tables in one pass.
+- ~~**Amelia tables lack FK relations to `Patient`**~~ ✅ Done 2026-08-06.
+  `AmeliaConversation`, `AmeliaMessage`, `AmeliaMemory` and `Reminder` now carry
+  real `@relation`s with `onDelete: Cascade` (`AmeliaConversation.doctor` uses
+  `SetNull`), plus a `prisma/migrations/20260717000000_baseline` migration.
 
 **Remaining Amelia phases (designed at a high level, not yet built):**
 - Phase 2 sub-feature still to do: proactive dashboard card.

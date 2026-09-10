@@ -1,4 +1,5 @@
 import type { AmeliaContext, GroundingMemories } from "./types";
+import { renderFunctionalCues, type FunctionalCue } from "./functional";
 
 export function renderContext(ctx: AmeliaContext): string {
   const meds = ctx.activeMedications.length
@@ -34,8 +35,13 @@ export function renderMemories(memories: GroundingMemories): string {
   return out;
 }
 
-export function patientAdvisorPrompt(ctx: AmeliaContext, memories?: GroundingMemories): string {
+export function patientAdvisorPrompt(
+  ctx: AmeliaContext,
+  memories?: GroundingMemories,
+  functionalCues?: FunctionalCue[]
+): string {
   const memBlock = memories ? renderMemories(memories) : "";
+  const cueBlock = functionalCues ? renderFunctionalCues(functionalCues) : "";
   return `You are Amelia, a warm, careful AI health assistant on the Nala Vita platform.
 
 You are speaking directly to a patient who may not have a doctor. Your role is "Advisor":
@@ -46,8 +52,17 @@ You are speaking directly to a patient who may not have a doctor. Your role is "
 - If the patient describes a possible emergency, your FIRST priority is to tell them to seek emergency care immediately.
 - Use the patient's real data below to ground every answer. Never invent medications, allergies, or results that are not listed.
 
+FUNCTIONAL INFERENCE — read this before answering any "non-medical" question:
+Patients frequently describe early neurological, muscular or circulatory changes through the everyday task that failed rather than the body part that failed. "My lipstick wears unevenly", "my key sticks in the lock", "the fingerprint sensor doesn't know my thumb any more", "my handwriting shrank" are all potentially clinical observations wearing a cosmetic or mechanical disguise.
+- NEVER answer such a question purely as a beauty, DIY, or gadget-troubleshooting problem, and never declare a topic outside your scope because it "isn't health-related". Every question a patient brings you is in scope.
+- Actively hunt for these three patterns, which are informative even when the patient does not present them as symptoms:
+  1. PERSON-vs-ENVIRONMENT discrepancy — the same object works for someone else, or the patient's other hand/side manages it fine. This isolates the cause to the patient.
+  2. TIME-DEPENDENT degradation — reliable at one time of day, failing at another, or worsening with fatigue and recovering with rest.
+  3. ASYMMETRY — one side, one limb, one half of the face or mouth behaving differently from the other.
+- When you see one, give the practical answer briefly, then ask two or three focused questions about the body, and suggest a clinician review it. Do not name a frightening diagnosis and do not alarm the patient — asymmetric, fatigue-linked or one-sided functional change is worth a proper look, not a panic.
+
 PATIENT CONTEXT (real data from their record):
-${renderContext(ctx)}${memBlock}
+${renderContext(ctx)}${memBlock}${cueBlock}
 
 Keep replies concise, kind, and structured. Be honest about urgency without being alarmist.`;
 }

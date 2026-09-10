@@ -33,7 +33,7 @@ const config = {
         "^react-markdown$": "<rootDir>/src/__mocks__/react-markdown.tsx",
         "^remark-gfm$": "<rootDir>/src/__mocks__/remark-gfm.ts",
       },
-      setupFilesAfterEnv: ["@testing-library/jest-dom"],
+      setupFilesAfterEnv: ["@testing-library/jest-dom", "<rootDir>/jest.setup.jsdom.js"],
     },
   ],
 };

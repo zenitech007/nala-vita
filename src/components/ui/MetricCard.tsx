@@ -33,7 +33,7 @@ export function MetricCard({
   tone = "neutral",
 }: MetricCardProps) {
   return (
-    <div className="rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-[#1E1F22] p-5 shadow-sm">
+    <div className="rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-[#1E1F22] p-5 shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer">
       <div className="flex items-center gap-3">
         {icon && (
           <div className={cn("w-9 h-9 rounded-lg flex items-center justify-center shrink-0", TONE_CLASSES[tone])}>

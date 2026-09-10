@@ -60,19 +60,6 @@ export default function PatientTelemedicinePage() {
     init();
   }, [appointmentId]);
 
-  // Placeholder appointment if API not wired
-  const displayAppointment: AppointmentInfo = appointment || {
-    id: appointmentId,
-    scheduledAt: new Date().toISOString(),
-    duration: 30,
-    status: "IN_PROGRESS",
-    consultationType: "VIDEO",
-    doctor: {
-      specialization: "General Practice",
-      user: { firstName: "Sarah", lastName: "Johnson", avatarUrl: null },
-    },
-  };
-
   const handleCallEnd = () => {
     setCallEnded(true);
   };
@@ -81,6 +68,28 @@ export default function PatientTelemedicinePage() {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center">
         <Loader2 className="w-10 h-10 animate-spin text-[var(--primary)]" />
+      </div>
+    );
+  }
+
+  if (!appointment) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl border border-gray-100 p-8 text-center max-w-md">
+          <div className="w-14 h-14 bg-red-50 text-red-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <AlertCircle className="w-7 h-7" />
+          </div>
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Appointment Not Found</h2>
+          <p className="text-gray-500 text-sm mb-6">
+            The consultation session could not be found or you do not have permission to join it.
+          </p>
+          <Link
+            href="/patient/appointments"
+            className="inline-flex items-center justify-center px-5 py-2.5 bg-[var(--primary)] text-white text-sm font-medium rounded-xl hover:opacity-90 transition"
+          >
+            Back to Appointments
+          </Link>
+        </div>
       </div>
     );
   }
@@ -97,8 +106,8 @@ export default function PatientTelemedicinePage() {
           </h2>
           <p className="text-gray-500 mb-2">
             Your video consultation with Dr.{" "}
-            {displayAppointment.doctor.user.firstName}{" "}
-            {displayAppointment.doctor.user.lastName} has ended.
+            {appointment.doctor?.user?.firstName}{" "}
+            {appointment.doctor?.user?.lastName} has ended.
           </p>
           <p className="text-sm text-gray-400 mb-8">
             Any prescriptions or notes will appear in your dashboard shortly.
@@ -137,11 +146,11 @@ export default function PatientTelemedicinePage() {
             <div>
               <h1 className="text-white font-semibold">
                 Consultation with Dr.{" "}
-                {displayAppointment.doctor.user.firstName}{" "}
-                {displayAppointment.doctor.user.lastName}
+                {appointment.doctor.user.firstName}{" "}
+                {appointment.doctor.user.lastName}
               </h1>
               <p className="text-gray-400 text-sm">
-                {displayAppointment.doctor.specialization}
+                {appointment.doctor.specialization}
               </p>
             </div>
           </div>
@@ -149,11 +158,11 @@ export default function PatientTelemedicinePage() {
           <div className="flex items-center gap-4 text-sm text-gray-400">
             <span className="inline-flex items-center gap-1.5">
               <Calendar className="w-4 h-4" />
-              {format(new Date(displayAppointment.scheduledAt), "MMM d, yyyy")}
+              {format(new Date(appointment.scheduledAt), "MMM d, yyyy")}
             </span>
             <span className="inline-flex items-center gap-1.5">
               <Clock className="w-4 h-4" />
-              {displayAppointment.duration} min
+              {appointment.duration} min
             </span>
           </div>
         </div>
@@ -161,7 +170,7 @@ export default function PatientTelemedicinePage() {
 
       {/* Main: Video panel */}
       <main className="flex-1 p-4 max-w-5xl mx-auto w-full">
-        {displayAppointment.consultationType !== "VIDEO" ? (
+        {appointment.consultationType !== "VIDEO" ? (
           <div className="flex items-center justify-center h-full">
             <div className="bg-gray-800 rounded-2xl p-10 text-center">
               <AlertCircle className="w-12 h-12 text-amber-500 mx-auto mb-4" />
@@ -170,7 +179,7 @@ export default function PatientTelemedicinePage() {
               </p>
               <p className="text-gray-400 text-sm mt-2">
                 This appointment is scheduled as{" "}
-                {displayAppointment.consultationType.replace("_", " ").toLowerCase()}
+                {appointment.consultationType.replace("_", " ").toLowerCase()}
               </p>
             </div>
           </div>

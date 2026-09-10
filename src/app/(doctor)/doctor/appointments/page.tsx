@@ -111,11 +111,8 @@ export default function DoctorAppointmentsPage() {
     fetchAppointments();
   }, [fetchAppointments]);
 
-  // Placeholder data for UI
-  const displayAppointments: DoctorAppointment[] =
-    appointments.length > 0
-      ? appointments
-      : generatePlaceholderAppointments(activeTab);
+  // Real appointments from database
+  const displayAppointments: DoctorAppointment[] = appointments;
 
   const calendarDays = Array.from({ length: 7 }, (_, i) => addDays(calendarWeekStart, i));
 
@@ -563,67 +560,4 @@ function PatientSidebar({
   );
 }
 
-// ═══════════════════════════════════════════════════════════
-//  Placeholder data generator
-// ═══════════════════════════════════════════════════════════
 
-function generatePlaceholderAppointments(tab: TabKey): DoctorAppointment[] {
-  const statusForTab: Record<TabKey, string> = {
-    upcoming: "CONFIRMED",
-    in_progress: "IN_PROGRESS",
-    completed: "COMPLETED",
-    cancelled: "CANCELLED",
-  };
-
-  const patients = [
-    { first: "Alice", last: "Brown", gender: "Female", dob: "1985-03-15", blood: "A+", allergies: ["Penicillin"] },
-    { first: "Robert", last: "Smith", gender: "Male", dob: "1978-07-22", blood: "O-", allergies: [] },
-    { first: "Diana", last: "Lee", gender: "Female", dob: "1992-11-08", blood: "B+", allergies: ["Sulfa drugs", "Latex"] },
-    { first: "James", last: "Wilson", gender: "Male", dob: "1965-01-30", blood: "AB+", allergies: ["Aspirin"] },
-    { first: "Maria", last: "Garcia", gender: "Female", dob: "1990-06-12", blood: "O+", allergies: [] },
-  ];
-
-  const reasons = [
-    "Chest pain and shortness of breath",
-    "Severe migraine - 3 days",
-    "Follow-up blood pressure check",
-    "Annual physical exam",
-    "Medication side effects review",
-  ];
-
-  const urgencies: ("LOW" | "MEDIUM" | "HIGH" | "CRITICAL")[] = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "MEDIUM"];
-  const types: string[] = ["VIDEO", "IN_PERSON", "VIDEO", "IN_PERSON", "PHONE"];
-
-  return patients.map((p, i) => {
-    const schedDate = new Date();
-    schedDate.setHours(9 + i, (i % 2) * 30, 0, 0);
-
-    return {
-      id: `placeholder-${i}`,
-      scheduledAt: schedDate.toISOString(),
-      duration: 30,
-      status: statusForTab[tab],
-      consultationType: types[i],
-      urgencyLevel: urgencies[i],
-      reason: reasons[i],
-      notes: null,
-      patient: {
-        id: `patient-${i}`,
-        dateOfBirth: p.dob,
-        gender: p.gender,
-        bloodType: p.blood,
-        allergies: p.allergies,
-        user: { firstName: p.first, lastName: p.last, avatarUrl: null, email: `${p.first.toLowerCase()}@email.com`, phone: "+1 555-000-000" + i },
-        vitals: [
-          { id: `v-${i}`, bloodPressure: "120/80", heartRate: 72, temperature: 98.6, recordedAt: new Date().toISOString() },
-        ],
-        prescriptions: [
-          { id: `rx-${i}`, medication: "Lisinopril 10mg", dosage: "10mg", frequency: "Once daily", isActive: true },
-        ],
-        medicalNotes: [
-          { id: `note-${i}`, title: "Previous visit", content: "Patient presented with mild symptoms. Vitals normal.", createdAt: new Date(Date.now() - 86400000 * 7).toISOString() },
-        ],
-      },
-    };
-  });
-}

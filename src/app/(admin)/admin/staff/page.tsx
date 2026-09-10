@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   ChevronLeft,
@@ -79,18 +79,31 @@ export default function AdminStaffPage() {
   const [deptModalId, setDeptModalId] = useState<string | null>(null);
   const [deptModalValue, setDeptModalValue] = useState("");
 
-  // ─── Placeholder data ──────────────────────────────────
+  // ─── Real Staff Data ─────────────────────────────────
 
-  const [staffList, setStaffList] = useState<StaffMember[]>([
-    { id: "s1", name: "Dr. Sarah Chen", email: "sarah.chen@mediconnect.io", role: "DOCTOR", speciality: "Cardiologist", licenceNumber: "MD-2024-1001", department: "Cardiology", isActive: true, joinedAt: "2023-06-15" },
-    { id: "s2", name: "Dr. Michael Ross", email: "m.ross@mediconnect.io", role: "DOCTOR", speciality: "Neurologist", licenceNumber: "MD-2024-1002", department: "Neurology", isActive: true, joinedAt: "2023-08-20" },
-    { id: "s3", name: "Dr. Emily Taylor", email: "e.taylor@mediconnect.io", role: "DOCTOR", speciality: "Pediatrician", licenceNumber: "MD-2024-1003", department: "Pediatrics", isActive: false, joinedAt: "2023-09-10" },
-    { id: "s4", name: "Nurse Rebecca Hall", email: "r.hall@mediconnect.io", role: "NURSE", speciality: "ICU Nurse", licenceNumber: "RN-2024-2001", department: "Emergency", isActive: true, joinedAt: "2024-01-05" },
-    { id: "s5", name: "Dr. David Kim", email: "d.kim@mediconnect.io", role: "DOCTOR", speciality: "Orthopedic Surgeon", licenceNumber: "MD-2024-1004", department: "Orthopedics", isActive: true, joinedAt: "2024-02-18" },
-    { id: "s6", name: "Nurse Lisa Patel", email: "l.patel@mediconnect.io", role: "NURSE", speciality: "OR Nurse", licenceNumber: "RN-2024-2002", department: "Orthopedics", isActive: true, joinedAt: "2024-03-01" },
-    { id: "s7", name: "Dr. James Cooper", email: "j.cooper@mediconnect.io", role: "DOCTOR", speciality: "Oncologist", licenceNumber: "MD-2024-1005", department: "Oncology", isActive: true, joinedAt: "2023-11-22" },
-    { id: "s8", name: "Nurse Ana Torres", email: "a.torres@mediconnect.io", role: "NURSE", speciality: "Registered Nurse", licenceNumber: "RN-2024-2003", department: "General Medicine", isActive: false, joinedAt: "2024-01-15" },
-  ]);
+  const [staffList, setStaffList] = useState<StaffMember[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchStaff = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/admin/staff");
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.staff)) {
+          setStaffList(data.staff);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to load staff list:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchStaff();
+  }, []);
 
   // ─── Handlers ──────────────────────────────────────────
 
@@ -103,45 +116,64 @@ export default function AdminStaffPage() {
     return matchesSearch && matchesRole;
   });
 
-  function toggleActive(id: string) {
+  async function toggleActive(id: string) {
+    const target = staffList.find((s) => s.id === id);
+    if (!target) return;
+    const nextState = !target.isActive;
     setStaffList((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, isActive: !s.isActive } : s))
+      prev.map((s) => (s.id === id ? { ...s, isActive: nextState } : s))
     );
+    try {
+      await fetch("/api/admin/staff", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ doctorId: id, isActive: nextState }),
+      });
+    } catch (err) {
+      console.error("Failed to toggle staff active state:", err);
+    }
   }
 
-  function assignDepartment(id: string, dept: string) {
+  async function assignDepartment(id: string, dept: string) {
     setStaffList((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, department: dept } : s))
+      prev.map((s) => (s.id === id ? { ...s, department: dept, speciality: dept } : s))
     );
     setDeptModalId(null);
     setDeptModalValue("");
+    try {
+      await fetch("/api/admin/staff", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ doctorId: id, department: dept }),
+      });
+    } catch (err) {
+      console.error("Failed to update staff department:", err);
+    }
   }
 
   function handleAddStaff() {
     if (!formName || !formEmail || !formSpeciality || !formLicence || !formDepartment) return;
     setSaving(true);
-    setTimeout(() => {
-      const newStaff: StaffMember = {
-        id: `s${Date.now()}`,
-        name: formRole === "DOCTOR" ? `Dr. ${formName}` : `Nurse ${formName}`,
-        email: formEmail,
-        role: formRole,
-        speciality: formSpeciality,
-        licenceNumber: formLicence,
-        department: formDepartment,
-        isActive: true,
-        joinedAt: new Date().toISOString().slice(0, 10),
-      };
-      setStaffList((prev) => [newStaff, ...prev]);
-      setFormName("");
-      setFormEmail("");
-      setFormRole("DOCTOR");
-      setFormSpeciality("");
-      setFormLicence("");
-      setFormDepartment("");
-      setShowAddForm(false);
-      setSaving(false);
-    }, 600);
+    const newStaff: StaffMember = {
+      id: `s${Date.now()}`,
+      name: formRole === "DOCTOR" ? `Dr. ${formName}` : `Nurse ${formName}`,
+      email: formEmail,
+      role: formRole,
+      speciality: formSpeciality,
+      licenceNumber: formLicence,
+      department: formDepartment,
+      isActive: true,
+      joinedAt: new Date().toISOString().slice(0, 10),
+    };
+    setStaffList((prev) => [newStaff, ...prev]);
+    setFormName("");
+    setFormEmail("");
+    setFormRole("DOCTOR");
+    setFormSpeciality("");
+    setFormLicence("");
+    setFormDepartment("");
+    setShowAddForm(false);
+    setSaving(false);
   }
 
   // ─── Stats ─────────────────────────────────────────────
@@ -245,7 +277,14 @@ export default function AdminStaffPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {filtered.length === 0 ? (
+                {loading ? (
+                  <tr>
+                    <td colSpan={7} className="text-center py-12">
+                      <Loader2 className="w-8 h-8 animate-spin text-[var(--primary)] mx-auto mb-2" />
+                      <p className="text-gray-500 text-sm">Loading staff directory...</p>
+                    </td>
+                  </tr>
+                ) : filtered.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="text-center py-12">
                       <Search className="w-10 h-10 text-gray-300 mx-auto mb-2" />

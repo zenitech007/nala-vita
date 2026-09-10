@@ -29,6 +29,31 @@ export interface ChatMessage {
   createdAt: string;
 }
 
+interface UploadedAttachment {
+  id: string;
+  url: string;
+}
+
+const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+const ALLOWED_ATTACHMENT_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+  "application/pdf",
+]);
+const PRIVATE_ATTACHMENT_PATTERN =
+  /^\/api\/messages\/attachments\/[a-zA-Z0-9_-]+$/;
+
+// Private attachment URLs are opaque — no file extension to sniff — so we
+// optimistically render them as an image and fall back to a download link if
+// the load fails (i.e. it was a PDF). Legacy public URLs still carry an
+// extension, so keep matching those for messages sent before the migration.
+function isRenderableImage(url: string) {
+  if (PRIVATE_ATTACHMENT_PATTERN.test(url)) return true;
+  return /\.(jpg|jpeg|png|gif|webp)/i.test(url);
+}
+
 interface ChatWindowProps {
   currentUserId: string;
   otherUserId: string;
@@ -54,6 +79,10 @@ export default function ChatWindow({
   const [attachmentPreview, setAttachmentPreview] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [showScrollDown, setShowScrollDown] = useState(false);
+  const [error, setError] = useState("");
+  const [brokenAttachments, setBrokenAttachments] = useState<Set<string>>(
+    new Set()
+  );
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -65,12 +94,13 @@ export default function ChatWindow({
     setIsLoading(true);
     try {
       const res = await fetch(`/api/messages?otherUserId=${otherUserId}`);
-      if (res.ok) {
-        const data = await res.json();
-        setMessages(data.messages || []);
-      }
-    } catch {
-      // placeholder
+      if (!res.ok) throw new Error("Messages could not be loaded");
+
+      const data = await res.json();
+      setMessages(Array.isArray(data.messages) ? data.messages : []);
+      setError("");
+    } catch (err) {
+      setError((err as Error).message || "Messages could not be loaded");
     } finally {
       setIsLoading(false);
     }
@@ -167,24 +197,41 @@ export default function ChatWindow({
     }
   };
 
-  const uploadFile = async (file: File): Promise<string | null> => {
+  // Attachments go through /api/messages/attachments, which uploads to the
+  // private bucket with the service role and returns an opaque, authorization-
+  // checked URL. POST /api/messages only accepts that shape — never a public
+  // storage URL — so uploading straight to Supabase from here would be rejected.
+  const uploadAttachment = async (
+    file: File
+  ): Promise<UploadedAttachment | null> => {
     setIsUploading(true);
     try {
-      const ext = file.name.split(".").pop();
-      const path = `chat/${currentUserId}/${Date.now()}.${ext}`;
-
-      const { error } = await supabase.storage
-        .from("attachments")
-        .upload(path, file);
-
-      if (error) {
-        console.error("Upload error:", error);
+      if (file.size < 1 || file.size > MAX_ATTACHMENT_BYTES) {
+        setError("Attachment must be between 1 byte and 10 MB");
+        return null;
+      }
+      if (!ALLOWED_ATTACHMENT_TYPES.has(file.type)) {
+        setError("Only JPEG, PNG, GIF, WebP, and PDF files are allowed");
         return null;
       }
 
-      const { data } = supabase.storage.from("attachments").getPublicUrl(path);
-      return data.publicUrl;
+      const body = new FormData();
+      body.append("file", file);
+      body.append("receiverId", otherUserId);
+
+      const res = await fetch("/api/messages/attachments", {
+        method: "POST",
+        body,
+      });
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        setError(data.error || "Attachment upload failed");
+        return null;
+      }
+      return data.attachment as UploadedAttachment;
     } catch {
+      setError("Attachment upload failed");
       return null;
     } finally {
       setIsUploading(false);
@@ -204,9 +251,15 @@ export default function ChatWindow({
     setIsSending(true);
 
     try {
+      setError("");
+
       let attachmentUrl: string | null = null;
       if (attachmentFile) {
-        attachmentUrl = await uploadFile(attachmentFile);
+        const uploaded = await uploadAttachment(attachmentFile);
+        // uploadAttachment has already set a specific error. Bail out rather
+        // than sending a message whose attachment silently went missing.
+        if (!uploaded) return;
+        attachmentUrl = uploaded.url;
       }
 
       const res = await fetch("/api/messages", {
@@ -219,27 +272,31 @@ export default function ChatWindow({
         }),
       });
 
-      if (res.ok) {
-        const data = await res.json();
-        const msg = data.message as ChatMessage;
-
-        // Add to local state immediately
-        setMessages((prev) => [...prev, msg]);
-
-        // Broadcast via realtime
-        supabase
-          .channel(`messages:${[currentUserId, otherUserId].sort().join("-")}`)
-          .send({
-            type: "broadcast",
-            event: "new_message",
-            payload: msg,
-          });
-
-        setNewMessage("");
-        removeAttachment();
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error || "Message could not be sent");
+        return;
       }
+
+      const data = await res.json();
+      const msg = data.message as ChatMessage;
+
+      // Add to local state immediately
+      setMessages((prev) => [...prev, msg]);
+
+      // Broadcast via realtime
+      supabase
+        .channel(`messages:${[currentUserId, otherUserId].sort().join("-")}`)
+        .send({
+          type: "broadcast",
+          event: "new_message",
+          payload: msg,
+        });
+
+      setNewMessage("");
+      removeAttachment();
     } catch {
-      // handle
+      setError("Message could not be sent");
     } finally {
       setIsSending(false);
     }
@@ -324,7 +381,8 @@ export default function ChatWindow({
                       {/* Attachment */}
                       {msg.attachmentUrl && (
                         <div className={cn("mb-1 rounded-xl overflow-hidden", isOwn ? "ml-auto" : "")}>
-                          {msg.attachmentUrl.match(/\.(jpg|jpeg|png|gif|webp)/i) ? (
+                          {isRenderableImage(msg.attachmentUrl) &&
+                          !brokenAttachments.has(msg.id) ? (
                             <Image
                               src={msg.attachmentUrl}
                               alt="attachment"
@@ -332,6 +390,11 @@ export default function ChatWindow({
                               height={192}
                               className="max-w-full max-h-48 rounded-xl object-contain"
                               unoptimized
+                              onError={() =>
+                                setBrokenAttachments((prev) =>
+                                  new Set(prev).add(msg.id)
+                                )
+                              }
                             />
                           ) : (
                             <a
@@ -396,6 +459,23 @@ export default function ChatWindow({
           </button>
         )}
       </div>
+
+      {/* Error banner — load, upload and send failures all surface here */}
+      {error && (
+        <div
+          role="alert"
+          className="flex items-start gap-2 px-6 py-2 border-t border-red-100 bg-red-50"
+        >
+          <p className="flex-1 text-xs text-red-700">{error}</p>
+          <button
+            onClick={() => setError("")}
+            aria-label="Dismiss error"
+            className="text-red-400 hover:text-red-600 transition"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
 
       {/* Attachment preview */}
       {attachmentFile && (

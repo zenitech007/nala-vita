@@ -51,6 +51,7 @@ type FilterKey = "all" | "pending" | "completed" | "abnormal";
 export default function PatientLabResultsPage() {
   const [orders, setOrders] = useState<LabOrder[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [activeFilter, setActiveFilter] = useState<FilterKey>("all");
   const [selectedOrder, setSelectedOrder] = useState<LabOrder | null>(null);
   const [aiSummary, setAiSummary] = useState<string | null>(null);
@@ -58,14 +59,25 @@ export default function PatientLabResultsPage() {
 
   const fetchOrders = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const res = await fetch("/api/lab-tests");
-      if (res.ok) {
-        const data = await res.json();
-        setOrders(data.labOrders || []);
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        throw new Error(data?.error || "Unable to load lab results");
       }
-    } catch {
-      // placeholder
+
+      if (!Array.isArray(data?.labOrders)) {
+        throw new Error("The lab results response was invalid");
+      }
+
+      setOrders(data.labOrders);
+    } catch (error) {
+      setOrders([]);
+      setLoadError(
+        error instanceof Error ? error.message : "Unable to load lab results"
+      );
     } finally {
       setLoading(false);
     }
@@ -75,88 +87,8 @@ export default function PatientLabResultsPage() {
     fetchOrders();
   }, [fetchOrders]);
 
-  // Placeholder orders for UI preview
-  const displayOrders: LabOrder[] =
-    orders.length > 0
-      ? orders
-      : [
-          {
-            id: "lo1",
-            testName: "Complete Blood Count (CBC)",
-            testCode: "CBC",
-            instructions: "Fasting for 8 hours",
-            urgency: "HIGH",
-            orderedAt: new Date(Date.now() - 86400000 * 7).toISOString(),
-            doctor: { user: { firstName: "Sarah", lastName: "Johnson" } },
-            results: [
-              {
-                id: "r1",
-                resultValue: "WBC: 7.5 x10^3/uL, RBC: 4.8 x10^6/uL, Hemoglobin: 14.2 g/dL, Hematocrit: 42%, Platelets: 250 x10^3/uL",
-                unit: null,
-                referenceMin: null,
-                referenceMax: null,
-                isAbnormal: false,
-                notes: "All values within normal range",
-                reportUrl: null,
-                completedAt: new Date(Date.now() - 86400000 * 5).toISOString(),
-              },
-            ],
-          },
-          {
-            id: "lo2",
-            testName: "Lipid Panel",
-            testCode: "LIPID",
-            instructions: "12-hour fasting required",
-            urgency: "MEDIUM",
-            orderedAt: new Date(Date.now() - 86400000 * 10).toISOString(),
-            doctor: { user: { firstName: "Sarah", lastName: "Johnson" } },
-            results: [
-              {
-                id: "r2",
-                resultValue: "Total Cholesterol: 245 mg/dL, LDL: 165 mg/dL, HDL: 42 mg/dL, Triglycerides: 190 mg/dL",
-                unit: null,
-                referenceMin: null,
-                referenceMax: null,
-                isAbnormal: true,
-                notes: "Elevated LDL and Total Cholesterol. Low HDL. Elevated Triglycerides.",
-                reportUrl: null,
-                completedAt: new Date(Date.now() - 86400000 * 8).toISOString(),
-              },
-            ],
-          },
-          {
-            id: "lo3",
-            testName: "Hemoglobin A1C",
-            testCode: "HBA1C",
-            instructions: null,
-            urgency: "LOW",
-            orderedAt: new Date(Date.now() - 86400000 * 3).toISOString(),
-            doctor: { user: { firstName: "Michael", lastName: "Chen" } },
-            results: [],
-          },
-          {
-            id: "lo4",
-            testName: "Thyroid Stimulating Hormone (TSH)",
-            testCode: "TSH",
-            instructions: null,
-            urgency: "LOW",
-            orderedAt: new Date(Date.now() - 86400000 * 14).toISOString(),
-            doctor: { user: { firstName: "Sarah", lastName: "Johnson" } },
-            results: [
-              {
-                id: "r4",
-                resultValue: "TSH: 6.8 mIU/L",
-                unit: "mIU/L",
-                referenceMin: "0.4",
-                referenceMax: "4.0",
-                isAbnormal: true,
-                notes: "Elevated TSH — may indicate hypothyroidism. Follow-up recommended.",
-                reportUrl: null,
-                completedAt: new Date(Date.now() - 86400000 * 12).toISOString(),
-              },
-            ],
-          },
-        ];
+  // Real orders from database
+  const displayOrders: LabOrder[] = orders;
 
   // Filter logic
   const filteredOrders = displayOrders.filter((order) => {
@@ -168,7 +100,7 @@ export default function PatientLabResultsPage() {
     return true;
   });
 
-  // Generate AI summary for a lab result
+  // Generate AI summary for a lab result using Gemini 3.6 Flash
   const generateAiSummary = async (order: LabOrder) => {
     setAiLoading(true);
     setAiSummary(null);
@@ -192,31 +124,14 @@ export default function PatientLabResultsPage() {
         const data = await res.json();
         setAiSummary(data.summary);
       } else {
-        // Placeholder AI summary for demo
-        setAiSummary(getPlaceholderSummary(order));
+        const errData = await res.json().catch(() => null);
+        setAiSummary(errData?.error || "Unable to generate AI summary at this time. Please consult your physician directly.");
       }
     } catch {
-      setAiSummary(getPlaceholderSummary(order));
+      setAiSummary("Unable to reach the AI summary service. Please review the detailed values below with your doctor.");
     } finally {
       setAiLoading(false);
     }
-  };
-
-  const getPlaceholderSummary = (order: LabOrder): string => {
-    const hasAbnormal = order.results.some((r) => r.isAbnormal);
-    if (order.testCode === "CBC") {
-      return "Your Complete Blood Count results are all within normal range. Your white blood cell count, red blood cell count, hemoglobin, and platelet levels are healthy. This means your immune system, oxygen-carrying capacity, and blood clotting function are all performing well. No action is needed at this time.";
-    }
-    if (order.testCode === "LIPID") {
-      return "Your Lipid Panel shows elevated cholesterol levels that need attention. Your total cholesterol (245 mg/dL) and LDL or 'bad' cholesterol (165 mg/dL) are above the recommended range. Your HDL or 'good' cholesterol (42 mg/dL) is lower than ideal, and your triglycerides (190 mg/dL) are borderline high. Consider discussing dietary changes, exercise, and possible medication with your doctor.";
-    }
-    if (order.testCode === "TSH") {
-      return "Your TSH level of 6.8 mIU/L is above the normal range (0.4–4.0 mIU/L). This may suggest your thyroid gland is underactive (hypothyroidism), meaning it may not be producing enough thyroid hormone. Common symptoms include fatigue, weight gain, and feeling cold. Your doctor may recommend additional testing (Free T4) or thyroid medication. This is a manageable condition with proper treatment.";
-    }
-    if (hasAbnormal) {
-      return `Your ${order.testName} results show some values outside the normal range. We recommend discussing these results with your doctor, who can provide personalized guidance based on your complete medical history. Abnormal results don't always indicate a serious condition — further testing or monitoring may be needed.`;
-    }
-    return `Your ${order.testName} results are within normal range. Everything looks good! Continue your current health routine and follow up with your doctor as scheduled.`;
   };
 
   const handleViewResult = (order: LabOrder) => {
@@ -276,6 +191,29 @@ export default function PatientLabResultsPage() {
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
         <LabPhotoUpload />
+
+        {/* Load failure — the list below falls back to sample data, so say so */}
+        {loadError && (
+          <div
+            role="alert"
+            className="flex items-start gap-3 mb-6 px-4 py-3 bg-red-50 border border-red-200 rounded-xl"
+          >
+            <AlertCircle className="w-4 h-4 text-red-500 mt-0.5 shrink-0" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-red-800">{loadError}</p>
+              <p className="text-xs text-red-600 mt-0.5">
+                Any results shown below are sample data, not your records.
+              </p>
+            </div>
+            <button
+              onClick={fetchOrders}
+              className="text-xs font-medium text-red-700 underline hover:no-underline"
+            >
+              Retry
+            </button>
+          </div>
+        )}
+
         {/* Filter tabs */}
         <div className="flex gap-1 bg-gray-100 p-1 rounded-xl mb-6 w-fit">
           {filterTabs.map((tab) => (

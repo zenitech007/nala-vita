@@ -1,13 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import OpenAI from "openai";
+import { ai, GEMINI_MODEL } from "@/lib/gemini";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { prisma } from "@/lib/prisma";
 import { checkRateLimitAsync } from "@/lib/rate-limit";
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
 
 const symptomCheckSchema = z.object({
   symptoms: z.array(z.string()).min(1, "At least one symptom is required"),
@@ -87,21 +83,18 @@ Guidelines for urgency levels:
 
 Provide 2-4 possible conditions, a clear recommendation, and 3-5 self-care tips.`;
 
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content:
-            "You are a medical triage assistant that returns structured JSON responses. Never provide definitive diagnoses. Always recommend professional medical consultation.",
-        },
-        { role: "user", content: prompt },
-      ],
-      temperature: 0.3,
-      max_tokens: 1000,
+    const interaction = await ai.interactions.create({
+      model: GEMINI_MODEL,
+      system_instruction:
+        "You are a medical triage assistant that returns structured JSON responses. Never provide definitive diagnoses. Always recommend professional medical consultation.",
+      input: prompt,
+      generation_config: {
+        max_output_tokens: 1000,
+      },
+      response_format: { type: "json_object" },
     });
 
-    const responseText = completion.choices[0]?.message?.content?.trim();
+    const responseText = interaction.output_text?.trim();
 
     if (!responseText) {
       return NextResponse.json(

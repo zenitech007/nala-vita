@@ -18,6 +18,9 @@ import {
   Mic,
   MicOff,
   CheckCircle,
+  Sparkles,
+  Wand2,
+  PictureInPicture2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
@@ -112,10 +115,45 @@ export default function DoctorConsultationPage() {
   const [noteTitle, setNoteTitle] = useState("Consultation Notes");
   const [isSaving, setIsSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const [isFormattingSoap, setIsFormattingSoap] = useState(false);
+  const [isPip, setIsPip] = useState(false);
 
   // Voice-to-text
   const [isRecording, setIsRecording] = useState(false);
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
+
+  // 1-Click AI SOAP Formatter using Gemini 3.6 Flash
+  const formatToSoap = async () => {
+    if (!notes.trim() || isFormattingSoap) return;
+    setIsFormattingSoap(true);
+    try {
+      const res = await fetch("/api/ai/soap-format", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          notes,
+          patientContext: {
+            name: `${patient?.user.firstName || ""} ${patient?.user.lastName || ""}`.trim(),
+            age: patient?.dateOfBirth ? calculateAge(patient.dateOfBirth) : undefined,
+            gender: patient?.gender,
+            allergies: patient?.allergies,
+          },
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.formattedSoap) {
+          setNotes(data.formattedSoap);
+          setNoteTitle("SOAP Consultation Notes");
+        }
+      }
+    } catch (err) {
+      console.error("Failed to format SOAP note:", err);
+    } finally {
+      setIsFormattingSoap(false);
+    }
+  };
 
   // ─── Init ──────────────────────────────────────────────
 
@@ -140,42 +178,8 @@ export default function DoctorConsultationPage() {
     init();
   }, [appointmentId]);
 
-  // Placeholder
-  const patient: PatientEHR = appointment?.patient || {
-    id: "patient-1",
-    dateOfBirth: "1985-03-15",
-    gender: "Female",
-    bloodType: "A+",
-    allergies: ["Penicillin", "Sulfa drugs"],
-    user: {
-      firstName: "Alice",
-      lastName: "Brown",
-      avatarUrl: null,
-      email: "alice@email.com",
-      phone: "+1 555-000-001",
-    },
-    vitals: [
-      { id: "v1", bloodPressure: "145/95", heartRate: 88, temperature: 98.8, oxygenSaturation: 97, recordedAt: new Date().toISOString() },
-      { id: "v2", bloodPressure: "138/90", heartRate: 82, temperature: 98.6, oxygenSaturation: 98, recordedAt: new Date(Date.now() - 86400000 * 3).toISOString() },
-    ],
-    prescriptions: [
-      { id: "rx1", medication: "Lisinopril 10mg", dosage: "10mg", frequency: "Once daily", isActive: true },
-      { id: "rx2", medication: "Metformin 500mg", dosage: "500mg", frequency: "Twice daily", isActive: true },
-    ],
-    medicalNotes: [
-      { id: "n1", title: "Previous checkup", content: "Patient reports occasional dizziness. BP slightly elevated. Continue current medications.", createdAt: new Date(Date.now() - 86400000 * 30).toISOString() },
-    ],
-  };
-
-  const displayAppointment: AppointmentDetail = appointment || {
-    id: appointmentId,
-    scheduledAt: new Date().toISOString(),
-    duration: 30,
-    status: "IN_PROGRESS",
-    consultationType: "VIDEO",
-    reason: "Follow-up on blood pressure",
-    patient,
-  };
+  const patient = appointment?.patient || null;
+  const displayAppointment = appointment;
 
   const calculateAge = (dob: string) => {
     const birth = new Date(dob);
@@ -241,7 +245,7 @@ export default function DoctorConsultationPage() {
   // ─── Save notes to EHR ────────────────────────────────
 
   const saveNotes = async () => {
-    if (!notes.trim()) return;
+    if (!notes.trim() || !patient) return;
     setIsSaving(true);
     setSavedSuccess(false);
 
@@ -280,6 +284,28 @@ export default function DoctorConsultationPage() {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center">
         <Loader2 className="w-10 h-10 animate-spin text-[var(--primary)]" />
+      </div>
+    );
+  }
+
+  if (!appointment || !patient) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl border border-gray-100 p-8 text-center max-w-md">
+          <div className="w-14 h-14 bg-red-50 text-red-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <AlertTriangle className="w-7 h-7" />
+          </div>
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Consultation Not Found</h2>
+          <p className="text-gray-500 text-sm mb-6">
+            This consultation session could not be found or has already expired.
+          </p>
+          <Link
+            href="/doctor/appointments"
+            className="inline-flex items-center justify-center px-5 py-2.5 bg-[var(--primary)] text-white text-sm font-medium rounded-xl hover:opacity-90 transition"
+          >
+            Back to Appointments
+          </Link>
+        </div>
       </div>
     );
   }
@@ -355,18 +381,18 @@ export default function DoctorConsultationPage() {
                 {patient.user.lastName}
               </h1>
               <p className="text-gray-400 text-sm">
-                {displayAppointment.reason || "Video Consultation"}
+                {appointment.reason || "Video Consultation"}
               </p>
             </div>
           </div>
           <div className="flex items-center gap-4 text-sm text-gray-400">
             <span className="inline-flex items-center gap-1.5">
               <Calendar className="w-4 h-4" />
-              {format(new Date(displayAppointment.scheduledAt), "MMM d, yyyy")}
+              {format(new Date(appointment.scheduledAt), "MMM d, yyyy")}
             </span>
             <span className="inline-flex items-center gap-1.5">
               <Clock className="w-4 h-4" />
-              {displayAppointment.duration} min
+              {appointment.duration} min
             </span>
           </div>
         </div>
@@ -376,18 +402,31 @@ export default function DoctorConsultationPage() {
       <main className="flex-1 flex gap-4 p-4 overflow-hidden">
         {/* Left: Video + Notes */}
         <div className="flex-1 flex flex-col gap-4 min-w-0">
-          {/* Video */}
-          <VideoCallPanel
-            appointmentId={appointmentId}
-            userId={userId}
-            isInitiator={true}
-            onCallEnd={handleCallEnd}
-            className="flex-1 min-h-[300px]"
-          />
+          {/* Video Container (PiP or Standard) */}
+          <div className={cn("relative transition-all duration-300", isPip ? "fixed bottom-6 right-6 z-40 w-80 h-48 rounded-2xl shadow-2xl border-2 border-[var(--primary)] overflow-hidden" : "flex-1 min-h-[300px] flex flex-col")}>
+            <div className="absolute top-3 right-3 z-10">
+              <button
+                type="button"
+                onClick={() => setIsPip((prev) => !prev)}
+                title={isPip ? "Restore full video pane" : "Minimize video to PiP"}
+                className="p-2 rounded-xl bg-gray-900/80 hover:bg-gray-900 text-white backdrop-blur-md shadow-md border border-white/10 transition flex items-center gap-1.5 text-xs font-medium"
+              >
+                <PictureInPicture2 className="w-3.5 h-3.5 text-[var(--primary)]" />
+                <span>{isPip ? "Expand Video" : "PiP Mini"}</span>
+              </button>
+            </div>
+            <VideoCallPanel
+              appointmentId={appointmentId}
+              userId={userId}
+              isInitiator={true}
+              onCallEnd={handleCallEnd}
+              className={cn("w-full h-full", isPip ? "min-h-0" : "flex-1")}
+            />
+          </div>
 
-          {/* Notes with voice-to-text */}
-          <div className="bg-gray-800 rounded-2xl p-4 flex-shrink-0">
-            <div className="flex items-center justify-between mb-3">
+          {/* Notes with voice-to-text & 1-Click AI SOAP */}
+          <div className={cn("bg-gray-800 rounded-2xl p-4 flex-shrink-0 transition-all", isPip ? "flex-1 flex flex-col min-h-[500px]" : "")}>
+            <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
               <div className="flex items-center gap-2">
                 <FileText className="w-4 h-4 text-gray-400" />
                 <input
@@ -398,6 +437,21 @@ export default function DoctorConsultationPage() {
                 />
               </div>
               <div className="flex items-center gap-2">
+                {/* 1-Click AI SOAP Button */}
+                <button
+                  onClick={formatToSoap}
+                  disabled={isFormattingSoap || !notes.trim()}
+                  title="Automatically organize into Subjective, Objective, Assessment, Plan using Gemini 3.6 Flash"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-gradient-to-r from-purple-600 to-indigo-600 hover:opacity-95 text-white shadow-sm transition disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isFormattingSoap ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Sparkles className="w-3.5 h-3.5" />
+                  )}
+                  <span>{isFormattingSoap ? "Formatting..." : "AI Format to SOAP"}</span>
+                </button>
+
                 <button
                   onClick={toggleRecording}
                   className={cn(
@@ -438,8 +492,8 @@ export default function DoctorConsultationPage() {
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              rows={4}
-              className="w-full bg-gray-900 text-gray-200 text-sm rounded-xl px-4 py-3 focus:ring-2 focus:ring-[var(--primary)] focus:outline-none resize-none placeholder-gray-600"
+              rows={isPip ? 14 : 4}
+              className={cn("w-full bg-gray-900 text-gray-200 text-sm rounded-xl px-4 py-3 focus:ring-2 focus:ring-[var(--primary)] focus:outline-none resize-none placeholder-gray-600", isPip ? "flex-1" : "")}
               placeholder="Type or dictate your consultation notes here..."
             />
             {isRecording && (

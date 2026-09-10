@@ -150,17 +150,39 @@ export async function GET(_req: NextRequest) {
 
     const user = await prisma.user.findUnique({
       where: { supabaseId: authUser.id },
-      include: { doctor: true },
+      include: { doctor: true, patient: true },
     });
 
-    if (!user?.doctor) {
+    if (!user?.doctor && !user?.patient) {
       return NextResponse.json(
-        { error: "Only doctors can view referrals" },
+        { error: "Only authorized doctors or patients can view referrals" },
         { status: 403 }
       );
     }
 
-    const doctorId = user.doctor.id;
+    // If patient is viewing their referrals
+    if (user.patient) {
+      const referrals = await prisma.referral.findMany({
+        where: { patientId: user.patient.id },
+        include: {
+          referringDoctor: {
+            include: {
+              user: { select: { firstName: true, lastName: true } },
+            },
+          },
+          referredDoctor: {
+            include: {
+              user: { select: { firstName: true, lastName: true } },
+            },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+      });
+
+      return NextResponse.json({ referrals });
+    }
+
+    const doctorId = user.doctor!.id;
 
     // Fetch sent referrals (where this doctor is the referring doctor)
     const sent = await prisma.referral.findMany({
@@ -208,7 +230,7 @@ export async function GET(_req: NextRequest) {
   }
 }
 
-// ─── PATCH: Accept or decline a referral ─────────────────
+// ─── PATCH: Accept or decline a referral (By Doctor or Patient) ──
 
 const patchReferralSchema = z.object({
   referralId: z.string().min(1),
@@ -228,12 +250,12 @@ export async function PATCH(req: NextRequest) {
 
     const user = await prisma.user.findUnique({
       where: { supabaseId: authUser.id },
-      include: { doctor: true },
+      include: { doctor: true, patient: true },
     });
 
-    if (!user?.doctor) {
+    if (!user?.doctor && !user?.patient) {
       return NextResponse.json(
-        { error: "Only doctors can update referrals" },
+        { error: "Forbidden: Account not authorized to update referrals" },
         { status: 403 }
       );
     }
@@ -241,11 +263,91 @@ export async function PATCH(req: NextRequest) {
     const body = await req.json();
     const validated = patchReferralSchema.parse(body);
 
-    // Verify the referral belongs to this doctor (as the receiving doctor)
+    // If patient is acting on the transfer referral:
+    if (user.patient) {
+      const referral = await prisma.referral.findFirst({
+        where: {
+          id: validated.referralId,
+          patientId: user.patient.id,
+          status: "PENDING",
+        },
+        include: {
+          patient: {
+            include: {
+              user: { select: { id: true, firstName: true, lastName: true } },
+            },
+          },
+          referringDoctor: {
+            include: {
+              user: { select: { id: true, firstName: true, lastName: true } },
+            },
+          },
+          referredDoctor: {
+            include: {
+              user: { select: { id: true, firstName: true, lastName: true } },
+            },
+          },
+        },
+      });
+
+      if (!referral) {
+        return NextResponse.json(
+          { error: "Referral not found or already processed" },
+          { status: 404 }
+        );
+      }
+
+      const updated = await prisma.referral.update({
+        where: { id: validated.referralId },
+        data: { status: validated.action },
+      });
+
+      const actionLabel = validated.action === "ACCEPTED" ? "approved" : "declined";
+
+      // Notify referring doctor
+      await createNotification(
+        referral.referringDoctor.user.id,
+        `Patient ${actionLabel} Transfer`,
+        `Patient ${user.firstName} ${user.lastName} has ${actionLabel} the medical record transfer to Dr. ${referral.referredDoctor.user.firstName} ${referral.referredDoctor.user.lastName}.`,
+        "REFERRAL",
+        { link: "/doctor/referrals" }
+      );
+
+      // Notify referred doctor
+      await createNotification(
+        referral.referredDoctor.user.id,
+        validated.action === "ACCEPTED" ? "Patient Approved Record Transfer" : "Transfer Declined",
+        `Patient ${user.firstName} ${user.lastName} has ${actionLabel} the medical record transfer from Dr. ${referral.referringDoctor.user.firstName} ${referral.referringDoctor.user.lastName}.`,
+        "REFERRAL",
+        { link: "/doctor/patients" }
+      );
+
+      // Audit Log
+      await prisma.auditLog.create({
+        data: {
+          userId: user.id,
+          action: validated.action === "ACCEPTED" ? "PATIENT_TRANSFER_APPROVED" : "PATIENT_TRANSFER_DECLINED",
+          resourceType: "REFERRAL",
+          resourceId: referral.id,
+          metadata: JSON.stringify({
+            referringDoctorId: referral.referringDoctorId,
+            referredDoctorId: referral.referredDoctorId,
+            action: validated.action,
+          }),
+        },
+      }).catch(() => {});
+
+      return NextResponse.json({
+        message: `Transfer ${actionLabel} successfully`,
+        referral: updated,
+      });
+    }
+
+    // Otherwise, receiving doctor is updating the referral:
     const referral = await prisma.referral.findFirst({
       where: {
         id: validated.referralId,
-        referredDoctorId: user.doctor.id,
+        referredDoctorId: user.doctor!.id,
         status: "PENDING",
       },
       include: {

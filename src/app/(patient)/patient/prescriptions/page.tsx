@@ -12,7 +12,6 @@ import {
   Loader2,
   Calendar,
   User,
-  Timer,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format, differenceInHours } from "date-fns";
@@ -37,72 +36,33 @@ interface Prescription {
   };
 }
 
-// ─── Dose timer helper ───────────────────────────────────
-
-function getNextDoseInfo(frequency: string): { label: string; hoursUntil: number } {
-  const now = new Date();
-  const currentHour = now.getHours();
-
-  // Calculate dose intervals based on frequency
-  let doseTimes: number[] = [];
-  switch (frequency) {
-    case "Once daily":
-      doseTimes = [8]; // 8am
-      break;
-    case "Twice daily":
-      doseTimes = [8, 20]; // 8am, 8pm
-      break;
-    case "Three times daily":
-      doseTimes = [8, 14, 20]; // 8am, 2pm, 8pm
-      break;
-    case "Four times daily":
-      doseTimes = [8, 12, 16, 20];
-      break;
-    case "Every 4 hours":
-      doseTimes = [6, 10, 14, 18, 22];
-      break;
-    case "Every 6 hours":
-      doseTimes = [6, 12, 18, 24];
-      break;
-    case "Every 8 hours":
-      doseTimes = [8, 16, 24];
-      break;
-    case "Every 12 hours":
-      doseTimes = [8, 20];
-      break;
-    default:
-      doseTimes = [8];
-  }
-
-  // Find next dose time
-  const nextHour = doseTimes.find((h) => h > currentHour) ?? doseTimes[0] + 24;
-  const hoursUntil = nextHour - currentHour;
-
-  if (hoursUntil <= 0) {
-    return { label: "Take now", hoursUntil: 0 };
-  } else if (hoursUntil < 1) {
-    const mins = Math.round(hoursUntil * 60);
-    return { label: `${mins}m`, hoursUntil };
-  } else {
-    return { label: `${hoursUntil}h`, hoursUntil };
-  }
-}
-
 export default function PatientPrescriptionsPage() {
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"active" | "expired">("active");
 
   const fetchPrescriptions = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const res = await fetch("/api/prescriptions");
-      if (res.ok) {
-        const data = await res.json();
-        setPrescriptions(data.prescriptions || []);
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        throw new Error(data?.error || "Unable to load prescriptions");
       }
-    } catch {
-      // placeholder data
+
+      if (!Array.isArray(data?.prescriptions)) {
+        throw new Error("The prescriptions response was invalid");
+      }
+
+      setPrescriptions(data.prescriptions);
+    } catch (error) {
+      setPrescriptions([]);
+      setLoadError(
+        error instanceof Error ? error.message : "Unable to load prescriptions"
+      );
     } finally {
       setLoading(false);
     }
@@ -112,83 +72,8 @@ export default function PatientPrescriptionsPage() {
     fetchPrescriptions();
   }, [fetchPrescriptions]);
 
-  // Placeholder prescriptions for UI demo
-  const displayPrescriptions: Prescription[] =
-    prescriptions.length > 0
-      ? prescriptions
-      : [
-          {
-            id: "1",
-            medication: "Lisinopril",
-            dosage: "10mg",
-            frequency: "Once daily",
-            duration: "Ongoing",
-            instructions: "Take in the morning with water. Avoid potassium supplements.",
-            refillsAllowed: 6,
-            refillsUsed: 2,
-            isActive: true,
-            prescribedAt: new Date(Date.now() - 86400000 * 30).toISOString(),
-            expiresAt: new Date(Date.now() + 86400000 * 150).toISOString(),
-            doctor: {
-              specialization: "Cardiology",
-              user: { firstName: "Michael", lastName: "Chen" },
-            },
-          },
-          {
-            id: "2",
-            medication: "Metformin",
-            dosage: "500mg",
-            frequency: "Twice daily",
-            duration: "Ongoing",
-            instructions: "Take with meals to reduce GI side effects.",
-            refillsAllowed: 6,
-            refillsUsed: 1,
-            isActive: true,
-            prescribedAt: new Date(Date.now() - 86400000 * 45).toISOString(),
-            expiresAt: new Date(Date.now() + 86400000 * 135).toISOString(),
-            doctor: {
-              specialization: "General Practice",
-              user: { firstName: "Sarah", lastName: "Johnson" },
-            },
-          },
-          {
-            id: "3",
-            medication: "Omeprazole",
-            dosage: "20mg",
-            frequency: "Once daily",
-            duration: "14 days",
-            instructions: "Take 30 minutes before breakfast.",
-            refillsAllowed: 0,
-            refillsUsed: 0,
-            isActive: true,
-            prescribedAt: new Date(Date.now() - 86400000 * 5).toISOString(),
-            expiresAt: new Date(Date.now() + 86400000 * 9).toISOString(),
-            doctor: {
-              specialization: "General Practice",
-              user: { firstName: "Sarah", lastName: "Johnson" },
-            },
-          },
-          {
-            id: "4",
-            medication: "Amoxicillin",
-            dosage: "500mg",
-            frequency: "Three times daily",
-            duration: "10 days",
-            instructions: "Complete the full course even if symptoms improve.",
-            refillsAllowed: 0,
-            refillsUsed: 0,
-            isActive: false,
-            prescribedAt: new Date(Date.now() - 86400000 * 60).toISOString(),
-            expiresAt: new Date(Date.now() - 86400000 * 50).toISOString(),
-            doctor: {
-              specialization: "General Practice",
-              user: { firstName: "Sarah", lastName: "Johnson" },
-            },
-          },
-        ];
-
-  const activePrescriptions = displayPrescriptions.filter((p) => p.isActive);
-  const expiredPrescriptions = displayPrescriptions.filter((p) => !p.isActive);
+  const activePrescriptions = prescriptions.filter((p) => p.isActive);
+  const expiredPrescriptions = prescriptions.filter((p) => !p.isActive);
   const displayList = activeTab === "active" ? activePrescriptions : expiredPrescriptions;
 
   return (
@@ -252,6 +137,18 @@ export default function PatientPrescriptionsPage() {
           <div className="flex items-center justify-center py-20">
             <Loader2 className="w-8 h-8 animate-spin text-[var(--primary)]" />
           </div>
+        ) : loadError ? (
+          <div className="text-center py-20" role="alert">
+            <AlertCircle className="w-16 h-16 text-red-300 mx-auto mb-4" />
+            <p className="text-gray-700 text-lg font-medium">Could not load prescriptions</p>
+            <p className="text-gray-500 text-sm mt-1">{loadError}</p>
+            <button
+              onClick={fetchPrescriptions}
+              className="mt-4 text-[var(--primary)] hover:opacity-80 font-medium text-sm"
+            >
+              Try again
+            </button>
+          </div>
         ) : displayList.length === 0 ? (
           <div className="text-center py-20">
             <Pill className="w-16 h-16 text-gray-300 mx-auto mb-4" />
@@ -262,7 +159,6 @@ export default function PatientPrescriptionsPage() {
         ) : (
           <div className="space-y-4">
             {displayList.map((rx) => {
-              const doseInfo = getNextDoseInfo(rx.frequency);
               const isExpiringSoon =
                 rx.expiresAt &&
                 differenceInHours(new Date(rx.expiresAt), new Date()) < 168; // < 7 days
@@ -354,45 +250,25 @@ export default function PatientPrescriptionsPage() {
                       </div>
                     </div>
 
-                    {/* Right side: next dose timer + actions */}
+                    {/* Right side: real pharmacy and refill workflows */}
                     {rx.isActive && (
                       <div className="flex flex-col items-end gap-3 flex-shrink-0 sm:min-w-[160px]">
-                        {/* Next dose countdown */}
-                        <div className="bg-[var(--primary)]/10 border border-[var(--primary)]/30 rounded-xl px-4 py-3 text-center w-full">
-                          <div className="flex items-center justify-center gap-1.5 mb-0.5">
-                            <Timer className="w-4 h-4 text-[var(--primary)]" />
-                            <span className="text-xs text-[var(--primary)] font-medium">
-                              Next dose
-                            </span>
-                          </div>
-                          <p
-                            className={cn(
-                              "text-2xl font-bold",
-                              doseInfo.hoursUntil === 0
-                                ? "text-red-600"
-                                : "text-[var(--primary)]"
-                            )}
-                          >
-                            {doseInfo.label}
-                          </p>
-                          {doseInfo.hoursUntil === 0 && (
-                            <p className="text-xs text-red-500 font-medium">
-                              Dose due now
-                            </p>
-                          )}
-                        </div>
-
-                        {/* Action buttons */}
                         <div className="flex gap-2 w-full">
-                          <button className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium rounded-xl transition">
+                          <Link
+                            href="/patient/pharmacy"
+                            className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium rounded-xl transition"
+                          >
                             <ShoppingBag className="w-3.5 h-3.5" />
                             Order
-                          </button>
+                          </Link>
                           {refillsRemaining > 0 && (
-                            <button className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-[var(--primary)] hover:opacity-90 text-white text-xs font-medium rounded-xl transition">
+                            <Link
+                              href="/patient/medications"
+                              className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-[var(--primary)] hover:opacity-90 text-white text-xs font-medium rounded-xl transition"
+                            >
                               <RefreshCw className="w-3.5 h-3.5" />
                               Refill
-                            </button>
+                            </Link>
                           )}
                         </div>
 

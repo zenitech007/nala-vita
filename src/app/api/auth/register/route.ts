@@ -52,12 +52,101 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const validated = registerSchema.parse(body);
 
-    // Check if user already exists in Prisma
-    const existingUser = await prisma.user.findUnique({
+    // Check if user already exists in Prisma by email
+    let existingUser = await prisma.user.findUnique({
       where: { email: validated.email },
+      include: { patient: true },
     });
 
+    // If not found by email, check if a clinic registered a patient profile with this phone
+    if (!existingUser && validated.phone) {
+      existingUser = await prisma.user.findFirst({
+        where: {
+          phone: validated.phone,
+          role: "PATIENT",
+          emailVerified: false,
+        },
+        include: { patient: true },
+      });
+    }
+
+    // If existing user was provisionally created by a clinic/doctor (unverified), allow claiming
     if (existingUser) {
+      if (existingUser.role === "PATIENT" && validated.role === "PATIENT" && !existingUser.emailVerified) {
+        // Create user credentials in Supabase Auth
+        const { data: authData, error: authError } =
+          await supabaseAdmin.auth.admin.createUser({
+            email: validated.email,
+            password: validated.password,
+            email_confirm: true,
+            user_metadata: {
+              first_name: validated.firstName,
+              last_name: validated.lastName,
+              role: validated.role,
+            },
+          });
+
+        if (authError || !authData.user) {
+          return NextResponse.json(
+            { error: authError?.message || "Failed to create authentication credentials" },
+            { status: 400 }
+          );
+        }
+
+        // Claim and update existing profile with the new Supabase ID and verified status
+        const claimedUser = await prisma.user.update({
+          where: { id: existingUser.id },
+          data: {
+            supabaseId: authData.user.id,
+            email: validated.email,
+            firstName: validated.firstName,
+            lastName: validated.lastName,
+            phone: validated.phone || existingUser.phone,
+            emailVerified: true,
+          },
+          include: { patient: true },
+        });
+
+        if (!claimedUser.patient) {
+          await prisma.patient.create({
+            data: {
+              userId: claimedUser.id,
+              dateOfBirth: new Date(validated.dateOfBirth),
+              gender: validated.gender,
+            },
+          });
+        }
+
+        await prisma.auditLog.create({
+          data: {
+            userId: claimedUser.id,
+            action: "CLAIM_RECORD",
+            resourceType: "PATIENT_RECORD",
+            resourceId: claimedUser.patient?.id || claimedUser.id,
+            metadata: JSON.stringify({
+              method: "hospital_record_claimed",
+              email: validated.email,
+              phone: validated.phone,
+            }),
+          },
+        }).catch(() => {});
+
+        return NextResponse.json(
+          {
+            message: "Welcome! Your prior medical records from your healthcare provider have been successfully claimed and connected to your account.",
+            claimed: true,
+            user: {
+              id: claimedUser.id,
+              email: claimedUser.email,
+              firstName: claimedUser.firstName,
+              lastName: claimedUser.lastName,
+              role: claimedUser.role,
+            },
+          },
+          { status: 201 }
+        );
+      }
+
       return NextResponse.json(
         { error: "An account with this email already exists" },
         { status: 409 }

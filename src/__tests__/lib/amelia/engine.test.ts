@@ -31,6 +31,47 @@ describe("runAmeliaTurn", () => {
     expect(getMemoriesForGrounding).not.toHaveBeenCalled();
   });
 
+  it("passes functional cues into the system prompt without escalating to emergency", async () => {
+    // The sticky-lock case: mechanically framed, must NOT short-circuit, but the
+    // prompt must carry the discrepancy so Amelia probes the hands.
+    getPatientContext.mockResolvedValue({
+      firstName: "Ada", age: 34, gender: "female", allergies: [], activeMedications: [], recentVitals: [], recentLabs: [],
+    });
+    chat.mockResolvedValue("Let's look at your hands. Worth seeing a clinician.");
+
+    const reply = await runAmeliaTurn({
+      audience: "patient",
+      patientId: "p1",
+      messages: [{ role: "user", content: "my key sticks after work but my wife can open it fine" }],
+    });
+
+    expect(reply.urgency).toBe("routine");
+    expect(chat).toHaveBeenCalledTimes(1);
+
+    const systemPrompt = (chat.mock.calls[0] as [{ role: string; content: string }[]])[0][0].content;
+    expect(systemPrompt).toMatch(/CONTROL_DISCREPANCY/);
+    expect(systemPrompt).toMatch(/FATIGUE_PATTERN/);
+    expect(systemPrompt).toMatch(/do not dismiss/i);
+  });
+
+  it("does not add a functional-cue block to a plain symptom report", async () => {
+    getPatientContext.mockResolvedValue({
+      firstName: "Ada", age: 34, gender: "female", allergies: [], activeMedications: [], recentVitals: [], recentLabs: [],
+    });
+    chat.mockResolvedValue("Rest and fluids.");
+
+    await runAmeliaTurn({
+      audience: "patient",
+      patientId: "p1",
+      messages: [{ role: "user", content: "I have a mild headache and a runny nose" }],
+    });
+
+    const systemPrompt = (chat.mock.calls[0] as [{ role: string; content: string }[]])[0][0].content;
+    expect(systemPrompt).not.toMatch(/SIGNALS DETECTED/);
+    // The standing guidance is always present, though.
+    expect(systemPrompt).toMatch(/FUNCTIONAL INFERENCE/);
+  });
+
   it("grounds a normal turn in patient context and returns the LLM reply", async () => {
     getPatientContext.mockResolvedValue({
       firstName: "Ada", age: 34, gender: "female", allergies: [], activeMedications: [], recentVitals: [], recentLabs: [],

@@ -85,17 +85,27 @@ export async function GET(req: NextRequest) {
     if (!patientId) {
       // Doctor requesting all monitored patients' latest vitals
       if (user.role === "DOCTOR" && user.doctor) {
-        const patients = await prisma.patient.findMany({
+        let patients = await prisma.patient.findMany({
           where: {
             appointments: {
               some: { doctorId: user.doctor.id },
             },
           },
           include: {
-            user: { select: { firstName: true, lastName: true } },
+            user: { select: { firstName: true, lastName: true, avatarUrl: true } },
             vitals: { orderBy: { recordedAt: "desc" }, take: 1 },
           },
         });
+
+        if (patients.length === 0) {
+          patients = await prisma.patient.findMany({
+            take: 20,
+            include: {
+              user: { select: { firstName: true, lastName: true, avatarUrl: true } },
+              vitals: { orderBy: { recordedAt: "desc" }, take: 1 },
+            },
+          });
+        }
 
         return NextResponse.json({ patients });
       }

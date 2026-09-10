@@ -35,35 +35,60 @@ interface Payment {
   };
 }
 
-interface InsuranceClaim {
-  id: string;
-  claimNumber: string;
-  status: "SUBMITTED" | "PROCESSING" | "APPROVED" | "DENIED";
-  amount: number;
-  submittedAt: string;
-  service: string;
+type TabKey = "history" | "outstanding" | "insurance";
+
+function formatMoney(amount: number, currency: string): string {
+  try {
+    return new Intl.NumberFormat(undefined, {
+      style: "currency",
+      currency: currency.toUpperCase(),
+    }).format(amount);
+  } catch {
+    return `${currency.toUpperCase()} ${amount.toFixed(2)}`;
+  }
 }
 
-type TabKey = "history" | "outstanding" | "insurance";
+function formatTotals(payments: Payment[]): string {
+  const totals = payments.reduce<Record<string, number>>((byCurrency, payment) => {
+    const currency = payment.currency.toUpperCase();
+    byCurrency[currency] = (byCurrency[currency] || 0) + payment.amount;
+    return byCurrency;
+  }, {});
+
+  const entries = Object.entries(totals);
+  if (entries.length === 0) return "—";
+  return entries.map(([currency, amount]) => formatMoney(amount, currency)).join(" · ");
+}
 
 // ─── Component ──────────────────────────────────────────
 
 export default function PatientPaymentsPage() {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabKey>("history");
   const [payingId, setPayingId] = useState<string | null>(null);
+  const [payError, setPayError] = useState<string | null>(null);
 
   const fetchPayments = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const res = await fetch("/api/payments");
-      if (res.ok) {
-        const data = await res.json();
-        setPayments(data.payments || []);
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        throw new Error(data?.error || "Unable to load payments");
       }
-    } catch {
-      // placeholder
+
+      if (!Array.isArray(data?.payments)) {
+        throw new Error("The payments response was invalid");
+      }
+
+      setPayments(data.payments);
+    } catch (error) {
+      setPayments([]);
+      setLoadError(error instanceof Error ? error.message : "Unable to load payments");
     } finally {
       setLoading(false);
     }
@@ -73,119 +98,34 @@ export default function PatientPaymentsPage() {
     fetchPayments();
   }, [fetchPayments]);
 
-  // Placeholder payments
-  const displayPayments: Payment[] =
-    payments.length > 0
-      ? payments
-      : [
-          {
-            id: "pay1",
-            amount: 150.0,
-            currency: "USD",
-            status: "COMPLETED",
-            method: "Visa **** 4242",
-            paidAt: new Date(Date.now() - 86400000 * 2).toISOString(),
-            createdAt: new Date(Date.now() - 86400000 * 3).toISOString(),
-            appointment: {
-              id: "apt1",
-              scheduledAt: new Date(Date.now() - 86400000 * 2).toISOString(),
-              consultationType: "VIDEO",
-              doctor: { user: { firstName: "Sarah", lastName: "Johnson" } },
-            },
-          },
-          {
-            id: "pay2",
-            amount: 200.0,
-            currency: "USD",
-            status: "COMPLETED",
-            method: "Visa **** 4242",
-            paidAt: new Date(Date.now() - 86400000 * 10).toISOString(),
-            createdAt: new Date(Date.now() - 86400000 * 11).toISOString(),
-            appointment: {
-              id: "apt2",
-              scheduledAt: new Date(Date.now() - 86400000 * 10).toISOString(),
-              consultationType: "IN_PERSON",
-              doctor: { user: { firstName: "Michael", lastName: "Chen" } },
-            },
-          },
-          {
-            id: "pay3",
-            amount: 75.0,
-            currency: "USD",
-            status: "PENDING",
-            method: null,
-            paidAt: null,
-            createdAt: new Date(Date.now() - 86400000).toISOString(),
-            appointment: {
-              id: "apt3",
-              scheduledAt: new Date(Date.now() + 86400000 * 3).toISOString(),
-              consultationType: "VIDEO",
-              doctor: { user: { firstName: "Sarah", lastName: "Johnson" } },
-            },
-          },
-          {
-            id: "pay4",
-            amount: 125.0,
-            currency: "USD",
-            status: "PENDING",
-            method: null,
-            paidAt: null,
-            createdAt: new Date(Date.now() - 86400000 * 5).toISOString(),
-            appointment: {
-              id: "apt4",
-              scheduledAt: new Date(Date.now() + 86400000).toISOString(),
-              consultationType: "PHONE",
-              doctor: { user: { firstName: "Michael", lastName: "Chen" } },
-            },
-          },
-          {
-            id: "pay5",
-            amount: 300.0,
-            currency: "USD",
-            status: "REFUNDED",
-            method: "Visa **** 4242",
-            paidAt: new Date(Date.now() - 86400000 * 20).toISOString(),
-            createdAt: new Date(Date.now() - 86400000 * 21).toISOString(),
-            appointment: {
-              id: "apt5",
-              scheduledAt: new Date(Date.now() - 86400000 * 20).toISOString(),
-              consultationType: "IN_PERSON",
-              doctor: { user: { firstName: "Sarah", lastName: "Johnson" } },
-            },
-          },
-        ];
-
-  // Placeholder insurance claims
-  const insuranceClaims: InsuranceClaim[] = [
-    { id: "ic1", claimNumber: "CLM-2024-00142", status: "APPROVED", amount: 120.0, submittedAt: new Date(Date.now() - 86400000 * 15).toISOString(), service: "Video Consultation" },
-    { id: "ic2", claimNumber: "CLM-2024-00158", status: "PROCESSING", amount: 200.0, submittedAt: new Date(Date.now() - 86400000 * 5).toISOString(), service: "In-Person Visit" },
-    { id: "ic3", claimNumber: "CLM-2024-00163", status: "SUBMITTED", amount: 75.0, submittedAt: new Date(Date.now() - 86400000 * 2).toISOString(), service: "Lab Tests" },
-    { id: "ic4", claimNumber: "CLM-2024-00101", status: "DENIED", amount: 350.0, submittedAt: new Date(Date.now() - 86400000 * 30).toISOString(), service: "Specialist Referral" },
-  ];
-
-  const outstanding = displayPayments.filter((p) => p.status === "PENDING");
-  const totalOutstanding = outstanding.reduce((sum, p) => sum + p.amount, 0);
-  const totalPaid = displayPayments
-    .filter((p) => p.status === "COMPLETED")
-    .reduce((sum, p) => sum + p.amount, 0);
+  const outstanding = payments.filter((p) => p.status === "PENDING");
+  const totalOutstanding = formatTotals(outstanding);
+  const totalPaid = formatTotals(
+    payments.filter((p) => p.status === "COMPLETED")
+  );
 
   const handlePay = async (payment: Payment) => {
     setPayingId(payment.id);
+    setPayError(null);
     try {
       const res = await fetch("/api/payments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ appointmentId: payment.appointment.id }),
       });
-      if (res.ok) {
-        const data = await res.json();
-        // Redirect to Paystack hosted checkout
-        if (data.authorizationUrl) {
-          window.location.href = data.authorizationUrl;
-        }
+
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(data?.error || "Unable to start payment");
       }
-    } catch {
-      //
+
+      if (typeof data?.authorizationUrl !== "string") {
+        throw new Error("The payment provider did not return a checkout link");
+      }
+
+      window.location.href = data.authorizationUrl;
+    } catch (error) {
+      setPayError(error instanceof Error ? error.message : "Unable to start payment");
     } finally {
       setPayingId(null);
     }
@@ -196,13 +136,6 @@ export default function PatientPaymentsPage() {
     PENDING: { icon: Clock, color: "text-amber-600", bg: "bg-amber-100", label: "Pending" },
     FAILED: { icon: XCircle, color: "text-red-600", bg: "bg-red-100", label: "Failed" },
     REFUNDED: { icon: ArrowUpRight, color: "text-[var(--primary)]", bg: "bg-[var(--primary)]/10", label: "Refunded" },
-  };
-
-  const CLAIM_STATUS_CONFIG: Record<string, { color: string; bg: string }> = {
-    SUBMITTED: { color: "text-[var(--primary)]", bg: "bg-[var(--primary)]/10" },
-    PROCESSING: { color: "text-amber-700", bg: "bg-amber-100" },
-    APPROVED: { color: "text-green-700", bg: "bg-green-100" },
-    DENIED: { color: "text-red-700", bg: "bg-red-100" },
   };
 
   const CONSULT_LABELS: Record<string, string> = {
@@ -222,7 +155,7 @@ export default function PatientPaymentsPage() {
     activeTab === "outstanding"
       ? outstanding
       : activeTab === "history"
-      ? displayPayments
+      ? payments
       : [];
 
   return (
@@ -251,7 +184,7 @@ export default function PatientPaymentsPage() {
               </div>
               <p className="text-sm text-gray-500">Total Paid</p>
             </div>
-            <p className="text-2xl font-bold text-gray-900">${totalPaid.toFixed(2)}</p>
+            <p className="text-2xl font-bold text-gray-900">{totalPaid}</p>
           </div>
           <div className="bg-white rounded-2xl border border-gray-100 p-5">
             <div className="flex items-center gap-3 mb-2">
@@ -260,7 +193,7 @@ export default function PatientPaymentsPage() {
               </div>
               <p className="text-sm text-gray-500">Outstanding</p>
             </div>
-            <p className="text-2xl font-bold text-gray-900">${totalOutstanding.toFixed(2)}</p>
+            <p className="text-2xl font-bold text-gray-900">{totalOutstanding}</p>
           </div>
           <div className="bg-white rounded-2xl border border-gray-100 p-5">
             <div className="flex items-center gap-3 mb-2">
@@ -269,7 +202,7 @@ export default function PatientPaymentsPage() {
               </div>
               <p className="text-sm text-gray-500">Insurance Claims</p>
             </div>
-            <p className="text-2xl font-bold text-gray-900">{insuranceClaims.length}</p>
+            <p className="text-lg font-semibold text-gray-500">Not connected</p>
           </div>
         </div>
 
@@ -289,73 +222,39 @@ export default function PatientPaymentsPage() {
           ))}
         </div>
 
+        {payError && (
+          <div
+            className="mb-6 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"
+            role="alert"
+          >
+            <XCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+            <span>{payError}</span>
+          </div>
+        )}
+
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <Loader2 className="w-8 h-8 animate-spin text-[var(--primary)]" />
           </div>
+        ) : loadError ? (
+          <div className="text-center py-20" role="alert">
+            <XCircle className="w-16 h-16 text-red-300 mx-auto mb-4" />
+            <p className="text-gray-700 text-lg font-medium">Could not load payments</p>
+            <p className="text-gray-500 text-sm mt-1">{loadError}</p>
+            <button
+              onClick={fetchPayments}
+              className="mt-4 text-[var(--primary)] hover:opacity-80 font-medium text-sm"
+            >
+              Try again
+            </button>
+          </div>
         ) : activeTab === "insurance" ? (
-          /* Insurance Claims */
-          <div className="space-y-4">
-            {insuranceClaims.map((claim) => {
-              const cfg = CLAIM_STATUS_CONFIG[claim.status] || CLAIM_STATUS_CONFIG.SUBMITTED;
-              return (
-                <div key={claim.id} className="bg-white rounded-2xl border border-gray-100 p-6">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center">
-                        <ShieldCheck className="w-5 h-5 text-purple-600" />
-                      </div>
-                      <div>
-                        <p className="font-semibold text-gray-900">{claim.claimNumber}</p>
-                        <p className="text-sm text-gray-500">{claim.service}</p>
-                      </div>
-                    </div>
-                    <span className={cn("px-3 py-1 rounded-full text-xs font-medium", cfg.bg, cfg.color)}>
-                      {claim.status}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-500">
-                      Submitted {format(new Date(claim.submittedAt), "MMM d, yyyy")}
-                    </span>
-                    <span className="font-semibold text-gray-900">${claim.amount.toFixed(2)}</span>
-                  </div>
-                  {/* Progress tracker */}
-                  <div className="mt-4 flex items-center gap-2">
-                    {(["SUBMITTED", "PROCESSING", "APPROVED"] as const).map((step, i) => {
-                      const steps = ["SUBMITTED", "PROCESSING", "APPROVED", "DENIED"];
-                      const currentIdx = steps.indexOf(claim.status);
-                      const stepIdx = steps.indexOf(step);
-                      const isActive = claim.status !== "DENIED" && stepIdx <= currentIdx;
-                      const isDenied = claim.status === "DENIED";
-                      return (
-                        <div key={step} className="flex items-center gap-2 flex-1">
-                          <div className={cn(
-                            "w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium flex-shrink-0",
-                            isDenied && step !== "SUBMITTED"
-                              ? "bg-gray-100 text-gray-400"
-                              : isActive
-                              ? "bg-green-500 text-white"
-                              : "bg-gray-100 text-gray-400"
-                          )}>
-                            {isActive && !isDenied ? <CheckCircle className="w-4 h-4" /> : i + 1}
-                          </div>
-                          <span className={cn("text-xs", isActive && !isDenied ? "text-gray-700 font-medium" : "text-gray-400")}>
-                            {step.charAt(0) + step.slice(1).toLowerCase()}
-                          </span>
-                          {i < 2 && <div className={cn("flex-1 h-0.5", isActive && stepIdx < currentIdx ? "bg-green-500" : "bg-gray-200")} />}
-                        </div>
-                      );
-                    })}
-                  </div>
-                  {claim.status === "DENIED" && (
-                    <div className="mt-3 bg-red-50 border border-red-200 rounded-xl px-4 py-2">
-                      <p className="text-sm text-red-700">Claim denied. Contact your insurance provider for details.</p>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+          <div className="text-center py-20">
+            <ShieldCheck className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+            <p className="text-gray-700 font-medium">Insurance claims are not connected yet</p>
+            <p className="text-gray-500 text-sm mt-1">
+              No claim records are available in Nala Vita.
+            </p>
           </div>
         ) : visiblePayments.length === 0 ? (
           <div className="text-center py-20">
@@ -403,7 +302,7 @@ export default function PatientPaymentsPage() {
                       </td>
                       <td className="px-6 py-4">
                         <p className="text-sm font-semibold text-gray-900">
-                          ${payment.amount.toFixed(2)}
+                          {formatMoney(payment.amount, payment.currency)}
                         </p>
                       </td>
                       <td className="px-6 py-4">
@@ -436,20 +335,6 @@ export default function PatientPaymentsPage() {
                 })}
               </tbody>
             </table>
-          </div>
-        )}
-
-        {/* Pay All Outstanding */}
-        {activeTab === "outstanding" && outstanding.length > 0 && (
-          <div className="mt-6 bg-gradient-to-r from-[var(--primary)] to-[var(--primary)] rounded-2xl p-6 flex items-center justify-between">
-            <div>
-              <p className="text-white font-semibold">Pay all outstanding balances</p>
-              <p className="text-white/70 text-sm mt-0.5">{outstanding.length} payment{outstanding.length > 1 ? "s" : ""} totaling ${totalOutstanding.toFixed(2)}</p>
-            </div>
-            <button className="px-6 py-3 bg-white text-[var(--primary)] font-semibold rounded-xl hover:bg-[var(--primary)]/10 transition flex items-center gap-2">
-              <CreditCard className="w-4 h-4" />
-              Pay ${totalOutstanding.toFixed(2)}
-            </button>
           </div>
         )}
       </main>

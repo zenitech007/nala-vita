@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Pill, Clock, Plus, Activity, Info } from "lucide-react";
+import { X, Pill, Clock, Plus, Activity, Info, Lock, ShieldCheck } from "lucide-react";
 
 export interface MedicationInput {
   name: string;
@@ -10,6 +10,7 @@ export interface MedicationInput {
   frequency: string;
   times: string[];
   instructions?: string;
+  isSharedWithDoctor?: boolean;
 }
 
 interface AddMedicationModalProps {
@@ -32,6 +33,7 @@ export default function AddMedicationModal({ isOpen, onClose, onAdd }: AddMedica
   const [frequency, setFrequency] = useState("Once daily");
   const [times, setTimes] = useState<string[]>(["08:00"]);
   const [instructions, setInstructions] = useState("");
+  const [isSharedWithDoctor, setIsSharedWithDoctor] = useState(true);
 
   // Dynamically adjust the number of time inputs based on frequency
   useEffect(() => {
@@ -61,6 +63,7 @@ export default function AddMedicationModal({ isOpen, onClose, onAdd }: AddMedica
       frequency,
       times,
       instructions: instructions || undefined,
+      isSharedWithDoctor,
     });
 
     // Reset and close
@@ -69,6 +72,7 @@ export default function AddMedicationModal({ isOpen, onClose, onAdd }: AddMedica
     setDosage("");
     setFrequency("Once daily");
     setInstructions("");
+    setIsSharedWithDoctor(true);
     onClose();
   };
 
@@ -192,6 +196,42 @@ export default function AddMedicationModal({ isOpen, onClose, onAdd }: AddMedica
                     onChange={(e) => setInstructions(e.target.value)}
                     className={`${inputClass} resize-none h-20`}
                   />
+                </div>
+
+                {/* Privacy Access Toggle */}
+                <div className="p-4 bg-gray-50 dark:bg-[#14151A] rounded-2xl border border-gray-200 dark:border-gray-800">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-start gap-2.5">
+                      {isSharedWithDoctor ? (
+                        <ShieldCheck size={18} className="text-emerald-500 shrink-0 mt-0.5" />
+                      ) : (
+                        <Lock size={18} className="text-amber-500 shrink-0 mt-0.5" />
+                      )}
+                      <div>
+                        <label
+                          htmlFor="shareWithDoctor"
+                          className="text-xs font-bold text-gray-800 dark:text-gray-200 cursor-pointer select-none"
+                        >
+                          Share with my Doctor
+                        </label>
+                        <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
+                          {isSharedWithDoctor
+                            ? "Your healthcare provider can view this drug and your daily adherence."
+                            : "Private to you. Hidden from doctor dashboard and provider records."}
+                        </p>
+                      </div>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                      <input
+                        type="checkbox"
+                        id="shareWithDoctor"
+                        checked={isSharedWithDoctor}
+                        onChange={(e) => setIsSharedWithDoctor(e.target.checked)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-10 h-5 bg-gray-200 dark:bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[var(--primary)]"></div>
+                    </label>
+                  </div>
                 </div>
               </form>
 

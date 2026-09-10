@@ -1,31 +1,34 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { createServerSupabaseClient } from "@/lib/supabase-server";
+import {
+  getAuthenticatedMessagingUser,
+  getAuthorizedMessageParticipant,
+} from "./_access";
+import {
+  chatAttachmentCategory,
+  parseChatAttachmentId,
+} from "./attachments/shared";
 
 // ─── GET: Return message thread between two users ────────
 
 export async function GET(req: NextRequest) {
   try {
-    const supabase = createServerSupabaseClient();
-    const { data: { user: authUser } } = await supabase.auth.getUser();
-
-    if (!authUser) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { supabaseId: authUser.id },
-    });
-
+    const user = await getAuthenticatedMessagingUser();
     if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { searchParams } = new URL(req.url);
     const otherUserId = searchParams.get("otherUserId");
-    const limit = parseInt(searchParams.get("limit") || "50");
-    const offset = parseInt(searchParams.get("offset") || "0");
+    const requestedLimit = Number.parseInt(searchParams.get("limit") || "50", 10);
+    const requestedOffset = Number.parseInt(searchParams.get("offset") || "0", 10);
+    const limit = Number.isFinite(requestedLimit)
+      ? Math.min(Math.max(requestedLimit, 1), 100)
+      : 50;
+    const offset = Number.isFinite(requestedOffset)
+      ? Math.max(requestedOffset, 0)
+      : 0;
 
     if (!otherUserId) {
       // Return conversation list (unique partners)
@@ -48,18 +51,10 @@ export async function GET(req: NextRequest) {
         ])
       );
 
-      const conversations = await Promise.all(
+      const conversationResults = await Promise.all(
         partnerIds.map(async (partnerId) => {
-          const partner = await prisma.user.findUnique({
-            where: { id: partnerId },
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              avatarUrl: true,
-              role: true,
-            },
-          });
+          const partner = await getAuthorizedMessageParticipant(user, partnerId);
+          if (!partner) return null;
 
           const lastMessage = await prisma.message.findFirst({
             where: {
@@ -79,8 +74,23 @@ export async function GET(req: NextRequest) {
             },
           });
 
-          return { partner, lastMessage, unreadCount };
+          return {
+            // Kept for the patient chat index route.
+            userId: partner.id,
+            partner: {
+              id: partner.id,
+              firstName: partner.firstName,
+              lastName: partner.lastName,
+              avatarUrl: partner.avatarUrl,
+              role: partner.role,
+            },
+            lastMessage,
+            unreadCount,
+          };
         })
+      );
+      const conversations = conversationResults.filter(
+        (conversation) => conversation !== null
       );
 
       // Sort by last message time
@@ -91,6 +101,14 @@ export async function GET(req: NextRequest) {
       });
 
       return NextResponse.json({ conversations });
+    }
+
+    const participant = await getAuthorizedMessageParticipant(user, otherUserId);
+    if (!participant) {
+      return NextResponse.json(
+        { error: "Conversation is not available" },
+        { status: 404 }
+      );
     }
 
     // Return thread between current user and otherUserId
@@ -118,36 +136,64 @@ export async function GET(req: NextRequest) {
 const sendMessageSchema = z.object({
   receiverId: z.string().min(1, "Receiver is required"),
   content: z.string().min(1, "Message cannot be empty"),
-  attachmentUrl: z.string().nullable().optional(),
+  attachmentUrl: z
+    .string()
+    .refine(
+      (value) => parseChatAttachmentId(value) !== null,
+      "Attachment reference is invalid"
+    )
+    .nullable()
+    .optional(),
 });
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = createServerSupabaseClient();
-    const { data: { user: authUser } } = await supabase.auth.getUser();
-
-    if (!authUser) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { supabaseId: authUser.id },
-    });
-
+    const user = await getAuthenticatedMessagingUser();
     if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const body = await req.json();
     const validated = sendMessageSchema.parse(body);
 
-    // Verify receiver exists
-    const receiver = await prisma.user.findUnique({
-      where: { id: validated.receiverId },
-    });
-
+    const receiver = await getAuthorizedMessageParticipant(
+      user,
+      validated.receiverId
+    );
     if (!receiver) {
-      return NextResponse.json({ error: "Receiver not found" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Conversation is not available" },
+        { status: 404 }
+      );
+    }
+
+    if (validated.attachmentUrl) {
+      const attachmentId = parseChatAttachmentId(validated.attachmentUrl)!;
+      const attachment = await prisma.fileUpload.findUnique({
+        where: { id: attachmentId },
+      });
+
+      if (
+        !attachment ||
+        attachment.userId !== user.id ||
+        attachment.category !== chatAttachmentCategory(validated.receiverId)
+      ) {
+        return NextResponse.json(
+          { error: "Attachment is not available" },
+          { status: 422 }
+        );
+      }
+
+      const existingMessage = await prisma.message.findFirst({
+        where: { attachmentUrl: validated.attachmentUrl },
+        select: { id: true },
+      });
+      if (existingMessage) {
+        return NextResponse.json(
+          { error: "Attachment has already been sent" },
+          { status: 409 }
+        );
+      }
     }
 
     // Create message and notification in a transaction
@@ -196,19 +242,9 @@ const markReadSchema = z.object({
 
 export async function PATCH(req: NextRequest) {
   try {
-    const supabase = createServerSupabaseClient();
-    const { data: { user: authUser } } = await supabase.auth.getUser();
-
-    if (!authUser) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { supabaseId: authUser.id },
-    });
-
+    const user = await getAuthenticatedMessagingUser();
     if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const body = await req.json();

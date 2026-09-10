@@ -22,6 +22,7 @@ import {
   ChevronLeft,
   Filter,
 } from "lucide-react";
+import { TableRowsSkeleton } from "@/components/ui/Skeleton";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 
@@ -109,6 +110,7 @@ export default function PatientAppointmentsPage() {
   const [activeTab, setActiveTab] = useState<TabKey>("upcoming");
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [showBooking, setShowBooking] = useState(false);
 
   // Check URL param for auto-open
@@ -119,14 +121,25 @@ export default function PatientAppointmentsPage() {
 
   const fetchAppointments = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const res = await fetch(`/api/appointments?status=${activeTab}`);
-      if (res.ok) {
-        const data = await res.json();
-        setAppointments(data.appointments || []);
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        throw new Error(data?.error || "Unable to load appointments");
       }
-    } catch {
-      // silently handle — placeholder data shown when API not wired
+
+      if (!Array.isArray(data?.appointments)) {
+        throw new Error("The appointments response was invalid");
+      }
+
+      setAppointments(data.appointments);
+    } catch (error) {
+      setAppointments([]);
+      setLoadError(
+        error instanceof Error ? error.message : "Unable to load appointments"
+      );
     } finally {
       setLoading(false);
     }
@@ -136,65 +149,10 @@ export default function PatientAppointmentsPage() {
     fetchAppointments();
   }, [fetchAppointments]);
 
-  // Placeholder appointments for UI demo
-  const displayAppointments: Appointment[] =
-    appointments.length > 0
-      ? appointments
-      : [
-          {
-            id: "1",
-            scheduledAt: new Date(Date.now() + 86400000 * 2).toISOString(),
-            duration: 30,
-            status: activeTab === "cancelled" ? "CANCELLED" : activeTab === "past" ? "COMPLETED" : "CONFIRMED",
-            consultationType: "VIDEO",
-            urgencyLevel: "MEDIUM",
-            reason: "Annual checkup",
-            notes: null,
-            doctor: {
-              id: "d1",
-              specialization: "General Practice",
-              consultationFee: 75,
-              user: { firstName: "Sarah", lastName: "Johnson", avatarUrl: null },
-            },
-          },
-          {
-            id: "2",
-            scheduledAt: new Date(Date.now() + 86400000 * 5).toISOString(),
-            duration: 45,
-            status: activeTab === "cancelled" ? "CANCELLED" : activeTab === "past" ? "COMPLETED" : "SCHEDULED",
-            consultationType: "IN_PERSON",
-            urgencyLevel: "LOW",
-            reason: "Follow-up consultation",
-            notes: null,
-            doctor: {
-              id: "d2",
-              specialization: "Cardiology",
-              consultationFee: 120,
-              user: { firstName: "Michael", lastName: "Chen", avatarUrl: null },
-            },
-          },
-          {
-            id: "3",
-            scheduledAt: new Date(Date.now() + 86400000 * 8).toISOString(),
-            duration: 30,
-            status: activeTab === "cancelled" ? "CANCELLED" : activeTab === "past" ? "COMPLETED" : "SCHEDULED",
-            consultationType: "VIDEO",
-            urgencyLevel: "HIGH",
-            reason: "Persistent headaches",
-            notes: null,
-            doctor: {
-              id: "d3",
-              specialization: "Neurology",
-              consultationFee: 150,
-              user: { firstName: "Emily", lastName: "Williams", avatarUrl: null },
-            },
-          },
-        ];
-
-  const tabs: { key: TabKey; label: string; count: number }[] = [
-    { key: "upcoming", label: "Upcoming", count: displayAppointments.filter((a) => ["SCHEDULED", "CONFIRMED"].includes(a.status)).length },
-    { key: "past", label: "Past", count: displayAppointments.filter((a) => a.status === "COMPLETED").length },
-    { key: "cancelled", label: "Cancelled", count: displayAppointments.filter((a) => a.status === "CANCELLED").length },
+  const tabs: { key: TabKey; label: string; count: number | null }[] = [
+    { key: "upcoming", label: "Upcoming", count: activeTab === "upcoming" ? appointments.length : null },
+    { key: "past", label: "Past", count: activeTab === "past" ? appointments.length : null },
+    { key: "cancelled", label: "Cancelled", count: activeTab === "cancelled" ? appointments.length : null },
   ];
 
   return (
@@ -238,24 +196,33 @@ export default function PatientAppointmentsPage() {
               )}
             >
               {tab.label}
-              <span
-                className={cn(
-                  "ml-2 px-2 py-0.5 rounded-full text-xs",
-                  activeTab === tab.key ? "bg-[var(--primary)]/10 text-[var(--primary)]" : "bg-gray-200 text-gray-500"
-                )}
-              >
-                {tab.count}
-              </span>
+              {tab.count !== null && (
+                <span className="ml-2 px-2 py-0.5 rounded-full text-xs bg-[var(--primary)]/10 text-[var(--primary)]">
+                  {tab.count}
+                </span>
+              )}
             </button>
           ))}
         </div>
 
         {/* Appointments List */}
         {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <Loader2 className="w-8 h-8 animate-spin text-[var(--primary)]" />
+          <div className="py-4">
+            <TableRowsSkeleton rows={5} />
           </div>
-        ) : displayAppointments.length === 0 ? (
+        ) : loadError ? (
+          <div className="text-center py-20" role="alert">
+            <AlertCircle className="w-16 h-16 text-red-300 mx-auto mb-4" />
+            <p className="text-gray-700 text-lg font-medium">Could not load appointments</p>
+            <p className="text-gray-500 text-sm mt-1">{loadError}</p>
+            <button
+              onClick={fetchAppointments}
+              className="mt-4 text-[var(--primary)] hover:opacity-80 font-medium text-sm"
+            >
+              Try again
+            </button>
+          </div>
+        ) : appointments.length === 0 ? (
           <div className="text-center py-20">
             <Calendar className="w-16 h-16 text-gray-300 mx-auto mb-4" />
             <p className="text-gray-500 text-lg">No {activeTab} appointments</p>
@@ -268,7 +235,7 @@ export default function PatientAppointmentsPage() {
           </div>
         ) : (
           <div className="space-y-4">
-            {displayAppointments.map((apt) => {
+            {appointments.map((apt) => {
               const statusCfg = STATUS_CONFIG[apt.status] || STATUS_CONFIG.SCHEDULED;
               const StatusIcon = statusCfg.icon;
               return (
@@ -320,9 +287,12 @@ export default function PatientAppointmentsPage() {
                     {/* Actions */}
                     <div className="flex items-center gap-2 flex-shrink-0">
                       {apt.status === "CONFIRMED" && apt.consultationType === "VIDEO" && (
-                        <button className="px-4 py-2 bg-[var(--primary)] hover:opacity-90 text-white text-sm font-medium rounded-xl transition">
+                        <Link
+                          href={`/patient/telemedicine/${apt.id}`}
+                          className="px-4 py-2 bg-[var(--primary)] hover:opacity-90 text-white text-sm font-medium rounded-xl transition"
+                        >
                           Join Call
-                        </button>
+                        </Link>
                       )}
                       {["SCHEDULED", "CONFIRMED"].includes(apt.status) && (
                         <button className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 text-sm font-medium rounded-xl transition">
@@ -359,6 +329,10 @@ export default function PatientAppointmentsPage() {
 function BookingModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
   const [step, setStep] = useState<BookingStep>(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [doctors, setDoctors] = useState<DoctorOption[]>([]);
+  const [doctorsLoading, setDoctorsLoading] = useState(true);
+  const [doctorsError, setDoctorsError] = useState<string | null>(null);
 
   // Step 1 — Doctor selection
   const [searchQuery, setSearchQuery] = useState("");
@@ -375,59 +349,37 @@ function BookingModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
   // Step 4 — Reason
   const [reason, setReason] = useState("");
 
-  // Placeholder doctors
-  const doctors: DoctorOption[] = [
-    {
-      id: "d1",
-      specialization: "General Practice",
-      consultationFee: 75,
-      rating: 4.8,
-      availableDays: ["Mon", "Tue", "Wed", "Thu", "Fri"],
-      availableFrom: "09:00",
-      availableTo: "17:00",
-      user: { firstName: "Sarah", lastName: "Johnson", avatarUrl: null },
-    },
-    {
-      id: "d2",
-      specialization: "Cardiology",
-      consultationFee: 120,
-      rating: 4.9,
-      availableDays: ["Mon", "Wed", "Fri"],
-      availableFrom: "10:00",
-      availableTo: "16:00",
-      user: { firstName: "Michael", lastName: "Chen", avatarUrl: null },
-    },
-    {
-      id: "d3",
-      specialization: "Neurology",
-      consultationFee: 150,
-      rating: 4.7,
-      availableDays: ["Tue", "Thu"],
-      availableFrom: "09:00",
-      availableTo: "15:00",
-      user: { firstName: "Emily", lastName: "Williams", avatarUrl: null },
-    },
-    {
-      id: "d4",
-      specialization: "Dermatology",
-      consultationFee: 90,
-      rating: 4.6,
-      availableDays: ["Mon", "Tue", "Wed", "Thu"],
-      availableFrom: "08:00",
-      availableTo: "14:00",
-      user: { firstName: "James", lastName: "Park", avatarUrl: null },
-    },
-    {
-      id: "d5",
-      specialization: "Pediatrics",
-      consultationFee: 85,
-      rating: 4.9,
-      availableDays: ["Mon", "Tue", "Wed", "Thu", "Fri"],
-      availableFrom: "09:00",
-      availableTo: "17:00",
-      user: { firstName: "Lisa", lastName: "Anderson", avatarUrl: null },
-    },
-  ];
+  const loadDoctors = useCallback(async () => {
+    setDoctorsLoading(true);
+    setDoctorsError(null);
+
+    try {
+      const res = await fetch("/api/doctors?limit=50");
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        throw new Error(data?.error || "Unable to load doctors");
+      }
+
+      if (!Array.isArray(data?.doctors)) {
+        throw new Error("The doctors response was invalid");
+      }
+
+      setDoctors(data.doctors);
+    } catch (error) {
+      setDoctors([]);
+      setSelectedDoctor(null);
+      setDoctorsError(
+        error instanceof Error ? error.message : "Unable to load doctors"
+      );
+    } finally {
+      setDoctorsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadDoctors();
+  }, [loadDoctors]);
 
   const filteredDoctors = doctors.filter((d) => {
     const matchesSearch =
@@ -447,8 +399,13 @@ function BookingModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
   });
 
   const handleBook = async () => {
-    if (!selectedDoctor || !selectedDate || !selectedTime) return;
+    if (!selectedDoctor || !selectedDate || !selectedTime) {
+      setSubmitError("Select a doctor, date, and time before booking.");
+      return;
+    }
+
     setIsSubmitting(true);
+    setSubmitError(null);
 
     try {
       // Parse selected time to build the full scheduledAt
@@ -472,11 +429,16 @@ function BookingModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
         }),
       });
 
-      if (res.ok) {
-        onSuccess();
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(data?.error || "Unable to book this appointment");
       }
-    } catch {
-      // handle error
+
+      onSuccess();
+    } catch (error) {
+      setSubmitError(
+        error instanceof Error ? error.message : "Unable to book this appointment"
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -562,37 +524,60 @@ function BookingModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
 
               {/* Doctor list */}
               <div className="space-y-3 max-h-[340px] overflow-y-auto">
-                {filteredDoctors.map((doc) => (
-                  <button
-                    key={doc.id}
-                    onClick={() => setSelectedDoctor(doc)}
-                    className={cn(
-                      "w-full flex items-center gap-4 p-4 rounded-xl border-2 transition text-left",
-                      selectedDoctor?.id === doc.id
-                        ? "border-[var(--primary)] bg-[var(--primary)]/10"
-                        : "border-gray-100 hover:border-gray-300"
-                    )}
-                  >
-                    <div className="w-12 h-12 bg-[var(--primary)]/10 rounded-xl flex items-center justify-center flex-shrink-0">
-                      <User className="w-6 h-6 text-[var(--primary)]" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-gray-900">
-                        Dr. {doc.user.firstName} {doc.user.lastName}
+                {doctorsLoading ? (
+                  <div className="flex items-center justify-center py-10">
+                    <Loader2 className="w-6 h-6 animate-spin text-[var(--primary)]" />
+                  </div>
+                ) : doctorsError ? (
+                  <div className="text-center py-8" role="alert">
+                    <AlertCircle className="w-8 h-8 text-red-400 mx-auto mb-2" />
+                    <p className="text-sm text-gray-700">{doctorsError}</p>
+                    <button
+                      onClick={loadDoctors}
+                      className="mt-3 text-sm font-medium text-[var(--primary)] hover:opacity-80"
+                    >
+                      Try again
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    {filteredDoctors.map((doc) => (
+                      <button
+                        key={doc.id}
+                        onClick={() => setSelectedDoctor(doc)}
+                        className={cn(
+                          "w-full flex items-center gap-4 p-4 rounded-xl border-2 transition text-left",
+                          selectedDoctor?.id === doc.id
+                            ? "border-[var(--primary)] bg-[var(--primary)]/10"
+                            : "border-gray-100 hover:border-gray-300"
+                        )}
+                      >
+                        <div className="w-12 h-12 bg-[var(--primary)]/10 rounded-xl flex items-center justify-center flex-shrink-0">
+                          <User className="w-6 h-6 text-[var(--primary)]" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-gray-900">
+                            Dr. {doc.user.firstName} {doc.user.lastName}
+                          </p>
+                          <p className="text-sm text-gray-500">{doc.specialization}</p>
+                          <div className="flex items-center gap-3 mt-1 text-xs text-gray-400">
+                            <span>★ {doc.rating}</span>
+                            <span>${doc.consultationFee}/visit</span>
+                          </div>
+                        </div>
+                        {selectedDoctor?.id === doc.id && (
+                          <CheckCircle className="w-6 h-6 text-[var(--primary)] flex-shrink-0" />
+                        )}
+                      </button>
+                    ))}
+                    {filteredDoctors.length === 0 && (
+                      <p className="text-center text-gray-400 py-8">
+                        {doctors.length === 0
+                          ? "No doctors are currently available"
+                          : "No doctors found matching your search"}
                       </p>
-                      <p className="text-sm text-gray-500">{doc.specialization}</p>
-                      <div className="flex items-center gap-3 mt-1 text-xs text-gray-400">
-                        <span>★ {doc.rating}</span>
-                        <span>${doc.consultationFee}/visit</span>
-                      </div>
-                    </div>
-                    {selectedDoctor?.id === doc.id && (
-                      <CheckCircle className="w-6 h-6 text-[var(--primary)] flex-shrink-0" />
                     )}
-                  </button>
-                ))}
-                {filteredDoctors.length === 0 && (
-                  <p className="text-center text-gray-400 py-8">No doctors found matching your search</p>
+                  </>
                 )}
               </div>
             </div>
@@ -763,11 +748,11 @@ function BookingModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
                 </div>
               </div>
 
-              {/* Payment summary */}
+              {/* Fee summary */}
               <div className="bg-[var(--primary)]/10 rounded-xl p-5">
                 <div className="flex items-center gap-2 mb-3">
                   <CreditCard className="w-5 h-5 text-[var(--primary)]" />
-                  <span className="font-semibold text-gray-900">Payment Summary</span>
+                  <span className="font-semibold text-gray-900">Fee Summary</span>
                 </div>
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
@@ -783,7 +768,19 @@ function BookingModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
                     <span className="text-[var(--primary)]">${(selectedDoctor.consultationFee + 2).toFixed(2)}</span>
                   </div>
                 </div>
+                <p className="text-xs text-gray-500 mt-3">
+                  You can complete payment from the Payments page after booking.
+                </p>
               </div>
+            </div>
+          )}
+          {submitError && (
+            <div
+              className="mt-5 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700"
+              role="alert"
+            >
+              <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+              <span>{submitError}</span>
             </div>
           )}
         </div>
@@ -820,8 +817,8 @@ function BookingModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
                 </>
               ) : (
                 <>
-                  <CreditCard className="w-4 h-4" />
-                  Confirm & Pay
+                  <CheckCircle className="w-4 h-4" />
+                  Confirm Appointment
                 </>
               )}
             </button>

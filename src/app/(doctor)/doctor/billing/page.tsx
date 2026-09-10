@@ -47,33 +47,45 @@ type PeriodKey = "today" | "week" | "month" | "all";
 export default function DoctorBillingPage() {
   const [loading, setLoading] = useState(true);
   const [activePeriod, setActivePeriod] = useState<PeriodKey>("month");
+  const [allEarnings, setAllEarnings] = useState<EarningsEntry[]>([]);
+  const [payouts, setPayouts] = useState<PayoutEntry[]>([]);
 
   useEffect(() => {
-    // Simulate API fetch
-    const timer = setTimeout(() => setLoading(false), 600);
-    return () => clearTimeout(timer);
+    async function loadBilling() {
+      try {
+        const res = await fetch("/api/payments");
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data.payments)) {
+            setAllEarnings(
+              data.payments.map((p: {
+                id: string;
+                amount: number;
+                status: string;
+                paidAt?: string | null;
+                createdAt: string;
+                patient?: { user?: { firstName?: string; lastName?: string } };
+                appointment?: { scheduledAt?: string; consultationType?: string };
+              }) => ({
+                id: p.id,
+                patientName: `${p.patient?.user?.firstName || ""} ${p.patient?.user?.lastName || ""}`.trim() || "Patient",
+                consultationType: p.appointment?.consultationType || "VIDEO",
+                scheduledAt: p.appointment?.scheduledAt || p.createdAt,
+                amount: p.amount,
+                status: p.status,
+                paidAt: p.paidAt || null,
+              }))
+            );
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load doctor payments:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadBilling();
   }, []);
-
-  // Placeholder earnings data
-  const allEarnings: EarningsEntry[] = [
-    { id: "e1", patientName: "Alice Brown", consultationType: "VIDEO", scheduledAt: new Date().toISOString(), amount: 150, status: "COMPLETED", paidAt: new Date().toISOString() },
-    { id: "e2", patientName: "James Wilson", consultationType: "IN_PERSON", scheduledAt: new Date().toISOString(), amount: 200, status: "COMPLETED", paidAt: new Date().toISOString() },
-    { id: "e3", patientName: "Maria Garcia", consultationType: "PHONE", scheduledAt: new Date(Date.now() - 86400000).toISOString(), amount: 75, status: "COMPLETED", paidAt: new Date(Date.now() - 86400000).toISOString() },
-    { id: "e4", patientName: "Robert Smith", consultationType: "VIDEO", scheduledAt: new Date(Date.now() - 86400000 * 2).toISOString(), amount: 150, status: "COMPLETED", paidAt: new Date(Date.now() - 86400000 * 2).toISOString() },
-    { id: "e5", patientName: "Diana Lee", consultationType: "IN_PERSON", scheduledAt: new Date(Date.now() - 86400000 * 3).toISOString(), amount: 200, status: "COMPLETED", paidAt: new Date(Date.now() - 86400000 * 3).toISOString() },
-    { id: "e6", patientName: "Alice Brown", consultationType: "CHAT", scheduledAt: new Date(Date.now() - 86400000 * 5).toISOString(), amount: 50, status: "COMPLETED", paidAt: new Date(Date.now() - 86400000 * 5).toISOString() },
-    { id: "e7", patientName: "James Wilson", consultationType: "VIDEO", scheduledAt: new Date(Date.now() - 86400000 * 8).toISOString(), amount: 150, status: "COMPLETED", paidAt: new Date(Date.now() - 86400000 * 8).toISOString() },
-    { id: "e8", patientName: "Maria Garcia", consultationType: "IN_PERSON", scheduledAt: new Date(Date.now() - 86400000 * 12).toISOString(), amount: 200, status: "COMPLETED", paidAt: new Date(Date.now() - 86400000 * 12).toISOString() },
-    { id: "e9", patientName: "Robert Smith", consultationType: "PHONE", scheduledAt: new Date(Date.now() - 86400000 * 15).toISOString(), amount: 75, status: "PENDING", paidAt: null },
-    { id: "e10", patientName: "Diana Lee", consultationType: "VIDEO", scheduledAt: new Date(Date.now() - 86400000 * 20).toISOString(), amount: 150, status: "COMPLETED", paidAt: new Date(Date.now() - 86400000 * 20).toISOString() },
-  ];
-
-  const payouts: PayoutEntry[] = [
-    { id: "po1", amount: 1250.0, status: "COMPLETED", method: "Bank Transfer (****6789)", processedAt: new Date(Date.now() - 86400000 * 7).toISOString(), period: "Mar 1-15, 2024" },
-    { id: "po2", amount: 980.0, status: "COMPLETED", method: "Bank Transfer (****6789)", processedAt: new Date(Date.now() - 86400000 * 21).toISOString(), period: "Feb 16-28, 2024" },
-    { id: "po3", amount: 1450.0, status: "PROCESSING", method: "Bank Transfer (****6789)", processedAt: new Date().toISOString(), period: "Mar 16-31, 2024" },
-    { id: "po4", amount: 1100.0, status: "COMPLETED", method: "Bank Transfer (****6789)", processedAt: new Date(Date.now() - 86400000 * 35).toISOString(), period: "Feb 1-15, 2024" },
-  ];
 
   // Filter by period
   const now = new Date();
@@ -300,32 +312,40 @@ export default function DoctorBillingPage() {
                   <Download className="w-4 h-4" /> Export
                 </button>
               </div>
-              <div className="divide-y divide-gray-50">
-                {payouts.map((payout) => {
-                  const cfg = PAYOUT_STATUS[payout.status] || PAYOUT_STATUS.PENDING;
-                  return (
-                    <div key={payout.id} className="px-6 py-4 flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center">
-                          <CreditCard className="w-5 h-5 text-gray-500" />
+              {payouts.length === 0 ? (
+                <div className="text-center py-10">
+                  <CreditCard className="w-10 h-10 text-gray-300 mx-auto mb-2" />
+                  <p className="text-gray-500 text-sm">No payout history recorded yet</p>
+                  <p className="text-gray-400 text-xs mt-1">Completed consultation earnings will be settled on your next payout cycle</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-gray-50">
+                  {payouts.map((payout) => {
+                    const cfg = PAYOUT_STATUS[payout.status] || PAYOUT_STATUS.PENDING;
+                    return (
+                      <div key={payout.id} className="px-6 py-4 flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center">
+                            <CreditCard className="w-5 h-5 text-gray-500" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">{payout.method}</p>
+                            <p className="text-xs text-gray-500">{payout.period}</p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-sm font-medium text-gray-900">{payout.method}</p>
-                          <p className="text-xs text-gray-500">{payout.period}</p>
+                        <div className="text-right">
+                          <p className="text-sm font-bold text-gray-900">${payout.amount.toFixed(2)}</p>
+                          <span className={cn("text-xs font-medium", cfg.color)}>
+                            {payout.status === "COMPLETED"
+                              ? `Paid ${format(new Date(payout.processedAt), "MMM d")}`
+                              : payout.status}
+                          </span>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <p className="text-sm font-bold text-gray-900">${payout.amount.toFixed(2)}</p>
-                        <span className={cn("text-xs font-medium", cfg.color)}>
-                          {payout.status === "COMPLETED"
-                            ? `Paid ${format(new Date(payout.processedAt), "MMM d")}`
-                            : payout.status}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </>
         )}
