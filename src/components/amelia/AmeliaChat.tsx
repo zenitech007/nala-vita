@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowDown, Sparkles } from "lucide-react";
+import { ArrowDown, Sparkles, ShieldCheck } from "lucide-react";
 import ChatMessage from "@/components/chat/ChatMessage";
 import ChatInput from "@/components/chat/ChatInput";
 import TypingIndicator from "@/components/chat/TypingIndicator";
@@ -10,7 +10,7 @@ import AmeliaConversationList, {
   type ConversationSummaryUI,
 } from "@/components/amelia/AmeliaConversationList";
 import { useStickToBottom } from "@/hooks/useStickToBottom";
-import { PATIENT_DISCLAIMER } from "@/lib/amelia/safety";
+import { PATIENT_DISCLAIMER, PRIVACY_NOTICE } from "@/lib/amelia/safety";
 import { cn } from "@/lib/utils";
 
 interface UiMessage {
@@ -283,9 +283,22 @@ export default function AmeliaChat({
             )}
           >
             {messages.length === 0 && (
-              <div className="text-center text-gray-400 text-sm py-8">
-                <Sparkles className="w-6 h-6 mx-auto mb-2 text-[var(--primary)]" />
-                Hi, I&apos;m Amelia. Tell me how you&apos;re feeling or ask a health question.
+              <div className="text-center text-gray-500 text-sm py-10 px-4 max-w-md mx-auto space-y-3">
+                <div className="w-12 h-12 bg-[var(--primary)]/10 text-[var(--primary)] rounded-2xl flex items-center justify-center mx-auto shadow-xs">
+                  <Sparkles className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-gray-900 text-base">
+                    Hi, I&apos;m Amelia. Tell me how you&apos;re feeling or ask a health question.
+                  </h3>
+                  <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+                    Your personal AI medical companion. Ask questions about your lab results, medications, symptoms, or care plans.
+                  </p>
+                </div>
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-700 text-[11px] font-semibold rounded-full border border-emerald-200/60" title={PRIVACY_NOTICE}>
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  <span>Strict Data Isolation &middot; HIPAA Protected</span>
+                </div>
               </div>
             )}
             {messages.map((m, i) => (
@@ -309,7 +322,7 @@ export default function AmeliaChat({
           )}
         </div>
 
-        <p className="text-[10px] leading-snug text-gray-400 px-4 py-1 border-t border-gray-100">
+        <p className="text-[10px] leading-snug text-gray-400 px-4 py-1.5 border-t border-gray-100" title={PRIVACY_NOTICE}>
           {PATIENT_DISCLAIMER}
         </p>
         <div className="p-2 border-t border-gray-100">

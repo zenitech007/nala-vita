@@ -11,8 +11,9 @@ export interface AmeliaContext {
   firstName: string;
   age: number | null;
   gender: string | null;
+  bloodType?: string | null;
   allergies: string[];
-  activeMedications: { medication: string; dosage: string; frequency: string }[];
+  activeMedications: { medication: string; dosage: string; frequency: string; instructions?: string | null }[];
   recentVitals: {
     recordedAt: string;
     bloodPressure: string | null;
@@ -21,7 +22,10 @@ export interface AmeliaContext {
     oxygenSaturation: number | null;
   }[];
   recentLabs: { testName: string; resultValue: string; unit: string | null; isAbnormal: boolean }[];
+  upcomingAppointments?: { doctorName: string; specialization: string; date: string; reason?: string | null }[];
+  recentDiagnosesOrNotes?: { title: string; category?: string; date: string }[];
 }
+
 
 export interface AmeliaTurnInput {
   audience: Audience;

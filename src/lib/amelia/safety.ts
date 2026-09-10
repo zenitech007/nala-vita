@@ -26,4 +26,7 @@ export const PATIENT_DISCLAIMER =
   "Amelia is an AI health assistant, not a substitute for a doctor. For anything serious or worsening, please consult a healthcare professional.";
 
 export const EMERGENCY_MESSAGE =
-  "⚠️ Your symptoms may indicate a medical emergency. Please call your local emergency number or go to the nearest emergency department now.";
+  "⚠️ Your symptoms may indicate a medical emergency. Please call emergency services (911 or your local equivalent) or go to the nearest emergency room immediately.";
+
+export const PRIVACY_NOTICE =
+  "Your conversations with Amelia are private and protected under applicable health privacy regulations (e.g., HIPAA). I only access the medical record of the signed-in patient.";
