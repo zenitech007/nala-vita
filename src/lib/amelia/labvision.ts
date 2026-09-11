@@ -27,8 +27,12 @@ export async function extractLabsFromImage(imageDataUrl: string): Promise<LabPho
 
   let parsed: Partial<LabPhotoResult> = {};
   try {
-    const cleaned = raw.replace(/^```json\s*/i, "").replace(/```\s*$/, "").trim();
-    parsed = JSON.parse(cleaned);
+    let jsonStr = raw.trim();
+    const jsonMatch = raw.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      jsonStr = jsonMatch[0];
+    }
+    parsed = JSON.parse(jsonStr);
   } catch {
     return { results: [], summary: COULD_NOT_READ, overallNote: ADVISORY };
   }

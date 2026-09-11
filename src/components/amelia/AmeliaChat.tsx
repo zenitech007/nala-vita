@@ -11,12 +11,14 @@ import AmeliaConversationList, {
 } from "@/components/amelia/AmeliaConversationList";
 import { useStickToBottom } from "@/hooks/useStickToBottom";
 import { PATIENT_DISCLAIMER, PRIVACY_NOTICE } from "@/lib/amelia/safety";
+import { downscaleImage } from "@/lib/downscaleImage";
 import { cn } from "@/lib/utils";
 
 interface UiMessage {
   role: "user" | "assistant";
   content: string;
   sentAt: string;
+  imageUrl?: string;
   reminderSuggestion?: ReminderSuggestionUI;
 }
 
@@ -36,6 +38,7 @@ export default function AmeliaChat({
 }: Props = {}) {
   const [messages, setMessages] = useState<UiMessage[]>([]);
   const [input, setInput] = useState("");
+  const [imageFile, setImageFile] = useState<File | null>(null);
   const [sending, setSending] = useState(false);
   const [streaming, setStreaming] = useState(false);
   const [conversationId, setConversationId] = useState<string | undefined>();
@@ -147,10 +150,25 @@ export default function AmeliaChat({
 
   const send = async () => {
     const text = input.trim();
-    if (!text || sending) return;
+    if ((!text && !imageFile) || sending) return;
     setInput("");
+    const fileToUpload = imageFile;
+    setImageFile(null);
+
+    let imageDataUrl: string | undefined = undefined;
+    let localImageUrl: string | undefined = undefined;
+    if (fileToUpload) {
+      try {
+        imageDataUrl = await downscaleImage(fileToUpload);
+        localImageUrl = URL.createObjectURL(fileToUpload);
+      } catch (err) {
+        console.warn("Failed to downscale image:", err);
+      }
+    }
+
+    const messageText = text || (fileToUpload ? "Please review and analyze this attached medical report / image." : "");
     const now = new Date().toISOString();
-    setMessages((m) => [...m, { role: "user", content: text, sentAt: now }]);
+    setMessages((m) => [...m, { role: "user", content: messageText, imageUrl: localImageUrl, sentAt: now }]);
     setSending(true);
     scrollToBottom();
 
@@ -161,7 +179,7 @@ export default function AmeliaChat({
       const res = await fetch("/api/amelia/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ conversationId, message: text }),
+        body: JSON.stringify({ conversationId, message: messageText, imageDataUrl }),
         signal: controller.signal,
       });
 
@@ -303,7 +321,7 @@ export default function AmeliaChat({
             )}
             {messages.map((m, i) => (
               <div key={i}>
-                <ChatMessage isMine={m.role === "user"} content={m.content} sentAt={m.sentAt} otherInitials="A" />
+                <ChatMessage isMine={m.role === "user"} content={m.content} imageUrl={m.imageUrl} sentAt={m.sentAt} otherInitials="A" />
                 {m.reminderSuggestion && <ReminderCard suggestion={m.reminderSuggestion} />}
               </div>
             ))}
@@ -326,7 +344,14 @@ export default function AmeliaChat({
           {PATIENT_DISCLAIMER}
         </p>
         <div className="p-2 border-t border-gray-100">
-          <ChatInput value={input} onChange={setInput} onSend={send} isSending={sending || streaming} />
+          <ChatInput
+            value={input}
+            onChange={setInput}
+            onSend={send}
+            isSending={sending || streaming}
+            imageFile={imageFile}
+            onImageChange={setImageFile}
+          />
         </div>
       </div>
     </div>

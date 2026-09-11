@@ -418,8 +418,29 @@ export default function PatientMedicationsPage() {
             </div>
           </div>
         </header>
-        <div className="flex items-center justify-center py-24">
-          <Loader2 className="w-8 h-8 animate-spin text-[var(--primary)]" />
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 space-y-6 animate-pulse">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm space-y-3">
+                <div className="h-4 w-24 bg-gray-200 rounded" />
+                <div className="h-7 w-16 bg-gray-200 rounded-lg" />
+              </div>
+            ))}
+          </div>
+          <div className="space-y-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-2">
+                    <div className="h-5 w-48 bg-gray-200 rounded" />
+                    <div className="h-4 w-32 bg-gray-100 rounded" />
+                  </div>
+                  <div className="h-9 w-28 bg-gray-200 rounded-xl" />
+                </div>
+                <div className="h-2 w-full bg-gray-100 rounded-full" />
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     );

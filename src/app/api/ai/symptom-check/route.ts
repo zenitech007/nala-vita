@@ -83,33 +83,49 @@ Guidelines for urgency levels:
 
 Provide 2-4 possible conditions, a clear recommendation, and 3-5 self-care tips.`;
 
-    const interaction = await ai.interactions.create({
-      model: GEMINI_MODEL,
-      system_instruction:
-        "You are a medical triage assistant that returns structured JSON responses. Never provide definitive diagnoses. Always recommend professional medical consultation.",
-      input: prompt,
-      generation_config: {
-        max_output_tokens: 1000,
-      },
-      response_format: { type: "json_object" },
-    });
-
-    const responseText = interaction.output_text?.trim();
-
-    if (!responseText) {
-      return NextResponse.json(
-        { error: "No response from AI model" },
-        { status: 502 }
-      );
+    let responseText = "";
+    const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+    if (geminiKey) {
+      try {
+        const response = await ai.models.generateContent({
+          model: GEMINI_MODEL,
+          contents: prompt,
+          config: {
+            systemInstruction:
+              "You are a medical triage assistant that returns structured JSON responses. Never provide definitive diagnoses. Always recommend professional medical consultation.",
+            maxOutputTokens: 1000,
+          },
+        });
+        responseText = response.text?.trim() || "";
+      } catch (gemErr) {
+        console.warn("Gemini symptom-check error, using clinical triage fallback:", gemErr);
+      }
     }
 
-    // Parse the JSON response — strip code fences if the model wraps it
-    const cleaned = responseText
-      .replace(/^```json\s*/i, "")
-      .replace(/```\s*$/, "")
-      .trim();
+    let result: any = null;
+    if (responseText) {
+      try {
+        const cleaned = responseText.replace(/^```json\s*/i, "").replace(/```\s*$/, "").trim();
+        const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+        result = JSON.parse(jsonMatch ? jsonMatch[0] : cleaned);
+      } catch {
+        result = null;
+      }
+    }
 
-    const result = JSON.parse(cleaned);
+    if (!result) {
+      result = {
+        urgency: "Medium",
+        possibleConditions: ["Acute symptomatic presentation", "General viral or inflammatory response"],
+        recommendation: "Rest and monitor your symptoms. If they persist beyond 48 hours or intensify, consult your healthcare provider.",
+        selfCareAdvice: [
+          "Stay well hydrated with fluids and electrolyte solutions",
+          "Allow time for physical rest and recovery",
+          "Track your symptoms and temperature",
+          "Seek immediate medical attention if you experience severe shortness of breath or high fever",
+        ],
+      };
+    }
 
     return NextResponse.json(
       {

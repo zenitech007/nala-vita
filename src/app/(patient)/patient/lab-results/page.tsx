@@ -100,7 +100,7 @@ export default function PatientLabResultsPage() {
     return true;
   });
 
-  // Generate AI summary for a lab result using Gemini 3.6 Flash
+  // Generate AI summary for a lab result using Gemini 2.5 Flash
   const generateAiSummary = async (order: LabOrder) => {
     setAiLoading(true);
     setAiSummary(null);

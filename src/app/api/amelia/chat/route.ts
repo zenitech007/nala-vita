@@ -7,10 +7,12 @@ import { runAmeliaTurn, runAmeliaTurnStream } from "@/lib/amelia/engine";
 import { extractMemories, saveMemories } from "@/lib/amelia/memory";
 import { detectReminder, computeNextFireAt, describeSchedule } from "@/lib/amelia/reminders";
 import { logAmeliaAudit } from "@/lib/amelia/audit";
+import { extractLabsFromImage } from "@/lib/amelia/labvision";
 
 const bodySchema = z.object({
   conversationId: z.string().optional(),
   message: z.string().min(1).max(4000),
+  imageDataUrl: z.string().optional(),
   /** When false the client gets a single JSON body instead of an SSE stream. */
   stream: z.boolean().optional(),
 });
@@ -77,7 +79,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { conversationId, message, stream } = bodySchema.parse(await req.json());
+    const { conversationId, message, imageDataUrl, stream } = bodySchema.parse(await req.json());
     const patientId = user.patient.id;
 
     let convo = conversationId
@@ -88,8 +90,25 @@ export async function POST(req: NextRequest) {
     }
     const convoId = convo.id;
 
+    let effectiveMessage = message;
+    if (imageDataUrl) {
+      try {
+        const labResult = await extractLabsFromImage(imageDataUrl);
+        if (labResult.results.length > 0) {
+          const labDetails = labResult.results
+            .map((r) => `- ${r.name}: ${r.value} ${r.unit || ""} (Ref: ${r.referenceRange || "—"}, Flag: ${r.flag})`)
+            .join("\n");
+          effectiveMessage = `${message}\n\n[Attached Lab Report Image Read by Amelia]:\n${labDetails}\nSummary: ${labResult.summary}`;
+        } else if (labResult.summary) {
+          effectiveMessage = `${message}\n\n[Attached Image Note]: ${labResult.summary}`;
+        }
+      } catch (imgErr) {
+        console.warn("Lab vision processing error:", imgErr);
+      }
+    }
+
     const userMsg = await prisma.ameliaMessage.create({
-      data: { conversationId: convoId, role: "user", content: message },
+      data: { conversationId: convoId, role: "user", content: effectiveMessage },
     });
 
     const history = await prisma.ameliaMessage.findMany({

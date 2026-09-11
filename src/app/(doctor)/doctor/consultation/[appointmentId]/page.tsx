@@ -122,7 +122,7 @@ export default function DoctorConsultationPage() {
   const [isRecording, setIsRecording] = useState(false);
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
 
-  // 1-Click AI SOAP Formatter using Gemini 3.6 Flash
+  // 1-Click AI SOAP Formatter using Gemini 2.5 Flash
   const formatToSoap = async () => {
     if (!notes.trim() || isFormattingSoap) return;
     setIsFormattingSoap(true);
@@ -441,7 +441,7 @@ export default function DoctorConsultationPage() {
                 <button
                   onClick={formatToSoap}
                   disabled={isFormattingSoap || !notes.trim()}
-                  title="Automatically organize into Subjective, Objective, Assessment, Plan using Gemini 3.6 Flash"
+                  title="Automatically organize into Subjective, Objective, Assessment, Plan using Gemini 2.5 Flash"
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-gradient-to-r from-purple-600 to-indigo-600 hover:opacity-95 text-white shadow-sm transition disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isFormattingSoap ? (

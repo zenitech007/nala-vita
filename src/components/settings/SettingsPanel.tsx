@@ -403,7 +403,7 @@ export default function SettingsPanel({
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
               </span>
-              Gemini 3.6 Flash Active
+              Gemini 2.5 Flash Active
             </div>
           </div>
 
@@ -1137,7 +1137,7 @@ export default function SettingsPanel({
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <h2 className="text-lg font-bold text-gray-900">Google Gemini 3.6 Flash</h2>
+                        <h2 className="text-lg font-bold text-gray-900">Google Gemini 2.5 Flash</h2>
                         <span className="px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wider uppercase bg-emerald-100 text-emerald-800">
                           Next-Gen
                         </span>
@@ -1158,12 +1158,12 @@ export default function SettingsPanel({
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 relative z-10">
                   <div className="p-3.5 rounded-xl bg-gray-50 border border-gray-100">
                     <p className="text-xs text-gray-500 font-medium">Architecture</p>
-                    <p className="text-sm font-semibold text-gray-900 mt-0.5">Interactions API</p>
-                    <p className="text-[11px] text-gray-400 mt-0.5">Server-managed state</p>
+                    <p className="text-sm font-semibold text-gray-900 mt-0.5">Google GenAI SDK</p>
+                    <p className="text-[11px] text-gray-400 mt-0.5">Multimodal & Audio TTS</p>
                   </div>
                   <div className="p-3.5 rounded-xl bg-gray-50 border border-gray-100">
                     <p className="text-xs text-gray-500 font-medium">Model Identifier</p>
-                    <p className="text-sm font-mono font-semibold text-gray-900 mt-0.5">gemini-3.6-flash</p>
+                    <p className="text-sm font-mono font-semibold text-gray-900 mt-0.5">gemini-2.5-flash</p>
                     <p className="text-[11px] text-gray-400 mt-0.5">Multimodal native</p>
                   </div>
                   <div className="p-3.5 rounded-xl bg-gray-50 border border-gray-100">

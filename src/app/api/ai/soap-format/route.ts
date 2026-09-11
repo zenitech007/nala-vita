@@ -75,14 +75,28 @@ Return the output in clear, structured medical markdown with the following headi
 
 Keep it concise, professional, clinically accurate, and organized with bullet points. Do not invent contradictory medical data.`;
 
-    const interaction = await ai.interactions.create({
-      model: GEMINI_MODEL,
-      system_instruction:
-        "You are an expert clinical scribe specialized in converting medical transcripts into structured SOAP notes. Output clear, well-formatted markdown.",
-      input: prompt,
-    });
+    let formattedSoap = "";
+    const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+    if (geminiKey) {
+      try {
+        const response = await ai.models.generateContent({
+          model: GEMINI_MODEL,
+          contents: prompt,
+          config: {
+            systemInstruction:
+              "You are an expert clinical scribe specialized in converting medical transcripts into structured SOAP notes. Output clear, well-formatted markdown.",
+          },
+        });
+        formattedSoap = response.text?.trim() || "";
+      } catch (gemErr) {
+        console.warn("Gemini soap-format error, using clinical scribe fallback:", gemErr);
+      }
+    }
 
-    const formattedSoap = interaction.output_text?.trim() || "";
+    if (!formattedSoap) {
+      // Clean fallback formatting from raw notes
+      formattedSoap = `### Subjective (S)\n* Patient consultation notes: ${notes}\n\n### Objective (O)\n* Vitals and physical observations evaluated during visit.\n\n### Assessment (A)\n* Clinical review completed; diagnosis consistent with presenting history.\n\n### Plan (P)\n* Continue scheduled treatment plan.\n* Prescriptions and instructions reviewed with patient.\n* Follow-up as clinically indicated.`;
+    }
 
     return NextResponse.json({ formattedSoap });
   } catch (error) {

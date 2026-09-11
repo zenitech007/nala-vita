@@ -29,7 +29,7 @@ async function prepareTurn(input: AmeliaTurnInput) {
     ...input.messages.map((m) => ({ role: m.role, content: m.content })),
   ];
 
-  return { turns, redFlags };
+  return { turns, redFlags, ctx };
 }
 
 export async function runAmeliaTurn(input: AmeliaTurnInput): Promise<AmeliaReply> {
@@ -41,8 +41,8 @@ export async function runAmeliaTurn(input: AmeliaTurnInput): Promise<AmeliaReply
     return { content: EMERGENCY_MESSAGE, urgency: "emergency", redFlags: earlyFlags, disclaimer: PATIENT_DISCLAIMER };
   }
 
-  const { turns, redFlags } = await prepareTurn(input);
-  const content = await chat(turns);
+  const { turns, redFlags, ctx } = await prepareTurn(input);
+  const content = await chat(turns, { context: ctx });
 
   return { content, urgency: urgencyFromRedFlags(redFlags), redFlags, disclaimer: PATIENT_DISCLAIMER };
 }
@@ -75,14 +75,14 @@ export async function* runAmeliaTurnStream(
     return;
   }
 
-  const { turns, redFlags } = await prepareTurn(input);
+  const { turns, redFlags, ctx } = await prepareTurn(input);
 
   yield {
     type: "start",
     meta: { urgency: urgencyFromRedFlags(redFlags), redFlags, disclaimer: PATIENT_DISCLAIMER },
   };
 
-  for await (const delta of chatStream(turns)) {
+  for await (const delta of chatStream(turns, { context: ctx })) {
     yield { type: "delta", text: delta };
   }
 }

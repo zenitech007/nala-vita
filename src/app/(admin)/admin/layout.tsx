@@ -1,18 +1,12 @@
-import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { redirect } from "next/navigation";
 import AdminSidebar from "@/components/layout/AdminSidebar";
-import { prisma } from "@/lib/prisma";
+import { getAuthenticatedUserWithProfile } from "@/lib/auth-cache";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-    const supabase = createServerSupabaseClient();
+    const authData = await getAuthenticatedUserWithProfile();
+    if (!authData?.session) redirect("/login");
 
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) redirect("/login");
-
-    const user = await prisma.user.findUnique({
-        where: { supabaseId: session.user.id },
-        select: { firstName: true, lastName: true, avatarUrl: true },
-    });
+    const { user } = authData;
 
     return (
         <div className="flex min-h-screen bg-gray-50">

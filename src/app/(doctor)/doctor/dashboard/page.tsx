@@ -1,22 +1,14 @@
-import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import DoctorDashboardClient from "./_components/DoctorDashboardClient";
+import { getAuthenticatedUserWithProfile } from "@/lib/auth-cache";
 
 export default async function DoctorDashboardPage() {
-  const supabase = createServerSupabaseClient();
+  const authData = await getAuthenticatedUserWithProfile();
+  if (!authData?.session || !authData.user?.doctor) redirect("/login");
 
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) redirect("/login");
-
-  const user = await prisma.user.findUnique({
-    where: { supabaseId: session.user.id },
-    include: { doctor: true },
-  });
-
-  if (!user || !user.doctor) redirect("/login");
-
-  const doctorId = user.doctor.id;
+  const { user } = authData;
+  const doctorId = authData.user.doctor.id;
   const now = new Date();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const todayEnd = new Date(todayStart);

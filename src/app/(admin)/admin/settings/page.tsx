@@ -105,10 +105,10 @@ export default function AdminSettingsPage() {
 
   const systemServices: SystemService[] = [
     {
-      name: "Google Gemini 3.6 Flash",
+      name: "Google Gemini 2.5 Flash",
       icon: Cpu,
       status: "operational",
-      description: "Interactions API Active",
+      description: "Multimodal & Audio TTS Active",
       badge: "AI Engine",
     },
     {
@@ -221,7 +221,7 @@ export default function AdminSettingsPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs font-medium text-gray-500">AI Response Engine</p>
-              <p className="text-lg font-bold text-gray-900 mt-1">Gemini 3.6 Flash</p>
+              <p className="text-lg font-bold text-gray-900 mt-1">Gemini 2.5 Flash</p>
             </div>
             <div className="w-11 h-11 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
               <Cpu className="w-5 h-5" />
@@ -229,7 +229,7 @@ export default function AdminSettingsPage() {
           </div>
           <p className="text-[11px] text-purple-600 font-medium mt-3 flex items-center gap-1">
             <Zap className="w-3 h-3" />
-            Interactions API Model
+            GenAI Multimodal & TTS Model
           </p>
         </motion.div>
 

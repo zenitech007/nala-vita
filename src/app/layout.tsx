@@ -20,6 +20,8 @@ const geistMono = localFont({
   display: "swap",
 });
 
+import RouteProgress from "@/components/common/RouteProgress";
+
 export const viewport: Viewport = {
   themeColor: "#FC94AF",
   width: "device-width",
@@ -105,6 +107,7 @@ export default async function RootLayout({
         />
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+        <RouteProgress />
         <ThemeProvider>
           <NextIntlClientProvider messages={messages} locale={locale}>
             <Providers>{children}</Providers>
