@@ -11,16 +11,23 @@ export default function Home() {
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) {
+    supabase.auth
+      .getSession()
+      .then((res) => {
+        const session = res?.data?.session;
+        if (!session) {
+          setChecking(false);
+          return;
+        }
+        const role = session.user.user_metadata?.role?.toUpperCase();
+        if (role === "DOCTOR") router.replace("/doctor/dashboard");
+        else if (role === "ADMIN") router.replace("/admin/dashboard");
+        else router.replace("/patient/dashboard");
+      })
+      .catch((err) => {
+        console.warn("Supabase session check failed (project may be paused or offline):", err?.message || err);
         setChecking(false);
-        return;
-      }
-      const role = session.user.user_metadata?.role?.toUpperCase();
-      if (role === "DOCTOR") router.replace("/doctor/dashboard");
-      else if (role === "ADMIN") router.replace("/admin/dashboard");
-      else router.replace("/patient/dashboard");
-    });
+      });
   }, [router]);
 
   if (checking) {

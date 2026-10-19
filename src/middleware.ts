@@ -30,9 +30,13 @@ export async function middleware(req: NextRequest) {
 
   // ✅ FIX: getSession() reads the cookie locally — zero network cost.
   // getUser() (the old code) made a live Supabase Auth API call on every page.
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+  let session = null;
+  try {
+    const { data } = await supabase.auth.getSession();
+    session = data?.session ?? null;
+  } catch {
+    session = null;
+  }
 
   const { pathname } = req.nextUrl;
 

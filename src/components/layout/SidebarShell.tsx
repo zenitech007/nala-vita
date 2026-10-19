@@ -63,7 +63,11 @@ export function SidebarShell({ role, roleLabel, brand = "Nala Vita", user, nav }
   };
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+    } catch (e) {
+      console.warn("Sign out error:", e);
+    }
     router.push("/login");
     router.refresh();
   };
