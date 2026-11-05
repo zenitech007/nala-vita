@@ -103,7 +103,7 @@ model Doctor {
   licenseNumber     String   @unique @map("license_number")
   yearsOfExperience Int      @map("years_of_experience")
   bio               String?
-  consultationFee   Float    @map("consultation_fee")
+  consultationFee   Decimal  @db.Decimal(12, 2) @map("consultation_fee")
   availableDays     String[] @map("available_days")
   availableFrom     String?  @map("available_from")
   availableTo       String?  @map("available_to")
@@ -321,7 +321,7 @@ model Payment {
   id                String    @id @default(cuid())
   patientId         String    @map("patient_id")
   appointmentId     String    @unique @map("appointment_id")
-  amount            Float
+  amount            Decimal   @db.Decimal(12, 2)
   currency          String    @default("USD")
   status            String    @default("PENDING")
   paystackReference String?   @map("paystack_reference")
@@ -332,11 +332,32 @@ model Payment {
 
   patient     Patient     @relation(fields: [patientId], references: [id], onDelete: Cascade)
   appointment Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  attempts    PaymentAttempt[]
 
   @@index([patientId, createdAt])
   @@index([paystackReference])
   @@index([status, paidAt])
   @@map("payments")
+}
+
+model PaymentAttempt {
+  id               String   @id @default(cuid())
+  paymentId        String   @map("payment_id")
+  patientId        String   @map("patient_id")
+  appointmentId    String   @map("appointment_id")
+  reference        String   @unique
+  amountMinor      BigInt   @map("amount_minor")
+  currency         String
+  domain           String   @default("test")
+  status           String   @default("INITIATING")
+  authorizationUrl String?  @map("authorization_url")
+  accessCode       String?  @map("access_code")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+  payment          Payment  @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+
+  @@index([paymentId, status])
+  @@map("payment_attempts")
 }
 
 model Notification {

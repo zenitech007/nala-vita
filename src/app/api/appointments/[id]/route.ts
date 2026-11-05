@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { moneyForJson } from "@/lib/money";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -91,7 +92,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    return NextResponse.json({ appointment });
+    return NextResponse.json(moneyForJson({ appointment }));
   } catch (error) {
     console.error("GET /api/appointments/[id] error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
@@ -173,7 +174,7 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
       },
     });
 
-    return NextResponse.json({ appointment: updated });
+    return NextResponse.json(moneyForJson({ appointment: updated }));
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(

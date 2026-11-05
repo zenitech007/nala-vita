@@ -65,7 +65,7 @@ export async function GET() {
             specialization: user.doctor.specialization,
             licenseNumber: user.doctor.licenseNumber,
             yearsOfExperience: user.doctor.yearsOfExperience,
-            consultationFee: user.doctor.consultationFee,
+            consultationFee: Number(user.doctor.consultationFee),
             isVerified: user.doctor.isVerified,
           }
         : null,

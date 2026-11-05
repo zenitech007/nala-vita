@@ -166,7 +166,7 @@ export default async function DoctorDashboardPage() {
       patient: p.patient,
     })),
     totalPatients,
-    revenueThisWeek: revenueThisWeekResult._sum.amount ?? 0,
+    revenueThisWeek: Number(revenueThisWeekResult._sum.amount ?? 0),
   };
 
   return <DoctorDashboardClient data={dashboardData} />;

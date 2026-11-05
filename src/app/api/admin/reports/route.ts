@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { moneyForJson } from "@/lib/money";
 
 export async function GET(req: NextRequest) {
   try {
@@ -138,7 +139,7 @@ export async function GET(req: NextRequest) {
       };
     });
 
-    return NextResponse.json({
+    return NextResponse.json(moneyForJson({
       overview: {
         totalPatients,
         totalDoctors,
@@ -160,7 +161,7 @@ export async function GET(req: NextRequest) {
       recentPayments,
       recentAppointments,
       topConditions: [],
-    });
+    }));
   } catch (error) {
     console.error("[GET /api/admin/reports]", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

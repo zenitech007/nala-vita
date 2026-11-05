@@ -38,6 +38,7 @@ const doctorSchema = baseSchema.extend({
     .max(60, "Years of experience must be 60 or less"),
   consultationFee: z
     .number()
+    .multipleOf(0.01, "Consultation fee must use whole cents")
     .min(0, "Consultation fee must be 0 or more")
     .max(10_000, "Consultation fee seems too high"),
   bio: z.string().optional(),

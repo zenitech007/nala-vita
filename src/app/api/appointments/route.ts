@@ -4,6 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { appointmentAvailabilityError } from "@/lib/appointment-availability";
 import { AppointmentConflict, reserveAppointmentSlot } from "@/lib/appointment-lock";
+import { Prisma } from "@prisma/client";
+import { moneyForJson } from "@/lib/money";
 
 // ─── GET: Fetch logged-in patient's appointments ─────────
 
@@ -74,7 +76,7 @@ export async function GET(req: NextRequest) {
       orderBy: { scheduledAt: statusFilter === "past" ? "desc" : "asc" },
     });
 
-    return NextResponse.json({ appointments });
+    return NextResponse.json(moneyForJson({ appointments }));
   } catch (error) {
     console.error("GET /api/appointments error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
@@ -164,7 +166,7 @@ export async function POST(req: NextRequest) {
         data: {
           patientId: user.patient!.id,
           appointmentId: appointment.id,
-          amount: doctor.consultationFee + 2, // fee + platform fee
+          amount: new Prisma.Decimal(doctor.consultationFee).plus(2), // exact fee + platform fee
           currency: "USD",
           status: "PENDING",
         },
@@ -174,11 +176,11 @@ export async function POST(req: NextRequest) {
     }, { isolationLevel: "ReadCommitted" });
 
     return NextResponse.json(
-      {
+      moneyForJson({
         message: "Appointment booked successfully",
         appointment: result.appointment,
         payment: result.payment,
-      },
+      }),
       { status: 201 }
     );
   } catch (error) {

@@ -1,31 +1,10 @@
+import { requireApiUser } from '@/lib/auth';
+import { CheckoutError, initializeCheckout } from '@/lib/payment-checkout';
+import { moneyForJson } from '@/lib/money';
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
-
-// ─── Paystack helpers ─────────────────────────────────────
-
-const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY!;
-const PAYSTACK_BASE = "https://api.paystack.co";
-
-async function paystackPost<T>(path: string, body: Record<string, unknown>): Promise<T> {
-  const res = await fetch(`${PAYSTACK_BASE}${path}`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  });
-
-  const data = await res.json();
-
-  if (!res.ok || !data.status) {
-    throw new Error(data.message ?? `Paystack error: ${res.status}`);
-  }
-
-  return data.data as T;
-}
 
 // ─── GET: Return payment history for the current user ────
 
@@ -105,7 +84,7 @@ export async function GET(_req: NextRequest) {
       );
     }
 
-    return NextResponse.json({ payments });
+    return NextResponse.json(moneyForJson({ payments }));
   } catch (error) {
     console.error("GET /api/payments error:", error);
     return NextResponse.json(
@@ -131,120 +110,15 @@ const createPaymentSchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
+  const auth = await requireApiUser({ roles: ["PATIENT"], profile: "patient" });
+  if (!auth.ok) return auth.response;
   try {
-    const supabase = createServerSupabaseClient();
-    const {
-      data: { user: authUser },
-    } = await supabase.auth.getUser();
-
-    if (!authUser) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { supabaseId: authUser.id },
-      include: { patient: true },
-    });
-
-    if (!user?.patient) {
-      return NextResponse.json(
-        { error: "Patient profile not found" },
-        { status: 404 }
-      );
-    }
-
-    const body = await req.json();
-    const validated = createPaymentSchema.parse(body);
-
-    // Verify the appointment belongs to this patient
-    const appointment = await prisma.appointment.findFirst({
-      where: {
-        id: validated.appointmentId,
-        patientId: user.patient.id,
-      },
-      include: { payment: true },
-    });
-
-    if (!appointment) {
-      return NextResponse.json(
-        { error: "Appointment not found" },
-        { status: 404 }
-      );
-    }
-
-    if (appointment.payment?.status === "COMPLETED") {
-      return NextResponse.json(
-        { error: "Payment already completed" },
-        { status: 400 }
-      );
-    }
-
-    // Paystack amounts are in the smallest currency unit (kobo for NGN, cents for USD)
-    const amountDecimal = appointment.payment?.amount ?? 150;
-    const currency = (appointment.payment?.currency ?? "NGN").toUpperCase();
-    // Paystack uses kobo (NGN×100) just like Stripe uses cents
-    const amountInSmallestUnit = Math.round(amountDecimal * 100);
-
-    // Initialize Paystack transaction
-    type PaystackInitResponse = {
-      authorization_url: string;
-      access_code: string;
-      reference: string;
-    };
-
-    const transaction = await paystackPost<PaystackInitResponse>(
-      "/transaction/initialize",
-      {
-        email: user.email,
-        amount: amountInSmallestUnit,
-        currency,
-        reference: `MC-${appointment.id}-${Date.now()}`,
-        callback_url: `${process.env.NEXT_PUBLIC_APP_URL}/patient/payments?status=success`,
-        metadata: {
-          appointmentId: appointment.id,
-          patientId: user.patient.id,
-          cancel_action: `${process.env.NEXT_PUBLIC_APP_URL}/patient/payments?status=cancelled`,
-        },
-      }
-    );
-
-    // Persist the Paystack reference so the webhook can look it up
-    if (appointment.payment) {
-      await prisma.payment.update({
-        where: { id: appointment.payment.id },
-        data: { paystackReference: transaction.reference },
-      });
-    } else {
-      await prisma.payment.create({
-        data: {
-          patientId: user.patient.id,
-          appointmentId: appointment.id,
-          amount: amountDecimal,
-          currency,
-          status: "PENDING",
-          paystackReference: transaction.reference,
-        },
-      });
-    }
-
-    return NextResponse.json({
-      authorizationUrl: transaction.authorization_url,
-      accessCode: transaction.access_code,
-      reference: transaction.reference,
-      amount: amountDecimal,
-      currency,
-    });
+    const { appointmentId } = createPaymentSchema.parse(await req.json());
+    const checkout = await initializeCheckout(auth.user.patient!.id, auth.user.email, appointmentId);
+    return NextResponse.json(checkout);
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { error: "Validation failed", details: error.issues },
-        { status: 422 }
-      );
-    }
-    console.error("POST /api/payments error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    if (error instanceof CheckoutError) return NextResponse.json({ error: error.message }, { status: error.status });
+    if (error instanceof z.ZodError) return NextResponse.json({ error: "Invalid checkout request", details: error.issues }, { status: 422 });
+    return NextResponse.json({ error: "Checkout unavailable" }, { status: 500 });
   }
 }
