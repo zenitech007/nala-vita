@@ -1,3 +1,4 @@
+import { doctorHasPatientAccess } from "@/lib/access-control";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
@@ -85,7 +86,7 @@ export async function GET(req: NextRequest) {
     if (!patientId) {
       // Doctor requesting all monitored patients' latest vitals
       if (user.role === "DOCTOR" && user.doctor) {
-        let patients = await prisma.patient.findMany({
+        const patients = await prisma.patient.findMany({
           where: {
             appointments: {
               some: { doctorId: user.doctor.id },
@@ -97,22 +98,13 @@ export async function GET(req: NextRequest) {
           },
         });
 
-        if (patients.length === 0) {
-          patients = await prisma.patient.findMany({
-            take: 20,
-            include: {
-              user: { select: { firstName: true, lastName: true, avatarUrl: true } },
-              vitals: { orderBy: { recordedAt: "desc" }, take: 1 },
-            },
-          });
-        }
-
         return NextResponse.json({ patients });
       }
 
       return NextResponse.json({ error: "Patient ID required" }, { status: 400 });
     }
 
+    if (user.role === 'DOCTOR' && (!user.doctor || !await doctorHasPatientAccess(user.doctor.id, patientId))) return NextResponse.json({error:'Forbidden'}, {status:403});
     const vitals = await prisma.vital.findMany({
       where: { patientId },
       orderBy: { recordedAt: "desc" },
