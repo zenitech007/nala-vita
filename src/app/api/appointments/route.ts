@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { appointmentAvailabilityError } from "@/lib/appointment-availability";
 
 // ─── GET: Fetch logged-in patient's appointments ─────────
 
@@ -87,7 +88,7 @@ const createAppointmentSchema = z.object({
   consultationType: z.enum(["IN_PERSON", "VIDEO", "PHONE", "CHAT"]),
   urgencyLevel: z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]).optional(),
   reason: z.string().optional(),
-  duration: z.number().min(15).max(120).optional(),
+  duration: z.number().int().min(15).max(120).optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -113,9 +114,14 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const validated = createAppointmentSchema.parse(body);
 
+    if (!user.isActive || user.role !== "PATIENT") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
     // Verify doctor exists
     const doctor = await prisma.doctor.findUnique({
       where: { id: validated.doctorId },
+      include: { user: { select: { isActive: true } } },
     });
 
     if (!doctor) {
@@ -128,6 +134,8 @@ export async function POST(req: NextRequest) {
     // active appointments in the broad window and check overlap in JS.
     const scheduledDate = new Date(validated.scheduledAt);
     const duration = validated.duration || 30;
+    const availabilityError = appointmentAvailabilityError(doctor, scheduledDate, duration);
+    if (availabilityError) return NextResponse.json({ error: availabilityError }, { status: 422 });
     const slotEnd = new Date(scheduledDate.getTime() + duration * 60_000);
 
     const broadWindowStart = new Date(scheduledDate.getTime() - 4 * 60 * 60 * 1000); // 4 h before

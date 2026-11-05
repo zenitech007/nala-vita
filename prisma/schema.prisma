@@ -107,6 +107,7 @@ model Doctor {
   availableDays     String[] @map("available_days")
   availableFrom     String?  @map("available_from")
   availableTo       String?  @map("available_to")
+  timeZone          String?  @map("time_zone")
   isVerified        Boolean  @default(false) @map("is_verified")
   rating            Float    @default(0)
   totalReviews      Int      @default(0) @map("total_reviews")
