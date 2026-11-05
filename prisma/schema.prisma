@@ -352,12 +352,28 @@ model PaymentAttempt {
   status           String   @default("INITIATING")
   authorizationUrl String?  @map("authorization_url")
   accessCode       String?  @map("access_code")
+  providerTransactionId String? @unique @map("provider_transaction_id")
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        DateTime @updatedAt @map("updated_at")
   payment          Payment  @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  events           PaymentProviderEvent[]
 
   @@index([paymentId, status])
   @@map("payment_attempts")
+}
+
+model PaymentProviderEvent {
+  id                    String   @id @default(cuid())
+  providerEventId       String   @unique @map("provider_event_id")
+  providerTransactionId String   @map("provider_transaction_id")
+  attemptId             String   @map("attempt_id")
+  type                  String
+  outcome               String
+  createdAt             DateTime @default(now()) @map("created_at")
+  attempt               PaymentAttempt @relation(fields: [attemptId], references: [id], onDelete: Restrict)
+
+  @@index([attemptId, createdAt])
+  @@map("payment_provider_events")
 }
 
 model Notification {
