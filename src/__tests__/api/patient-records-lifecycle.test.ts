@@ -107,72 +107,14 @@ import { GET as getPatientRecordHandler } from "@/app/api/patients/[id]/route";
 
 describe("Patient Records Lifecycle & Privacy Suite", () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    jest.resetAllMocks();
     auditLogCreate.mockResolvedValue({ id: "audit-1" });
     createNotification.mockResolvedValue(true);
   });
 
   describe("1. Patient Account Claiming (Hospital Pre-registered Profile)", () => {
-    it("should allow a patient to claim their hospital-provisioned account using their email", async () => {
-      // Existing patient created by hospital clinic with emailVerified: false
-      userFindUnique.mockResolvedValueOnce({
-        id: "u-hospital-1",
-        email: "claimant@test.com",
-        firstName: "Jane",
-        lastName: "HospitalPatient",
-        phone: "+15551234",
-        role: "PATIENT",
-        emailVerified: false,
-        patient: { id: "p-hospital-1" },
-      });
-
-      // Supabase user creation succeeds
-      createUser.mockResolvedValueOnce({
-        data: { user: { id: "new-supabase-uid" } },
-        error: null,
-      });
-
-      // Update Prisma user with Supabase ID and emailVerified: true
-      userUpdate.mockResolvedValueOnce({
-        id: "u-hospital-1",
-        email: "claimant@test.com",
-        firstName: "Jane",
-        lastName: "HospitalPatient",
-        role: "PATIENT",
-        emailVerified: true,
-        patient: { id: "p-hospital-1" },
-      });
-
-      const request = new Request("http://localhost/api/auth/register", {
-        method: "POST",
-        body: JSON.stringify({
-          email: "claimant@test.com",
-          password: "SecurePassword123!",
-          firstName: "Jane",
-          lastName: "HospitalPatient",
-          role: "PATIENT",
-          dateOfBirth: "1990-01-01",
-          gender: "female",
-        }),
-      });
-
-      const res = await registerHandler(request as never);
-      const json = await res.json();
-
-      expect(res.status).toBe(201);
-      expect(json.claimed).toBe(true);
-      expect(json.message).toContain("prior medical records");
-      expect(userUpdate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { id: "u-hospital-1" },
-          data: expect.objectContaining({
-            supabaseId: "new-supabase-uid",
-            emailVerified: true,
-          }),
-        })
-      );
-    });
-
+    it('F01 rejects claiming an existing provisional email',async()=>{createUser.mockResolvedValueOnce({data:{user:{id:'attacker'}}});userUpdate.mockResolvedValueOnce({id:'victim',patient:{id:'p'}});userFindUnique.mockResolvedValueOnce({id:'victim',role:'PATIENT',emailVerified:false,patient:{id:'p'}});const res=await registerHandler(new Request('http://localhost/api/auth/register',{method:'POST',body:JSON.stringify({firstName:'Test',lastName:'Person',email:'victim@example.test',password:'password123',role:'PATIENT',dateOfBirth:'1990-01-01',gender:'other'})}) as never);expect(res.status).toBe(409);expect(userUpdate).not.toHaveBeenCalled();expect(createUser).not.toHaveBeenCalled();});
+    it('F01 creates a separate record without phone matching or email confirmation',async()=>{userFindUnique.mockResolvedValueOnce(null);userFindFirst.mockResolvedValueOnce({id:'victim',role:'PATIENT',emailVerified:false,patient:{id:'p'}});createUser.mockResolvedValueOnce({data:{user:{id:'new-auth'}}});userCreate.mockResolvedValueOnce({id:'new',role:'PATIENT',email:'new@example.test'});const res=await registerHandler(new Request('http://localhost/api/auth/register',{method:'POST',body:JSON.stringify({firstName:'Test',lastName:'Person',phone:'victim-phone',email:'new@example.test',password:'password123',role:'PATIENT',dateOfBirth:'1990-01-01',gender:'other'})}) as never);expect(res.status).toBe(201);expect(userFindFirst).not.toHaveBeenCalled();expect(userUpdate).not.toHaveBeenCalled();expect(createUser).toHaveBeenCalledWith(expect.objectContaining({email_confirm:false}));expect(userCreate).toHaveBeenCalledWith(expect.objectContaining({data:expect.objectContaining({emailVerified:false})}));});
     it("should reject claiming if user already has an active verified account", async () => {
       userFindUnique.mockResolvedValueOnce({
         id: "u-active",
