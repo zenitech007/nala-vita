@@ -1,3 +1,5 @@
+import { requireApiUser } from "@/lib/auth";
+import { doctorHasPatientAccess } from "@/lib/access-control";
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { prisma } from "@/lib/prisma";
@@ -25,21 +27,21 @@ export async function GET(_req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = createServerSupabaseClient();
-    const { data: { user: authUser } } = await supabase.auth.getUser();
-    if (!authUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-    const user = await prisma.user.findUnique({
-      where: { supabaseId: authUser.id },
-      include: { doctor: true, patient: true },
-    });
-    if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
-
+    const auth = await requireApiUser({roles:['PATIENT','DOCTOR']});
+    if (!auth.ok) return auth.response;
+    const {user} = auth;
     const limit = await checkRateLimitAsync(`amelia:med-safety:${user.id}`);
     if (!limit.allowed) return NextResponse.json({ error: "Too many requests." }, { status: 429 });
 
     const body = await req.json();
-    const { patientId, medications, allergies } = body;
+    const { medications, allergies } = body;
+    let patientId = body.patientId;
+    if (user.role === 'PATIENT') {
+      if (!user.patient || (patientId && patientId !== user.patient.id)) return NextResponse.json({error:'Forbidden'}, {status:403});
+      patientId = user.patient.id;
+    } else if (patientId && (!user.doctor || !await doctorHasPatientAccess(user.doctor.id, patientId))) {
+      return NextResponse.json({error:'Forbidden'}, {status:403});
+    }
 
     let targetAllergies: string[] = Array.isArray(allergies) ? allergies : [];
     const allMeds: { medication: string; dosage: string }[] = Array.isArray(medications)
