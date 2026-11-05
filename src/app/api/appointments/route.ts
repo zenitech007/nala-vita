@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { appointmentAvailabilityError } from "@/lib/appointment-availability";
+import { AppointmentConflict, reserveAppointmentSlot } from "@/lib/appointment-lock";
 
 // ─── GET: Fetch logged-in patient's appointments ─────────
 
@@ -128,45 +129,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Doctor not found" }, { status: 404 });
     }
 
-    // Check for conflicting appointment: two intervals overlap when
-    //   existingStart < newEnd  AND  existingEnd > newStart
-    // Prisma doesn't know each appointment's duration directly, so we fetch
-    // active appointments in the broad window and check overlap in JS.
     const scheduledDate = new Date(validated.scheduledAt);
     const duration = validated.duration || 30;
     const availabilityError = appointmentAvailabilityError(doctor, scheduledDate, duration);
     if (availabilityError) return NextResponse.json({ error: availabilityError }, { status: 422 });
-    const slotEnd = new Date(scheduledDate.getTime() + duration * 60_000);
-
-    const broadWindowStart = new Date(scheduledDate.getTime() - 4 * 60 * 60 * 1000); // 4 h before
-    const broadWindowEnd   = new Date(scheduledDate.getTime() + 4 * 60 * 60 * 1000); // 4 h after
-
-    const activeInWindow = await prisma.appointment.findMany({
-      where: {
-        doctorId: validated.doctorId,
-        status: { in: ["SCHEDULED", "CONFIRMED", "IN_PROGRESS"] },
-        scheduledAt: { gte: broadWindowStart, lte: broadWindowEnd },
-      },
-      select: { id: true, scheduledAt: true, duration: true },
-    });
-
-    const conflict = activeInWindow.find((appt) => {
-      const existingStart = appt.scheduledAt.getTime();
-      const existingEnd   = existingStart + appt.duration * 60_000;
-      const newStart      = scheduledDate.getTime();
-      const newEnd        = slotEnd.getTime();
-      return existingStart < newEnd && existingEnd > newStart;
-    });
-
-    if (conflict) {
-      return NextResponse.json(
-        { error: "This time slot is not available. Please choose a different time." },
-        { status: 409 }
-      );
-    }
 
     // Create appointment and pending payment in a transaction
     const result = await prisma.$transaction(async (tx) => {
+      await reserveAppointmentSlot(tx, doctor.id, user.patient!.id, scheduledDate, duration);
       const appointment = await tx.appointment.create({
         data: {
           patientId: user.patient!.id,
@@ -201,7 +171,7 @@ export async function POST(req: NextRequest) {
       });
 
       return { appointment, payment };
-    });
+    }, { isolationLevel: "ReadCommitted" });
 
     return NextResponse.json(
       {
@@ -212,6 +182,12 @@ export async function POST(req: NextRequest) {
       { status: 201 }
     );
   } catch (error) {
+    // Exclusion violations protect every writer once the forward migration is applied.
+    const databaseError = error as { code?: string; meta?: { code?: string; database_error?: string } };
+    if (error instanceof AppointmentConflict || databaseError.code === "23P01"
+      || databaseError.meta?.code === "23P01" || databaseError.meta?.database_error?.includes("appointments_no_")) {
+      return NextResponse.json({ error: "This doctor or patient already has an overlapping appointment" }, { status: 409 });
+    }
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: "Validation failed", details: error.issues },

@@ -6,6 +6,7 @@ jest.mock('@/lib/prisma', () => ({ prisma: {
   doctor: { findUnique: (...args: unknown[]) => findDoctor(...args) },
   appointment: { findMany: (...args: unknown[]) => conflicts(...args) },
   $transaction: async (fn: (tx: unknown) => unknown) => fn({
+    $queryRaw: async () => [],
     appointment: { create: createAppointment }, payment: { create: createPayment },
   }),
 } }));
