@@ -42,11 +42,12 @@ enum UrgencyLevel {
 
 model User {
   id            String   @id @default(cuid())
-  supabaseId    String   @unique @map("supabase_id") @db.Uuid
-  email         String   @unique
+  supabaseId    String?  @unique @map("supabase_id") @db.Uuid
+  email         String?  @unique
   firstName     String   @map("first_name")
   lastName      String   @map("last_name")
   phone         String?
+  verifiedPhone String? @map("verified_phone")
   avatarUrl     String?  @map("avatar_url")
   role          Role     @default(PATIENT)
   isActive      Boolean  @default(true) @map("is_active")
@@ -62,6 +63,7 @@ model User {
   receivedMessages Message[]      @relation("ReceivedMessages")
   notifications    Notification[]
   fileUploads      FileUpload[]
+  otpChallenges    OtpChallenge[]
 
   @@map("users")
 }
@@ -69,6 +71,7 @@ model User {
 model Patient {
   id                String   @id @default(cuid())
   userId            String   @unique @map("user_id")
+  createdByDoctorId  String? @map("created_by_doctor_id")
   dateOfBirth       DateTime @map("date_of_birth")
   gender            String
   bloodType         String?  @map("blood_type")
@@ -92,8 +95,53 @@ model Patient {
   ameliaConversations AmeliaConversation[]
   ameliaMemories      AmeliaMemory[]
   reminders           Reminder[]
+  creatorDoctor       Doctor? @relation("ClinicPatients", fields: [createdByDoctorId], references: [id], onDelete: SetNull)
+  claimInvitations    ClaimInvitation[]
 
   @@map("patients")
+}
+
+model OtpChallenge {
+  id           String @id
+  recipientHash String @map("recipient_hash")
+  ipHash        String @map("ip_hash")
+  purpose       String
+  targetUserId  String? @map("target_user_id")
+  bindingHash   String @map("binding_hash")
+  codeHash      String @map("code_hash")
+  context       Json
+  expiresAt     DateTime @map("expires_at")
+  attempts      Int @default(0)
+  consumedAt    DateTime? @map("consumed_at")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  targetUser User? @relation(fields: [targetUserId], references: [id], onDelete: Cascade)
+
+  @@index([recipientHash, createdAt])
+  @@index([ipHash, createdAt])
+  @@map("otp_challenges")
+}
+
+model ClaimInvitation {
+  id             String @id @default(cuid())
+  patientId      String @map("patient_id")
+  issuerDoctorId String @map("issuer_doctor_id")
+  tokenHash      String @unique @map("token_hash")
+  expiresAt      DateTime @map("expires_at")
+  usedAt         DateTime? @map("used_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+  patient        Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  issuerDoctor   Doctor @relation(fields: [issuerDoctorId], references: [id], onDelete: Cascade)
+
+  @@index([patientId, expiresAt])
+  @@map("claim_invitations")
+}
+
+model OtpVerificationBudget {
+  id          String @id
+  windowStart DateTime @map("window_start")
+  count       Int
+  @@map("otp_verification_budgets")
 }
 
 model Doctor {
@@ -111,6 +159,8 @@ model Doctor {
   isVerified        Boolean  @default(false) @map("is_verified")
   rating            Float    @default(0)
   totalReviews      Int      @default(0) @map("total_reviews")
+  clinicPatients    Patient[] @relation("ClinicPatients")
+  claimInvitations  ClaimInvitation[]
   createdAt         DateTime @default(now()) @map("created_at")
   updatedAt         DateTime @updatedAt @map("updated_at")
 

@@ -62,7 +62,7 @@ export async function GET(req: NextRequest) {
         results.push({
           id: p.id,
           title: `${p.user.firstName} ${p.user.lastName}`,
-          subtitle: p.user.email,
+          subtitle: p.user.email ?? "No email on file",
           category: "patients",
           href: `/doctor/patients/${p.id}`,
         });

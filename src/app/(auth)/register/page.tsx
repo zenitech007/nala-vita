@@ -160,8 +160,8 @@ export default function RegisterPage() {
         return;
       }
 
-      setSuccessMessage(result.message || "Account created successfully! Redirecting to login...");
-      setTimeout(() => router.push("/login"), 3000);
+      setSuccessMessage("Account created. Next, verify your email before signing in.");
+      setTimeout(() => router.push("/verify-email"), 1500);
     } catch {
       setServerError("Something went wrong. Please try again.");
     }
@@ -362,6 +362,7 @@ export default function RegisterPage() {
           </form>
 
           {/* Footer */}
+          <p className="text-center text-sm text-gray-700 mt-6">Have a record from your clinic? <Link href="/claim" className="underline">Claim your clinic record</Link></p>
           <p className="text-center text-sm text-gray-500 mt-6">
             Already have an account?{" "}
             <Link href="/login" className="text-[var(--primary)] hover:opacity-80 font-medium">

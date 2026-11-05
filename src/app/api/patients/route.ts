@@ -150,8 +150,8 @@ export async function GET(req: NextRequest) {
 const createPatientSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
-  email: z.string().email("Invalid email address"),
-  phone: z.string().optional(),
+  email: z.string().trim().email("Invalid email address").optional(),
+  phone: z.string().trim().min(1).optional(),
   dateOfBirth: z.string().min(1, "Date of birth is required"),
   gender: z.string().min(1, "Gender is required"),
   bloodType: z.string().optional(),
@@ -162,7 +162,7 @@ const createPatientSchema = z.object({
   insuranceProvider: z.string().optional(),
   insuranceNumber: z.string().optional(),
   initialNotes: z.string().optional(),
-});
+}).refine(value => !!(value.email || value.phone), "Provide an email or phone contact");
 
 export async function POST(req: NextRequest) {
   try {
@@ -193,10 +193,10 @@ export async function POST(req: NextRequest) {
     const doctorId = doctorUser.doctor.id;
 
     // Check if user already exists
-    let existingUser = await prisma.user.findUnique({
+    let existingUser = validated.email ? await prisma.user.findUnique({
       where: { email: validated.email },
       include: { patient: true },
-    });
+    }) : null;
 
     if (!existingUser && validated.phone) {
       existingUser = await prisma.user.findFirst({
@@ -230,11 +230,10 @@ export async function POST(req: NextRequest) {
       }
     } else {
       // Create provisional User and Patient record
-      const provisionalSupabaseId = crypto.randomUUID();
       const newUser = await prisma.user.create({
         data: {
-          supabaseId: provisionalSupabaseId,
-          email: validated.email,
+          supabaseId: null,
+          email: validated.email ?? null,
           firstName: validated.firstName,
           lastName: validated.lastName,
           phone: validated.phone || null,
@@ -242,6 +241,7 @@ export async function POST(req: NextRequest) {
           emailVerified: false,
           patient: {
             create: {
+              createdByDoctorId: doctorId,
               dateOfBirth: new Date(validated.dateOfBirth),
               gender: validated.gender,
               bloodType: validated.bloodType || null,
@@ -319,7 +319,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         message:
-          "Patient registered successfully. They can claim online access anytime by signing up with their email or phone.",
+          "Patient registered successfully. They can claim online access by verifying the email on file, or with a clinic invitation and email verification.",
         patient: patientRecord,
       },
       { status: 201 }

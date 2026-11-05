@@ -26,7 +26,7 @@ interface PatientUser {
   firstName: string;
   lastName: string;
   avatarUrl: string | null;
-  email: string;
+  email: string | null;
   phone: string | null;
 }
 
@@ -129,7 +129,7 @@ function IntakePatientModal({
         body: JSON.stringify({
           firstName: firstName.trim(),
           lastName: lastName.trim(),
-          email: email.trim().toLowerCase(),
+          email: email.trim().toLowerCase() || undefined,
           phone: phone.trim() || undefined,
           dateOfBirth,
           gender,
@@ -189,7 +189,7 @@ function IntakePatientModal({
           <div className="bg-blue-50 border border-blue-200 rounded-xl p-3.5 flex items-start gap-2.5">
             <ShieldCheck className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
             <p className="text-xs text-blue-800 leading-relaxed">
-              <strong>Seamless Patient Claiming:</strong> When the patient signs up online with this email or phone number, their account will automatically claim all their clinical notes, vitals, prescriptions, and lab orders created here.
+              <strong>Verified record claiming:</strong> The patient must verify the email on file, or use a clinic invitation and verify their chosen email. Phone numbers do not claim records and no SMS is sent.
             </p>
           </div>
 
@@ -224,12 +224,13 @@ function IntakePatientModal({
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
-                Email Address <span className="text-red-500">*</span>
+              <label htmlFor="intake-email" className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                Email Address (or provide a phone number)
               </label>
               <input
                 type="email"
-                required
+                id="intake-email"
+                required={!phone.trim()}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="patient@example.com"
@@ -237,11 +238,13 @@ function IntakePatientModal({
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+              <label htmlFor="intake-phone" className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
                 Phone Number
               </label>
               <input
                 type="tel"
+                id="intake-phone"
+                required={!email.trim()}
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="+1 555-0199"

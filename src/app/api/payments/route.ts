@@ -114,6 +114,7 @@ export async function POST(req: NextRequest) {
   if (!auth.ok) return auth.response;
   try {
     const { appointmentId } = createPaymentSchema.parse(await req.json());
+    if (!auth.user.email) return NextResponse.json({ error: "A verified email is required for checkout" }, { status: 409 });
     const checkout = await initializeCheckout(auth.user.patient!.id, auth.user.email, appointmentId);
     return NextResponse.json(checkout);
   } catch (error) {

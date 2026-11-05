@@ -49,6 +49,7 @@ const registerSchema = z.discriminatedUnion("role", [patientSchema, doctorSchema
 // ─── POST: Register a new user ────────────────────────────
 
 export async function POST(req: NextRequest) {
+  let createdAuthId: string | null = null;
   try {
     const body = await req.json();
     const validated = registerSchema.parse(body);
@@ -97,6 +98,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Create User record in Prisma with the role-specific relation
+    createdAuthId = authData.user.id;
     const user = await prisma.user.create({
       data: {
         supabaseId: authData.user.id,
@@ -134,6 +136,7 @@ export async function POST(req: NextRequest) {
         doctor: true,
       },
     });
+    createdAuthId = null; // The identity is now durably bound; later response errors must not delete it.
 
     return NextResponse.json(
       {
@@ -153,6 +156,12 @@ export async function POST(req: NextRequest) {
       { status: 201 }
     );
   } catch (error) {
+    if (createdAuthId) {
+      try {
+        const compensation = await supabaseAdmin.auth.admin.deleteUser(createdAuthId);
+        if (compensation.error) return NextResponse.json({ error: "Account reconciliation is required. Contact support before retrying." }, { status: 503 });
+      } catch { return NextResponse.json({ error: "Account reconciliation is required. Contact support before retrying." }, { status: 503 }); }
+    }
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: "Validation failed", details: error.issues },
@@ -160,8 +169,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const message = error instanceof Error ? error.message : "Unknown error";
-    console.error("Registration error:", message, error);
+    console.error("Registration persistence failed");
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
