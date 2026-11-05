@@ -32,3 +32,5 @@ describe("extractLabsFromImage", () => {
     expect(out.results[0].name).toBe("WBC");
   });
 });
+
+it('F02 propagates unavailable without findings', async()=>{visionChat.mockResolvedValue(JSON.stringify({status:'unavailable',results:[],summary:'Unavailable',overallNote:'Retry'}));expect(await extractLabsFromImage('data:image/png;base64,AAA')).toMatchObject({status:'unavailable',results:[]});});

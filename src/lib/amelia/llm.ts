@@ -256,19 +256,6 @@ export async function visionChat(
     }
   }
 
-  // 3. Resilient fallback: Return a structured response so lab photo parsing never crashes
-  return JSON.stringify({
-    results: [
-      {
-        name: "Blood Chemistry & Vitals Panel",
-        value: "Detected",
-        unit: null,
-        referenceRange: "Standard Diagnostic Ranges",
-        flag: "normal",
-      },
-    ],
-    summary:
-      "Your uploaded lab image was received and inspected. Values appear within expected parameters. Please confirm any specific diagnostic flags with your physician during your next consultation.",
-    overallNote: "Always review official laboratory results directly with your healthcare provider.",
-  });
+  // Provider failure must never manufacture clinical findings.
+  return JSON.stringify({status: 'unavailable', results: [], summary: 'The report could not be read. Please retry.', overallNote: 'Review the original report with your healthcare provider.'});
 }

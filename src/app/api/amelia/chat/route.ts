@@ -90,11 +90,13 @@ export async function POST(req: NextRequest) {
     }
     const convoId = convo.id;
 
+    let imageStatus: "available" | "unavailable" | undefined;
     let effectiveMessage = message;
     if (imageDataUrl) {
       try {
         const labResult = await extractLabsFromImage(imageDataUrl);
-        if (labResult.results.length > 0) {
+        imageStatus = labResult.status ?? (labResult.results.length ? "available" : "unavailable");
+        if (imageStatus !== "unavailable" && labResult.results.length > 0) {
           const labDetails = labResult.results
             .map((r) => `- ${r.name}: ${r.value} ${r.unit || ""} (Ref: ${r.referenceRange || "—"}, Flag: ${r.flag})`)
             .join("\n");
@@ -103,6 +105,8 @@ export async function POST(req: NextRequest) {
           effectiveMessage = `${message}\n\n[Attached Image Note]: ${labResult.summary}`;
         }
       } catch (imgErr) {
+        imageStatus = "unavailable";
+        effectiveMessage = `${message}\n\n[Attached image unavailable: no lab values could be read. Do not infer findings.]`;
         console.warn("Lab vision processing error:", imgErr);
       }
     }
@@ -142,7 +146,7 @@ export async function POST(req: NextRequest) {
         summary: `urgency=${reply.urgency} redFlags=${reply.redFlags.length}`,
       });
 
-      return NextResponse.json({ conversationId: convoId, reply, reminderSuggestion });
+      return NextResponse.json({ conversationId: convoId, reply, reminderSuggestion, imageStatus });
     }
 
     // ---- Streaming path (default) ----
@@ -157,7 +161,7 @@ export async function POST(req: NextRequest) {
         let redFlagCount = 0;
 
         try {
-          send({ type: "meta", conversationId: convoId });
+          send({ type: "meta", conversationId: convoId, imageStatus });
 
           for await (const evt of runAmeliaTurnStream({ audience: "patient", patientId, messages })) {
             if (evt.type === "start") {

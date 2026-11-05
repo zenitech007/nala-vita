@@ -42,6 +42,8 @@ jest.mock("@/lib/amelia/reminders", () => ({
 }));
 jest.mock("@/lib/amelia/audit", () => ({ logAmeliaAudit: async () => undefined }));
 
+const extractLabsFromImage = jest.fn();
+jest.mock('@/lib/amelia/labvision',()=>({extractLabsFromImage:(...a: unknown[])=>extractLabsFromImage(...a)}));
 import { POST } from "@/app/api/amelia/chat/route";
 
 /** Buffered request — the streaming path is the route default, so opt out here. */
@@ -194,3 +196,5 @@ describe("POST /api/amelia/chat (streaming)", () => {
     expect(res.status).toBe(401);
   });
 });
+
+it.each([false,true])('F02 propagates unavailable image status (stream=%s)',async(stream)=>{getUser.mockResolvedValue({data:{user:{id:'a'}}});userFindUnique.mockResolvedValue({id:'u',patient:{id:'p'}});convoCreate.mockResolvedValue({id:'c'});msgCreate.mockResolvedValue({id:'m'});msgFindMany.mockResolvedValue([]);extractLabsFromImage.mockResolvedValue({status:'unavailable',results:[],summary:'Unavailable',overallNote:'Retry'});runAmeliaTurn.mockResolvedValue({content:'reply',urgency:'routine',redFlags:[],disclaimer:'d'});runAmeliaTurnStream.mockImplementation(async function*(){yield {type:'start',meta:{urgency:'routine',redFlags:[],disclaimer:'d'}};yield {type:'delta',text:'reply'};});const res=await POST(req({message:'image',imageDataUrl:'data:image/png;base64,AAA',stream}));if(stream){expect(await readFrames(res)).toEqual(expect.arrayContaining([expect.objectContaining({type:'meta',imageStatus:'unavailable'})]));}else expect(await res.json()).toHaveProperty('imageStatus','unavailable');});

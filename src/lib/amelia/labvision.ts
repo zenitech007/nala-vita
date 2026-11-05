@@ -10,6 +10,7 @@ export interface ExtractedLab {
 }
 
 export interface LabPhotoResult {
+  status?: "available" | "unavailable";
   results: ExtractedLab[];
   summary: string;
   overallNote: string;
@@ -34,9 +35,10 @@ export async function extractLabsFromImage(imageDataUrl: string): Promise<LabPho
     }
     parsed = JSON.parse(jsonStr);
   } catch {
-    return { results: [], summary: COULD_NOT_READ, overallNote: ADVISORY };
+    return { status: "unavailable", results: [], summary: COULD_NOT_READ, overallNote: ADVISORY };
   }
 
+  if (!parsed || typeof parsed !== 'object' || parsed.status === 'unavailable') return {status:'unavailable', results:[], summary:COULD_NOT_READ, overallNote:'Please retry or review the original report with your doctor.'};
   const results: ExtractedLab[] = Array.isArray(parsed.results)
     ? parsed.results
         .filter(

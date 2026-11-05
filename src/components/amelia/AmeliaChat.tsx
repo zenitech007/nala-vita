@@ -223,6 +223,7 @@ export default function AmeliaChat({
 
           if (evt.type === "meta") {
             setConversationId(evt.conversationId as string);
+            if (evt.imageStatus === "unavailable") setMessages((m) => [...m, {role:"assistant",content:"The attached image could not be read. Please retry; no lab findings are available.",sentAt:new Date().toISOString()}]);
           } else if (evt.type === "start") {
             setEmergency(evt.urgency === "emergency");
             setStreaming(true);
