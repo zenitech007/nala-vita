@@ -1,4 +1,5 @@
 "use client";
+import { temperatureFromCelsius, TEMPERATURE, TEMPERATURE_RANGE_F } from "@/lib/temperature";
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
@@ -93,7 +94,7 @@ const DETAIL_VITALS = [
   { key: "heartRate" as const, label: "Heart Rate", unit: "bpm", icon: Heart, color: "#ef4444", normalMin: 60, normalMax: 100 },
   { key: "bloodSugar" as const, label: "Blood Sugar", unit: "mg/dL", icon: Activity, color: "#f59e0b", normalMin: 70, normalMax: 140 },
   { key: "oxygenSaturation" as const, label: "SpO2", unit: "%", icon: Wind, color: "#06b6d4", normalMin: 95, normalMax: 100 },
-  { key: "temperature" as const, label: "Temperature", unit: "°F", icon: Thermometer, color: "#10b981", normalMin: 97, normalMax: 99.5 },
+  { key: "temperature" as const, label: "Temperature", unit: "°F", icon: Thermometer, color: "#10b981", normalMin: TEMPERATURE_RANGE_F.min, normalMax: TEMPERATURE_RANGE_F.max },
 ];
 
 export default function DoctorMonitoringPage() {
@@ -132,7 +133,7 @@ export default function DoctorMonitoringPage() {
               const hr = latestVital?.heartRate != null ? String(latestVital.heartRate) : "--";
               const sugar = latestVital?.bloodSugar != null ? String(latestVital.bloodSugar) : "--";
               const spo2 = latestVital?.oxygenSaturation != null ? String(latestVital.oxygenSaturation) : "--";
-              const temp = latestVital?.temperature != null ? String(latestVital.temperature) : "--";
+              const temp = latestVital?.temperature != null ? String(temperatureFromCelsius(latestVital.temperature, "F")) : "--";
               const wt = latestVital?.weight != null ? String(latestVital.weight) : "--";
 
               return {
@@ -145,7 +146,7 @@ export default function DoctorMonitoringPage() {
                 heartRate: { value: hr, status: assessStatus(latestVital?.heartRate, 60, 100) },
                 bloodSugar: { value: sugar, status: assessStatus(latestVital?.bloodSugar, 70, 140) },
                 oxygenSaturation: { value: spo2, status: assessStatus(latestVital?.oxygenSaturation, 95, 100) },
-                temperature: { value: temp, status: assessStatus(latestVital?.temperature, 97, 99.5) },
+                temperature: { value: temp, status: assessStatus(latestVital?.temperature, TEMPERATURE.normalMinC, TEMPERATURE.normalMaxC) },
                 weight: { value: wt, status: assessStatus(latestVital?.weight, 40, 150) },
               };
             });
@@ -183,6 +184,7 @@ export default function DoctorMonitoringPage() {
                   val = typeof v[detailVitalKey] === "number" ? (v[detailVitalKey] as number) : null;
                 }
                 if (val == null || isNaN(val)) return null;
+                if (detailVitalKey === "temperature") val = temperatureFromCelsius(val, "F");
                 return {
                   date: format(new Date(v.recordedAt as string), "MMM d"),
                   value: val,

@@ -1,5 +1,6 @@
 import type { AmeliaContext, GroundingMemories } from "./types";
 import { renderFunctionalCues, type FunctionalCue } from "./functional";
+import { formatTemperature } from "@/lib/temperature";
 
 export function renderContext(ctx: AmeliaContext): string {
   const meds = ctx.activeMedications.length
@@ -17,7 +18,7 @@ export function renderContext(ctx: AmeliaContext): string {
   const vitals = v
     ? `BP ${v.bloodPressure ?? "?"}, HR ${v.heartRate ?? "?"}, SpO2 ${
         v.oxygenSaturation ?? "?"
-      }, glucose ${v.bloodSugar ?? "?"} (recorded ${v.recordedAt})`
+      }, glucose ${v.bloodSugar ?? "?"}, temperature ${v.temperature == null ? "?" : formatTemperature(v.temperature, "C")} (recorded ${v.recordedAt})`
     : "none on record";
   const labs = ctx.recentLabs.length
     ? ctx.recentLabs

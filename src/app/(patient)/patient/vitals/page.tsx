@@ -1,4 +1,5 @@
 "use client";
+import { temperatureFromCelsius, TEMPERATURE, TEMPERATURE_RANGE_F } from "@/lib/temperature";
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
@@ -61,7 +62,7 @@ const VITAL_CONFIGS: VitalConfig[] = [
   { key: "bloodSugar", label: "Blood Sugar", unit: "mg/dL", icon: Activity, color: "#f59e0b", normalMin: 70, normalMax: 140, placeholder: "100" },
   { key: "oxygenSaturation", label: "SpO2", unit: "%", icon: Wind, color: "#06b6d4", normalMin: 95, normalMax: 100, placeholder: "98" },
   { key: "weight", label: "Weight", unit: "kg", icon: Weight, color: "#8b5cf6", normalMin: 40, normalMax: 150, placeholder: "70" },
-  { key: "temperature", label: "Temperature", unit: "°F", icon: Thermometer, color: "#10b981", normalMin: 97, normalMax: 99.5, placeholder: "98.6" },
+  { key: "temperature", label: "Temperature", unit: "°F", icon: Thermometer, color: "#10b981", normalMin: TEMPERATURE_RANGE_F.min, normalMax: TEMPERATURE_RANGE_F.max, placeholder: "98.6" },
 ];
 
 // ─── Custom tooltip ──────────────────────────────────────
@@ -190,8 +191,8 @@ export default function PatientVitalsPage() {
             mappedData.temperature.push({
               id: r.id,
               date: dateStr,
-              value: r.temperature,
-              isAbnormal: r.temperature < 97 || r.temperature > 99.5,
+              value: temperatureFromCelsius(r.temperature, "F"),
+              isAbnormal: r.temperature < TEMPERATURE.normalMinC || r.temperature > TEMPERATURE.normalMaxC,
               source: sourceStr,
             });
           }
@@ -233,6 +234,7 @@ export default function PatientVitalsPage() {
         body.weight = parseFloat(inputValue);
       } else if (selectedVital === "temperature") {
         body.temperature = parseFloat(inputValue);
+        body.temperatureUnit = "F";
       }
 
       await fetch("/api/vitals", {

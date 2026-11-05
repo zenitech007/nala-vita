@@ -3,12 +3,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { TEMPERATURE, temperatureToCelsius } from "@/lib/temperature";
 
 // ─── Reference ranges for anomaly detection ──────────────
 
 const REFERENCE_RANGES = {
   heartRate: { min: 60, max: 100, label: "Heart Rate" },
-  temperature: { min: 97, max: 99.5, label: "Temperature" },
+  temperature: { min: TEMPERATURE.normalMinC, max: TEMPERATURE.normalMaxC, label: "Temperature (°C)" },
   oxygenSaturation: { min: 95, max: 100, label: "SpO2" },
   bloodSugar: { min: 70, max: 140, label: "Blood Sugar" },
   respiratoryRate: { min: 12, max: 20, label: "Respiratory Rate" },
@@ -124,6 +125,7 @@ const createVitalSchema = z.object({
   bloodPressure: z.string().optional(),
   heartRate: z.number().optional(),
   temperature: z.number().optional(),
+  temperatureUnit: z.enum(["C", "F"]).optional(),
   respiratoryRate: z.number().optional(),
   oxygenSaturation: z.number().optional(),
   weight: z.number().optional(),
@@ -131,6 +133,8 @@ const createVitalSchema = z.object({
   bloodSugar: z.number().optional(),
   notes: z.string().optional(),
   source: z.string().optional(),
+}).refine(value => (value.temperature === undefined) === (value.temperatureUnit === undefined), {
+  message: "Temperature requires an explicit C or F unit", path: ["temperatureUnit"],
 });
 
 export async function POST(req: NextRequest) {
@@ -155,7 +159,8 @@ export async function POST(req: NextRequest) {
     const validated = createVitalSchema.parse(body);
 
     // Check for anomalies
-    const anomalies = checkAnomalies(validated as Record<string, unknown>);
+    const canonicalTemperature = validated.temperature === undefined ? null : temperatureToCelsius(validated.temperature, validated.temperatureUnit!);
+    const anomalies = checkAnomalies({ ...validated, temperature: canonicalTemperature });
 
     // Create vital record
     const vital = await prisma.vital.create({
@@ -163,7 +168,10 @@ export async function POST(req: NextRequest) {
         patientId: user.patient.id,
         bloodPressure: validated.bloodPressure || null,
         heartRate: validated.heartRate ?? null,
-        temperature: validated.temperature ?? null,
+        temperature: canonicalTemperature,
+        temperatureUnit: "C",
+        temperatureOriginal: validated.temperature ?? null,
+        temperatureOriginalUnit: validated.temperatureUnit ?? null,
         respiratoryRate: validated.respiratoryRate ?? null,
         oxygenSaturation: validated.oxygenSaturation ?? null,
         weight: validated.weight ?? null,

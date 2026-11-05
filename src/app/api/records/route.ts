@@ -98,6 +98,7 @@ export async function GET(_req: NextRequest) {
         latestVitals[key] = {
           value: reading[key],
           recordedAt: reading.recordedAt,
+          ...(key === "temperature" ? { unit: "C", originalValue: reading.temperatureOriginal, originalUnit: reading.temperatureOriginalUnit } : {}),
         };
       }
     }

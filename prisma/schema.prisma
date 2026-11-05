@@ -203,6 +203,9 @@ model Vital {
   bloodPressure    String?  @map("blood_pressure")
   heartRate        Int?     @map("heart_rate")
   temperature      Float?
+  temperatureUnit  String @default("C") @map("temperature_unit")
+  temperatureOriginal Float? @map("temperature_original")
+  temperatureOriginalUnit String? @map("temperature_original_unit")
   respiratoryRate  Int?     @map("respiratory_rate")
   oxygenSaturation Float?   @map("oxygen_saturation")
   weight           Float?

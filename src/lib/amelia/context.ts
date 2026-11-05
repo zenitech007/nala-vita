@@ -76,6 +76,8 @@ export async function getPatientContext(patientId: string): Promise<AmeliaContex
       heartRate: v.heartRate,
       bloodSugar: v.bloodSugar,
       oxygenSaturation: v.oxygenSaturation,
+      temperature: v.temperature ?? null,
+      temperatureUnit: "C",
     })),
     recentLabs,
     upcomingAppointments,

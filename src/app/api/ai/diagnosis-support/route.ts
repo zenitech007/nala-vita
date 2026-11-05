@@ -4,6 +4,7 @@ import { ai, GEMINI_MODEL } from "@/lib/gemini";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { prisma } from "@/lib/prisma";
 import { checkRateLimitAsync } from "@/lib/rate-limit";
+import { temperatureToCelsius, formatTemperature } from "@/lib/temperature";
 
 // ─── Input schema ────────────────────────────────────────
 
@@ -13,10 +14,11 @@ const diagnosisSupportSchema = z.object({
     bloodPressure: z.string().optional(),
     heartRate: z.number().optional(),
     temperature: z.number().optional(),
+    temperatureUnit: z.enum(["C", "F"]).optional(),
     respiratoryRate: z.number().optional(),
     oxygenSaturation: z.number().optional(),
     bloodSugar: z.number().optional(),
-  }).optional(),
+  }).refine(value => (value.temperature === undefined) === (value.temperatureUnit === undefined), "Temperature requires an explicit C or F unit").optional(),
   history: z.array(z.string()).optional(),
   currentMedications: z.array(z.string()).optional(),
   patientAge: z.number().optional(),
@@ -75,8 +77,8 @@ export async function POST(req: NextRequest) {
 
     const vitalsText = validated.vitals
       ? Object.entries(validated.vitals)
-          .filter(([, v]) => v !== undefined && v !== null && v !== "")
-          .map(([k, v]) => `  - ${k}: ${v}`)
+          .filter(([k, v]) => k !== "temperatureUnit" && v !== undefined && v !== null && v !== "")
+          .map(([k, v]) => `  - ${k}: ${k === "temperature" ? formatTemperature(temperatureToCelsius(v as number, validated.vitals!.temperatureUnit!), "C") : v}`)
           .join("\n") || "  None recorded"
       : "  None recorded";
 

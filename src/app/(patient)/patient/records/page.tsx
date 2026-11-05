@@ -1,4 +1,5 @@
 "use client";
+import { formatTemperature } from "@/lib/temperature";
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
@@ -600,7 +601,7 @@ const VITAL_CARDS: VitalCardConfig[] = [
     icon: Thermometer,
     color: "text-emerald-600",
     bgColor: "bg-emerald-50",
-    format: (v) => `${v} °F`,
+    format: (v) => formatTemperature(Number(v), "F"),
   },
   {
     key: "oxygenSaturation",

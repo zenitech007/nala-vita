@@ -1,4 +1,5 @@
 "use client";
+import { formatTemperature } from "@/lib/temperature";
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
@@ -512,7 +513,7 @@ function PatientSidebar({
                 <div className="flex gap-3 text-gray-700">
                   {v.bloodPressure && <span>BP: {v.bloodPressure}</span>}
                   {v.heartRate && <span>HR: {v.heartRate}</span>}
-                  {v.temperature && <span>Temp: {v.temperature}°F</span>}
+                  {v.temperature != null && <span>Temp: {formatTemperature(v.temperature, "F")}</span>}
                 </div>
               </div>
             ))}

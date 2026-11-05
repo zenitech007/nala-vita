@@ -1,4 +1,5 @@
 "use client";
+import { temperatureFromCelsius } from "@/lib/temperature";
 
 import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
@@ -517,7 +518,7 @@ function OverviewTab({
           label: "Temperature",
           value:
             latest.temperature != null
-              ? latest.temperature.toFixed(1)
+              ? temperatureFromCelsius(latest.temperature, "F").toFixed(1)
               : "--",
           unit: "°F",
           icon: Thermometer,
@@ -713,7 +714,7 @@ function VitalsTab({ vitals }: { vitals: Vital[] }) {
       label: "Temperature",
       unit: "°F",
       color: "#f97316",
-      getData: (v: Vital) => v.temperature,
+      getData: (v: Vital) => v.temperature == null ? null : temperatureFromCelsius(v.temperature, "F"),
     },
     {
       key: "oxygenSaturation",

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { ai, GEMINI_MODEL } from "@/lib/gemini";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { prisma } from "@/lib/prisma";
+import { formatTemperature } from "@/lib/temperature";
 
 // ─── Input schema ────────────────────────────────────────
 
@@ -99,7 +100,7 @@ export async function POST(req: NextRequest) {
         ? patient.vitals
             .map(
               (v) =>
-                `  [${new Date(v.recordedAt).toLocaleDateString()}] BP: ${v.bloodPressure ?? "N/A"}, HR: ${v.heartRate ?? "N/A"}, Temp: ${v.temperature ?? "N/A"}, SpO2: ${v.oxygenSaturation ?? "N/A"}, Sugar: ${v.bloodSugar ?? "N/A"}`
+                `  [${new Date(v.recordedAt).toLocaleDateString()}] BP: ${v.bloodPressure ?? "N/A"}, HR: ${v.heartRate ?? "N/A"}, Temp: ${v.temperature == null ? "N/A" : formatTemperature(v.temperature, "C")}, SpO2: ${v.oxygenSaturation ?? "N/A"}, Sugar: ${v.bloodSugar ?? "N/A"}`
             )
             .join("\n")
         : "  No vitals recorded";

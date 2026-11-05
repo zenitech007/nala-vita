@@ -20,6 +20,8 @@ export interface AmeliaContext {
     heartRate: number | null;
     bloodSugar: number | null;
     oxygenSaturation: number | null;
+    temperature?: number | null;
+    temperatureUnit?: "C";
   }[];
   recentLabs: { testName: string; resultValue: string; unit: string | null; isAbnormal: boolean }[];
   upcomingAppointments?: { doctorName: string; specialization: string; date: string; reason?: string | null }[];

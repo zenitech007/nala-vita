@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { TEMPERATURE, formatTemperature } from "@/lib/temperature";
 import { redirect } from "next/navigation";
 import DoctorDashboardClient from "./_components/DoctorDashboardClient";
 import { getAuthenticatedUserWithProfile } from "@/lib/auth-cache";
@@ -91,7 +92,7 @@ export default async function DoctorDashboardPage() {
           OR: [
             { heartRate: { gt: 100 } },
             { heartRate: { lt: 50 } },
-            { temperature: { gt: 38.5 } },
+            { temperature: { gt: TEMPERATURE.feverC } },
             { oxygenSaturation: { lt: 92 } },
             { bloodSugar: { gt: 180 } },
             { bloodSugar: { lt: 70 } },
@@ -116,10 +117,10 @@ export default async function DoctorDashboardPage() {
       metric = "Heart Rate";
       value = `${v.heartRate} bpm`;
       severity = v.heartRate > 120 || v.heartRate < 40 ? "critical" : "warning";
-    } else if (v.temperature && v.temperature > 38.5) {
+    } else if (v.temperature != null && v.temperature > TEMPERATURE.feverC) {
       metric = "Temperature";
-      value = `${v.temperature}°C`;
-      severity = v.temperature > 39.5 ? "critical" : "warning";
+      value = formatTemperature(v.temperature, "C");
+      severity = v.temperature > TEMPERATURE.criticalC ? "critical" : "warning";
     } else if (v.oxygenSaturation && v.oxygenSaturation < 92) {
       metric = "SpO2";
       value = `${v.oxygenSaturation}%`;

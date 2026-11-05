@@ -1,4 +1,5 @@
 "use client";
+import { formatTemperature } from "@/lib/temperature";
 
 import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -583,11 +584,11 @@ export default function DoctorConsultationPage() {
                           </span>
                         </div>
                       )}
-                      {v.temperature && (
+                      {v.temperature != null && (
                         <div>
                           <span className="text-gray-500">Temp: </span>
                           <span className="text-gray-200 font-medium">
-                            {v.temperature}°F
+                            {formatTemperature(v.temperature, "F")}
                           </span>
                         </div>
                       )}
