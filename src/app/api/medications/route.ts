@@ -1,3 +1,4 @@
+import { doctorHasPatientAccess } from "@/lib/access-control";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
@@ -315,6 +316,8 @@ export async function POST(req: NextRequest) {
     // ─────────────────────────────────────────────────────────────
     if (user.role === "DOCTOR" && user.doctor) {
       const validated = doctorPrescribeSchema.parse(body);
+
+      if (!await doctorHasPatientAccess(user.doctor!.id, validated.patientId)) return NextResponse.json({error:'Forbidden'}, {status:403});
 
       const patient = await prisma.patient.findUnique({
         where: { id: validated.patientId },

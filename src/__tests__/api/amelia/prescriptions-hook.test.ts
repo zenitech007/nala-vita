@@ -14,6 +14,8 @@ jest.mock("@/lib/prisma", () => ({
   prisma: {
     user: { findUnique: (...a: unknown[]) => userFindUnique(...a) },
     patient: { findUnique: (...a: unknown[]) => patientFindUnique(...a) },
+    appointment: {findFirst: async()=>({id:"care"})},
+    referral: {findFirst: async()=>null},
     $transaction: (...a: unknown[]) => $transaction(...a),
   },
 }));

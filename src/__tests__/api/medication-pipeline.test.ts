@@ -403,6 +403,8 @@ describe("Two-Sided Medication Pipeline & Adherence Suite", () => {
     });
 
     it("should allow a doctor to prescribe medication to a patient", async () => {
+      appointmentFindFirst.mockResolvedValueOnce({id:"care"});
+      referralFindFirst.mockResolvedValueOnce(null);
       getUser.mockResolvedValueOnce({
         data: { user: { id: "auth-doctor-1" } },
       });

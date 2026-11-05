@@ -1,3 +1,4 @@
+import { doctorHasPatientAccess } from "@/lib/access-control";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
@@ -34,6 +35,8 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
     if (!user?.doctor) {
       return NextResponse.json({ error: "Only doctors can create medical notes" }, { status: 403 });
     }
+
+    if (!await doctorHasPatientAccess(user.doctor!.id, id)) return NextResponse.json({error:'Forbidden'}, {status:403});
 
     // Verify the patient exists
     const patient = await prisma.patient.findUnique({
