@@ -13,7 +13,7 @@ import type { AmeliaTurnInput, AmeliaReply } from "./types";
  */
 async function prepareTurn(input: AmeliaTurnInput) {
   const latestUser = [...input.messages].reverse().find((m) => m.role === "user");
-  const redFlags = latestUser ? detectRedFlags(latestUser.content) : [];
+  const redFlags = detectRedFlags(input.rawMessage ?? latestUser?.content ?? "");
 
   // Functional cues are advisory only — unlike red flags they never short-circuit,
   // because "your key sticks" must not produce "call an ambulance".
@@ -34,7 +34,7 @@ async function prepareTurn(input: AmeliaTurnInput) {
 
 export async function runAmeliaTurn(input: AmeliaTurnInput): Promise<AmeliaReply> {
   const latestUser = [...input.messages].reverse().find((m) => m.role === "user");
-  const earlyFlags = latestUser ? detectRedFlags(latestUser.content) : [];
+  const earlyFlags = detectRedFlags(input.rawMessage ?? latestUser?.content ?? "");
 
   // Emergency short-circuit — deterministic, no LLM call, no data load.
   if (earlyFlags.length > 0) {
@@ -64,7 +64,7 @@ export async function* runAmeliaTurnStream(
   input: AmeliaTurnInput
 ): AsyncGenerator<{ type: "start"; meta: AmeliaStreamStart } | { type: "delta"; text: string }> {
   const latestUser = [...input.messages].reverse().find((m) => m.role === "user");
-  const earlyFlags = latestUser ? detectRedFlags(latestUser.content) : [];
+  const earlyFlags = detectRedFlags(input.rawMessage ?? latestUser?.content ?? "");
 
   if (earlyFlags.length > 0) {
     yield {

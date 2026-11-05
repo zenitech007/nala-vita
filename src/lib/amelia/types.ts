@@ -28,6 +28,8 @@ export interface AmeliaContext {
 
 
 export interface AmeliaTurnInput {
+  /** Raw submitted text, screened independently of history and image extraction. */
+  rawMessage?: string;
   audience: Audience;
   patientId: string;
   messages: { role: "user" | "assistant"; content: string }[];

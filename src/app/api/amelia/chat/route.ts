@@ -117,10 +117,10 @@ export async function POST(req: NextRequest) {
 
     const history = await prisma.ameliaMessage.findMany({
       where: { conversationId: convoId },
-      orderBy: { createdAt: "asc" },
+      orderBy: { createdAt: "desc" },
       take: 20,
     });
-    const messages = history.map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
+    const messages = history.reverse().map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
 
     // `updatedAt` is @updatedAt, so it only moves when the conversation row itself
     // is written. Message inserts don't touch it — bump it explicitly to keep the
@@ -130,7 +130,7 @@ export async function POST(req: NextRequest) {
 
     // ---- Buffered path (explicit opt-out, and the shape the tests assert) ----
     if (stream === false) {
-      const reply = await runAmeliaTurn({ audience: "patient", patientId, messages });
+      const reply = await runAmeliaTurn({ audience: "patient", patientId, messages, rawMessage: message });
 
       await prisma.ameliaMessage.create({
         data: { conversationId: convoId, role: "assistant", content: reply.content },
@@ -163,7 +163,7 @@ export async function POST(req: NextRequest) {
         try {
           send({ type: "meta", conversationId: convoId, imageStatus });
 
-          for await (const evt of runAmeliaTurnStream({ audience: "patient", patientId, messages })) {
+          for await (const evt of runAmeliaTurnStream({ audience: "patient", patientId, messages, rawMessage: message })) {
             if (evt.type === "start") {
               urgency = evt.meta.urgency;
               redFlagCount = evt.meta.redFlags.length;

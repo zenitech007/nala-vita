@@ -8,7 +8,7 @@ jest.mock("@/lib/amelia/llm", () => ({ chat: (...a: unknown[]) => chat(...a) }))
 const getMemoriesForGrounding = jest.fn();
 jest.mock("@/lib/amelia/memory", () => ({ getMemoriesForGrounding: (...a: unknown[]) => getMemoriesForGrounding(...a) }));
 
-import { runAmeliaTurn } from "@/lib/amelia/engine";
+import { runAmeliaTurn, runAmeliaTurnStream } from "@/lib/amelia/engine";
 
 beforeEach(() => {
   getPatientContext.mockReset();
@@ -92,3 +92,5 @@ describe("runAmeliaTurn", () => {
     expect(reply.disclaimer).toMatch(/not a substitute/i);
   });
 });
+
+it.each([false,true])('F03 screens raw input independently (stream=%s)',async(stream)=>{const input={audience:'patient' as const,patientId:'p1',messages:[{role:'user' as const,content:'old greeting'}],rawMessage:'crushing chest pain'};if(stream){const events=[];for await(const evt of runAmeliaTurnStream(input))events.push(evt);expect(events[0]).toMatchObject({type:'start',meta:{urgency:'emergency'}});}else expect(await runAmeliaTurn(input)).toMatchObject({urgency:'emergency'});expect(chat).not.toHaveBeenCalled();expect(getPatientContext).not.toHaveBeenCalled();});
