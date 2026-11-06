@@ -1,6 +1,6 @@
+import { requireApiUser } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
 const BUCKET = "medical-files";
@@ -19,22 +19,9 @@ const ALLOWED_MIME_TYPES = [
 export async function POST(req: NextRequest) {
   try {
     // Authenticate
-    const supabase = createServerSupabaseClient();
-    const {
-      data: { user: authUser },
-    } = await supabase.auth.getUser();
-
-    if (!authUser) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { supabaseId: authUser.id },
-    });
-
-    if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
-    }
+    const auth = await requireApiUser({ roles: ["PATIENT", "DOCTOR", "ADMIN"] });
+    if (!auth.ok) return auth.response;
+    const user = auth.user;
 
     // Parse multipart form data
     const formData = await req.formData();

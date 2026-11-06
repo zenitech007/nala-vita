@@ -1,7 +1,7 @@
+import { requireApiUser } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { ai, GEMINI_MODEL } from "@/lib/gemini";
-import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { prisma } from "@/lib/prisma";
 import { checkRateLimitAsync } from "@/lib/rate-limit";
 
@@ -16,22 +16,9 @@ const symptomCheckSchema = z.object({
 export async function POST(req: NextRequest) {
   try {
     // ─── Authenticate ────────────────────────────────────
-    const supabase = createServerSupabaseClient();
-    const {
-      data: { user: authUser },
-    } = await supabase.auth.getUser();
-
-    if (!authUser) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { supabaseId: authUser.id },
-    });
-
-    if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
-    }
+    const auth = await requireApiUser({ roles: ["PATIENT"], profile: "patient" });
+    if (!auth.ok) return auth.response;
+    const user = auth.user;
 
     // ─── Rate limit (10 calls / 60s per user) ────────────
     const limit = await checkRateLimitAsync(`ai:symptom-check:${user.id}`);

@@ -5,7 +5,8 @@ import { getAuthenticatedUserWithProfile } from "@/lib/auth-cache";
 
 export default async function DoctorLayout({ children }: { children: React.ReactNode }) {
     const authData = await getAuthenticatedUserWithProfile();
-    if (!authData?.session || authData.user?.role !== "DOCTOR" || !authData.user.doctor) redirect("/login");
+    if (!authData?.session || !authData.user?.isActive) redirect("/login");
+  if (authData.user.role !== "DOCTOR" || !authData.user.doctor) redirect("/unauthorized");
 
     const { user } = authData;
 

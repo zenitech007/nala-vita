@@ -31,7 +31,7 @@ describe("reminders API", () => {
 
   it("POST creates a reminder for the patient", async () => {
     getUser.mockResolvedValue({ data: { user: { id: "sub1" } } });
-    userFindUnique.mockResolvedValue({ id: "u1", patient: { id: "pat1" } });
+    userFindUnique.mockResolvedValue({ id: "u1", role: "PATIENT", isActive: true, patient: { id: "pat1" } });
     createReminder.mockResolvedValue(undefined);
     const iso = new Date(2026, 5, 12, 8, 0).toISOString();
     const res = await POST(req({ kind: "MEDICATION", label: "BP meds", frequency: "DAILY", nextFireAt: iso }));
@@ -45,7 +45,7 @@ describe("reminders API", () => {
 
   it("GET lists the patient's reminders", async () => {
     getUser.mockResolvedValue({ data: { user: { id: "sub1" } } });
-    userFindUnique.mockResolvedValue({ id: "u1", patient: { id: "pat1" } });
+    userFindUnique.mockResolvedValue({ id: "u1", role: "PATIENT", isActive: true, patient: { id: "pat1" } });
     listReminders.mockResolvedValue([{ id: "1", kind: "MEDICATION", label: "BP meds", frequency: "DAILY", nextFireAt: "x", schedule: "every day at 8:00 AM" }]);
     const res = await GET(req());
     const json = await res.json();
@@ -56,7 +56,7 @@ describe("reminders API", () => {
 
   it("DELETE cancels scoped to the patient", async () => {
     getUser.mockResolvedValue({ data: { user: { id: "sub1" } } });
-    userFindUnique.mockResolvedValue({ id: "u1", patient: { id: "pat1" } });
+    userFindUnique.mockResolvedValue({ id: "u1", role: "PATIENT", isActive: true, patient: { id: "pat1" } });
     cancelReminder.mockResolvedValue(undefined);
     const res = await DELETE(req(), ctx("r1"));
     expect(res.status).toBe(200);

@@ -4,35 +4,20 @@ import { moneyForJson } from '@/lib/money';
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { createServerSupabaseClient } from "@/lib/supabase-server";
 
 // ─── GET: Return payment history for the current user ────
 
 export async function GET(_req: NextRequest) {
   try {
-    const supabase = createServerSupabaseClient();
-    const {
-      data: { user: authUser },
-    } = await supabase.auth.getUser();
-
-    if (!authUser) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { supabaseId: authUser.id },
-      include: { patient: true, doctor: true },
-    });
-
-    if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
-    }
+    const auth = await requireApiUser({ roles: ["PATIENT", "DOCTOR"] });
+    if (!auth.ok) return auth.response;
+    const user = auth.user;
 
     let payments;
 
     if (user.role === "PATIENT" && user.patient) {
       payments = await prisma.payment.findMany({
-        where: { patientId: user.patient.id },
+        where: { patientId: user.patient!.id },
         include: {
           appointment: {
             include: {
@@ -51,7 +36,7 @@ export async function GET(_req: NextRequest) {
     } else if (user.role === "DOCTOR" && user.doctor) {
       payments = await prisma.payment.findMany({
         where: {
-          appointment: { doctorId: user.doctor.id },
+          appointment: { doctorId: user.doctor!.id },
         },
         include: {
           patient: {

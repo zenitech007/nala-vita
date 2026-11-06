@@ -4,7 +4,8 @@ import { getAuthenticatedUserWithProfile } from "@/lib/auth-cache";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
     const authData = await getAuthenticatedUserWithProfile();
-    if (!authData?.session) redirect("/login");
+    if (!authData?.session || !authData.user?.isActive) redirect("/login");
+  if (authData.user.role !== "ADMIN" || !authData.user.admin) redirect("/unauthorized");
 
     const { user } = authData;
 

@@ -1,6 +1,6 @@
+import { requireApiUser } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { prisma } from "@/lib/prisma";
 import { confirmMemory, updateMemory, deleteMemory } from "@/lib/amelia/memory";
 
@@ -10,11 +10,8 @@ const patchSchema = z.union([
 ]);
 
 async function getPatientId(): Promise<string | null> {
-  const supabase = createServerSupabaseClient();
-  const { data: { user: authUser } } = await supabase.auth.getUser();
-  if (!authUser) return null;
-  const user = await prisma.user.findUnique({ where: { supabaseId: authUser.id }, include: { patient: true } });
-  return user?.patient?.id ?? null;
+  const auth = await requireApiUser({ roles: ["PATIENT"], profile: "patient" });
+  return auth.ok ? auth.user.patient!.id : null;
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {

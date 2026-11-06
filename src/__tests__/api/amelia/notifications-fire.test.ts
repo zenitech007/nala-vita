@@ -24,7 +24,7 @@ beforeEach(() => [getUser, userFindUnique, notifFindMany, notifCount, fireDueRem
 describe("GET /api/notifications fires reminders for patients", () => {
   it("calls fireDueReminders with patientId + userId then returns notifications", async () => {
     getUser.mockResolvedValue({ data: { user: { id: "sub1" } } });
-    userFindUnique.mockResolvedValue({ id: "u1", patient: { id: "pat1" } });
+    userFindUnique.mockResolvedValue({ id: "u1", role: "PATIENT", isActive: true, patient: { id: "pat1" } });
     fireDueReminders.mockResolvedValue(1);
     notifFindMany.mockResolvedValue([{ id: "n1" }]);
     notifCount.mockResolvedValue(1);
@@ -38,7 +38,7 @@ describe("GET /api/notifications fires reminders for patients", () => {
 
   it("does not fire for non-patients (no patient profile)", async () => {
     getUser.mockResolvedValue({ data: { user: { id: "sub1" } } });
-    userFindUnique.mockResolvedValue({ id: "u1", patient: null });
+    userFindUnique.mockResolvedValue({ id: "u1", role: "DOCTOR", isActive: true, doctor: { id: "d", isVerified: true }, patient: null });
     notifFindMany.mockResolvedValue([]);
     notifCount.mockResolvedValue(0);
 

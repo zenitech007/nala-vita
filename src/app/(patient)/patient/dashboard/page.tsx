@@ -7,7 +7,7 @@ import PatientDashboardClient from "./_components/PatientDashboardClient";
 import { getAuthenticatedUserWithProfile } from "@/lib/auth-cache";
 
 async function getPatientDashboardData(user: NonNullable<Awaited<ReturnType<typeof getAuthenticatedUserWithProfile>>>["user"]) {
-  if (!user || !user.patient) return null;
+  if (!user?.isActive || user.role !== "PATIENT" || !user.patient) return null;
   const patientId = user.patient.id;
 
   const [appointments, prescriptions, vitals, unreadMessageCount, notifications] =

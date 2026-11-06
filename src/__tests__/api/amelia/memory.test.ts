@@ -35,7 +35,7 @@ describe("memory API", () => {
 
   it("GET returns the patient's memories", async () => {
     getUser.mockResolvedValue({ data: { user: { id: "sub1" } } });
-    userFindUnique.mockResolvedValue({ id: "u1", patient: { id: "pat1" } });
+    userFindUnique.mockResolvedValue({ id: "u1", role: "PATIENT", isActive: true, patient: { id: "pat1" } });
     listMemories.mockResolvedValue([{ id: "1", kind: "ALLERGY", value: "penicillin", confirmedByUser: true }]);
     const res = await GET(req());
     const json = await res.json();
@@ -46,7 +46,7 @@ describe("memory API", () => {
 
   it("PATCH confirm calls confirmMemory scoped to the patient", async () => {
     getUser.mockResolvedValue({ data: { user: { id: "sub1" } } });
-    userFindUnique.mockResolvedValue({ id: "u1", patient: { id: "pat1" } });
+    userFindUnique.mockResolvedValue({ id: "u1", role: "PATIENT", isActive: true, patient: { id: "pat1" } });
     confirmMemory.mockResolvedValue(undefined);
     const res = await PATCH(req({ action: "confirm" }), ctx("m1"));
     expect(res.status).toBe(200);
@@ -55,7 +55,7 @@ describe("memory API", () => {
 
   it("DELETE removes the memory scoped to the patient", async () => {
     getUser.mockResolvedValue({ data: { user: { id: "sub1" } } });
-    userFindUnique.mockResolvedValue({ id: "u1", patient: { id: "pat1" } });
+    userFindUnique.mockResolvedValue({ id: "u1", role: "PATIENT", isActive: true, patient: { id: "pat1" } });
     deleteMemory.mockResolvedValue(undefined);
     const res = await DELETE(req(), ctx("m1"));
     expect(res.status).toBe(200);
@@ -64,7 +64,7 @@ describe("memory API", () => {
 
   it("DELETE returns 500 when the delete fails", async () => {
     getUser.mockResolvedValue({ data: { user: { id: "sub1" } } });
-    userFindUnique.mockResolvedValue({ id: "u1", patient: { id: "pat1" } });
+    userFindUnique.mockResolvedValue({ id: "u1", role: "PATIENT", isActive: true, patient: { id: "pat1" } });
     deleteMemory.mockRejectedValue(new Error("db down"));
     const res = await DELETE(req(), ctx("m1"));
     expect(res.status).toBe(500);

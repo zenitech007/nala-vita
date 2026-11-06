@@ -9,8 +9,7 @@ export const getCachedSession = cache(async () => {
   const supabase = createServerSupabaseClient();
   const { data: { user }, error } = await supabase.auth.getUser();
   if (error || !user) return null;
-  const { data: { session } } = await supabase.auth.getSession();
-  return session?.user.id === user.id ? session : null;
+  return { user: { id: user.id } };
 });
 
 /**
@@ -24,6 +23,7 @@ export const getAuthenticatedUserWithProfile = cache(async () => {
   const user = await prisma.user.findUnique({
     where: { supabaseId: session.user.id },
     include: {
+      admin: true,
       patient: {
         select: { id: true, dateOfBirth: true, gender: true, bloodType: true },
       },

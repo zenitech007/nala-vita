@@ -1,7 +1,7 @@
+import { requireApiUser } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { createServerSupabaseClient } from "@/lib/supabase-server";
 
 const moodSchema = z.object({
   mood: z.number().min(1).max(10),
@@ -10,27 +10,13 @@ const moodSchema = z.object({
 
 export async function GET(_req: NextRequest) {
   try {
-    const supabase = createServerSupabaseClient();
-    const {
-      data: { user: authUser },
-    } = await supabase.auth.getUser();
-
-    if (!authUser) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { supabaseId: authUser.id },
-      include: { patient: true },
-    });
-
-    if (!user || !user.patient) {
-      return NextResponse.json({ error: "Patient not found" }, { status: 404 });
-    }
+    const auth = await requireApiUser({ roles: ["PATIENT"], profile: "patient" });
+    if (!auth.ok) return auth.response;
+    const user = auth.user;
 
     const entries = await prisma.medicalNote.findMany({
       where: {
-        patientId: user.patient.id,
+        patientId: user.patient!.id,
         category: "MOOD_LOG",
       },
       orderBy: { createdAt: "desc" },
@@ -46,23 +32,9 @@ export async function GET(_req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = createServerSupabaseClient();
-    const {
-      data: { user: authUser },
-    } = await supabase.auth.getUser();
-
-    if (!authUser) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { supabaseId: authUser.id },
-      include: { patient: true },
-    });
-
-    if (!user || !user.patient) {
-      return NextResponse.json({ error: "Patient not found" }, { status: 404 });
-    }
+    const auth = await requireApiUser({ roles: ["PATIENT"], profile: "patient" });
+    if (!auth.ok) return auth.response;
+    const user = auth.user;
 
     const body = await req.json();
     const parsed = moodSchema.safeParse(body);
@@ -74,7 +46,7 @@ export async function POST(req: NextRequest) {
     }
 
     const { mood, note } = parsed.data;
-    const patientId = user.patient.id;
+    const patientId = user.patient!.id;
 
     const lastAppointment = await prisma.appointment.findFirst({
       where: { patientId },

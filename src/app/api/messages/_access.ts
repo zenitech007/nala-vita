@@ -10,7 +10,7 @@ const messagingUserSelect = {
   role: true,
   isActive: true,
   patient: { select: { id: true } },
-  doctor: { select: { id: true, specialization: true } },
+  doctor: { select: { id: true, specialization: true, isVerified: true } },
 } satisfies Prisma.UserSelect;
 
 export type MessagingUser = Prisma.UserGetPayload<{
@@ -30,7 +30,7 @@ export async function getAuthenticatedMessagingUser(): Promise<MessagingUser | n
     select: messagingUserSelect,
   });
 
-  return user?.isActive ? user : null;
+  return user?.isActive && (user.role === "PATIENT" ? !!user.patient : user.role === "DOCTOR" && !!user.doctor?.isVerified) ? user : null;
 }
 
 /**
@@ -49,7 +49,7 @@ export async function getAuthorizedMessageParticipant(
     select: messagingUserSelect,
   });
 
-  if (!otherUser?.isActive) return null;
+  if (!otherUser?.isActive || (otherUser.role === "DOCTOR" && !otherUser.doctor?.isVerified)) return null;
 
   let appointmentWhere: { patientId: string; doctorId: string } | null = null;
 
