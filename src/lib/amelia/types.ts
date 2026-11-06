@@ -8,6 +8,7 @@ export interface RedFlag {
 }
 
 export interface AmeliaContext {
+  accessLimited?: boolean;
   firstName: string;
   age: number | null;
   gender: string | null;
@@ -32,6 +33,7 @@ export interface AmeliaContext {
 export interface AmeliaTurnInput {
   /** Raw submitted text, screened independently of history and image extraction. */
   rawMessage?: string;
+  viewer?: import("@/lib/record-visibility").RecordViewer;
   audience: Audience;
   patientId: string;
   messages: { role: "user" | "assistant"; content: string }[];

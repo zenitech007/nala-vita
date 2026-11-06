@@ -1,3 +1,5 @@
+import { requireApiUser } from "@/lib/auth";
+import { getCollectionVisibility } from "@/lib/record-visibility";
 import { doctorHasPatientAccess } from "@/lib/access-control";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
@@ -9,52 +11,14 @@ import { checkNewPrescriptionSafety } from "@/lib/amelia/medsafety";
 
 export async function GET(req: NextRequest) {
   try {
-    const supabase = createServerSupabaseClient();
-    const {
-      data: { user: authUser },
-    } = await supabase.auth.getUser();
-
-    if (!authUser) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { supabaseId: authUser.id },
-      include: { patient: true, doctor: true },
-    });
-
-    if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
-    }
-
-    const { searchParams } = new URL(req.url);
-    const activeOnly = searchParams.get("active") !== "false";
-
-    // Build role-based filter
-    let roleFilter: object;
-    if (user.role === "DOCTOR" && user.doctor) {
-      roleFilter = { doctorId: user.doctor.id };
-    } else if (user.patient) {
-      roleFilter = { patientId: user.patient.id };
-    } else {
-      // Admin — return all (with optional patient filter)
-      const patientId = searchParams.get("patientId");
-      roleFilter = patientId ? { patientId } : {};
-    }
-
+    const auth = await requireApiUser({ roles: ["PATIENT", "DOCTOR"] });
+    if (!auth.ok) return auth.response;
+    const user = auth.user;
+    const access = await getCollectionVisibility(user, "PRESCRIPTIONS", new URL(req.url).searchParams.get("patientId") ?? undefined);
     const prescriptions = await prisma.prescription.findMany({
-      where: {
-        ...roleFilter,
-        ...(activeOnly ? {} : {}), // Return all, frontend filters by isActive
-      },
+      where: access.where("PRESCRIPTIONS"),
       include: {
-        patient: {
-          include: {
-            user: {
-              select: { firstName: true, lastName: true, avatarUrl: true },
-            },
-          },
-        },
+        patient: { select: { id: true, user: { select: { firstName: true, lastName: true, avatarUrl: true } } } },
         doctor: {
           include: {
             user: {
@@ -66,6 +30,7 @@ export async function GET(req: NextRequest) {
       orderBy: { prescribedAt: "desc" },
     });
 
+    await access.log("PRESCRIPTIONS", prescriptions);
     return NextResponse.json({ prescriptions });
   } catch (error) {
     console.error("GET /api/prescriptions error:", error);

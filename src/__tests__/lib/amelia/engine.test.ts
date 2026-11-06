@@ -20,7 +20,7 @@ beforeEach(() => {
 describe("runAmeliaTurn", () => {
   it("short-circuits on an emergency without calling the LLM", async () => {
     const reply = await runAmeliaTurn({
-      audience: "patient",
+      audience: "patient", viewer: { id: "u", role: "PATIENT", isActive: true, patient: { id: "p1" } },
       patientId: "p1",
       messages: [{ role: "user", content: "I have crushing chest pain" }],
     });
@@ -40,7 +40,7 @@ describe("runAmeliaTurn", () => {
     chat.mockResolvedValue("Let's look at your hands. Worth seeing a clinician.");
 
     const reply = await runAmeliaTurn({
-      audience: "patient",
+      audience: "patient", viewer: { id: "u", role: "PATIENT", isActive: true, patient: { id: "p1" } },
       patientId: "p1",
       messages: [{ role: "user", content: "my key sticks after work but my wife can open it fine" }],
     });
@@ -61,7 +61,7 @@ describe("runAmeliaTurn", () => {
     chat.mockResolvedValue("Rest and fluids.");
 
     await runAmeliaTurn({
-      audience: "patient",
+      audience: "patient", viewer: { id: "u", role: "PATIENT", isActive: true, patient: { id: "p1" } },
       patientId: "p1",
       messages: [{ role: "user", content: "I have a mild headache and a runny nose" }],
     });
@@ -79,12 +79,12 @@ describe("runAmeliaTurn", () => {
     chat.mockResolvedValue("Here is some careful advice. Please confirm with a doctor.");
 
     const reply = await runAmeliaTurn({
-      audience: "patient",
+      audience: "patient", viewer: { id: "u", role: "PATIENT", isActive: true, patient: { id: "p1" } },
       patientId: "p1",
       messages: [{ role: "user", content: "I have a mild sore throat" }],
     });
 
-    expect(getPatientContext).toHaveBeenCalledWith("p1");
+    expect(getPatientContext).toHaveBeenCalledWith("p1", expect.objectContaining({ id: "u" }));
     expect(getMemoriesForGrounding).toHaveBeenCalledWith("p1");
     expect(chat).toHaveBeenCalledTimes(1);
     expect(reply.urgency).toBe("routine");

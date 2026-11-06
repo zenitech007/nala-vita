@@ -60,6 +60,7 @@ export function renderContext(ctx: AmeliaContext): string {
     lines.push(`Recent clinical records & history: ${notes}.`);
   }
 
+  if (ctx.accessLimited) lines.unshift("Only own or explicitly approved records are available. Missing data is unavailable, never evidence of normal findings or no allergies/medications.");
   return lines.join("\n");
 }
 

@@ -19,9 +19,10 @@ async function prepareTurn(input: AmeliaTurnInput) {
   // because "your key sticks" must not produce "call an ambulance".
   const functionalCues = latestUser ? detectFunctionalCues(latestUser.content) : [];
 
+  if (!input.viewer) throw new Error("Authenticated record viewer required");
   const [ctx, memories] = await Promise.all([
-    getPatientContext(input.patientId),
-    getMemoriesForGrounding(input.patientId),
+    getPatientContext(input.patientId, input.viewer),
+    input.viewer.role === "PATIENT" && input.viewer.patient?.id === input.patientId ? getMemoriesForGrounding(input.patientId) : Promise.resolve({ known: [], toConfirm: [] }),
   ]);
 
   const turns: ChatTurn[] = [

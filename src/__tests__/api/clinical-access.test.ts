@@ -1,6 +1,6 @@
 const getUser=jest.fn(),findUser=jest.fn(),findPatient=jest.fn(),relationship=jest.fn();
 jest.mock('@/lib/supabase-server',()=>({createServerSupabaseClient:()=>({auth:{getUser}})}));
-jest.mock('@/lib/prisma',()=>({prisma:{user:{findUnique:(...a:unknown[])=>findUser(...a)},patient:{findUnique:(...a:unknown[])=>findPatient(...a)},appointment:{findFirst:(...a:unknown[])=>relationship(...a)},referral:{findFirst:async()=>null}}}));
+jest.mock('@/lib/prisma',()=>({prisma:{user:{findUnique:(...a:unknown[])=>findUser(...a)},patient:{findFirst:async()=>null,findUnique:(...a:unknown[])=>findPatient(...a)},appointment:{findFirst:(...a:unknown[])=>relationship(...a)},referral:{findFirst:async()=>null}}}));
 jest.mock('@/lib/amelia/medsafety',()=>({checkNewPrescriptionSafety:jest.fn()}));jest.mock('@/lib/notifications',()=>({createNotification:jest.fn()}));
 import {POST as prescription} from '@/app/api/prescriptions/route';import {POST as lab} from '@/app/api/lab-tests/route';import {POST as notes} from '@/app/api/patients/[id]/notes/route';import {POST as referral} from '@/app/api/referrals/route';
 const routes=[['prescription',prescription,{medication:'Test',dosage:'1',frequency:'daily',duration:'1 day'}],['lab',lab,{testName:'Test'}],['notes',notes,{title:'Test',content:'Test'}],['referral',referral,{referredDoctorId:'d2',reason:'Test'}]] as const;

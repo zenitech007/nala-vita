@@ -130,7 +130,7 @@ export async function POST(req: NextRequest) {
 
     // ---- Buffered path (explicit opt-out, and the shape the tests assert) ----
     if (stream === false) {
-      const reply = await runAmeliaTurn({ audience: "patient", patientId, messages, rawMessage: message });
+      const reply = await runAmeliaTurn({ audience: "patient", patientId, viewer: user, messages, rawMessage: message });
 
       await prisma.ameliaMessage.create({
         data: { conversationId: convoId, role: "assistant", content: reply.content },
@@ -163,7 +163,7 @@ export async function POST(req: NextRequest) {
         try {
           send({ type: "meta", conversationId: convoId, imageStatus });
 
-          for await (const evt of runAmeliaTurnStream({ audience: "patient", patientId, messages, rawMessage: message })) {
+          for await (const evt of runAmeliaTurnStream({ audience: "patient", patientId, viewer: user, messages, rawMessage: message })) {
             if (evt.type === "start") {
               urgency = evt.meta.urgency;
               redFlagCount = evt.meta.redFlags.length;

@@ -1,3 +1,5 @@
+import { requireApiUser } from "@/lib/auth";
+import { getRecordVisibility } from "@/lib/record-visibility";
 import { doctorHasPatientAccess } from "@/lib/access-control";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
@@ -34,24 +36,9 @@ function computeNextDoseAt(frequency: string): string | null {
 
 export async function GET(req: NextRequest) {
   try {
-    const supabase = createServerSupabaseClient();
-    const {
-      data: { user: authUser },
-    } = await supabase.auth.getUser();
-
-    if (!authUser) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { supabaseId: authUser.id },
-      include: { patient: true, doctor: true },
-    });
-
-    if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
-    }
-
+    const auth = await requireApiUser({ roles: ["PATIENT", "DOCTOR"] });
+    if (!auth.ok) return auth.response;
+    const user = auth.user;
     const { searchParams } = new URL(req.url);
     const now = new Date();
     const todayStr = now.toISOString().split("T")[0];
@@ -68,28 +55,8 @@ export async function GET(req: NextRequest) {
         );
       }
 
-      const doctorId = user.doctor.id;
-
-      // Access Check: Active appointment or accepted referral
-      const hasAppointment = await prisma.appointment.findFirst({
-        where: { doctorId, patientId },
-        select: { id: true },
-      });
-
-      const hasReferral = hasAppointment
-        ? true
-        : await prisma.referral.findFirst({
-            where: { patientId, referredDoctorId: doctorId, status: "ACCEPTED" },
-            select: { id: true },
-          });
-
-      if (!hasAppointment && !hasReferral) {
-        return NextResponse.json(
-          { error: "Forbidden: No authorized care relationship with patient" },
-          { status: 403 }
-        );
-      }
-
+      if (!await doctorHasPatientAccess(user.doctor.id, patientId)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      const access = await getRecordVisibility(user, patientId);
       // 6-month threshold
       const sixMonthsAgo = new Date(now);
       sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
@@ -97,23 +64,7 @@ export async function GET(req: NextRequest) {
 
       // Query: Doctor medications + patient self-added WHERE isSharedWithDoctor === true
       const prescriptions = await prisma.prescription.findMany({
-        where: {
-          patientId,
-          AND: [
-            {
-              OR: [
-                { addedBy: "DOCTOR" },
-                { isSharedWithDoctor: true },
-              ],
-            },
-            {
-              OR: [
-                { prescribedAt: { gte: sixMonthsAgo } },
-                { isActive: true },
-              ],
-            },
-          ],
-        },
+        where: { AND: [access.where("PRESCRIPTIONS"), { OR: [{ prescribedAt: { gte: sixMonthsAgo } }, { isActive: true }] }] },
         orderBy: { prescribedAt: "desc" },
         include: {
           doctor: {
@@ -124,6 +75,7 @@ export async function GET(req: NextRequest) {
         },
       });
 
+      await access.log("PRESCRIPTIONS", prescriptions);
       // Filter usageLogs strictly to the last 6 months (180 days)
       const sixMonthsDays: string[] = [];
       for (let i = 180; i >= 0; i--) {

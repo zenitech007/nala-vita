@@ -1,3 +1,5 @@
+import { requireApiUser } from "@/lib/auth";
+import { getCollectionVisibility } from "@/lib/record-visibility";
 import { doctorHasPatientAccess } from "@/lib/access-control";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
@@ -142,88 +144,19 @@ export async function POST(req: NextRequest) {
 
 export async function GET(_req: NextRequest) {
   try {
-    const supabase = createServerSupabaseClient();
-    const {
-      data: { user: authUser },
-    } = await supabase.auth.getUser();
-
-    if (!authUser) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { supabaseId: authUser.id },
-      include: { doctor: true, patient: true },
-    });
-
-    if (!user?.doctor && !user?.patient) {
-      return NextResponse.json(
-        { error: "Only authorized doctors or patients can view referrals" },
-        { status: 403 }
-      );
-    }
-
-    // If patient is viewing their referrals
-    if (user.patient) {
-      const referrals = await prisma.referral.findMany({
-        where: { patientId: user.patient.id },
-        include: {
-          referringDoctor: {
-            include: {
-              user: { select: { firstName: true, lastName: true } },
-            },
-          },
-          referredDoctor: {
-            include: {
-              user: { select: { firstName: true, lastName: true } },
-            },
-          },
-        },
-        orderBy: { createdAt: "desc" },
-      });
-
-      return NextResponse.json({ referrals });
-    }
-
-    const doctorId = user.doctor!.id;
-
-    // Fetch sent referrals (where this doctor is the referring doctor)
-    const sent = await prisma.referral.findMany({
-      where: { referringDoctorId: doctorId },
-      include: {
-        patient: {
-          include: {
-            user: { select: { firstName: true, lastName: true } },
-          },
-        },
-        referredDoctor: {
-          include: {
-            user: { select: { firstName: true, lastName: true } },
-          },
-        },
-      },
-      orderBy: { createdAt: "desc" },
-    });
-
-    // Fetch received referrals (where this doctor is the referred doctor)
-    const received = await prisma.referral.findMany({
-      where: { referredDoctorId: doctorId },
-      include: {
-        patient: {
-          include: {
-            user: { select: { firstName: true, lastName: true } },
-          },
-        },
-        referringDoctor: {
-          include: {
-            user: { select: { firstName: true, lastName: true } },
-          },
-        },
-      },
-      orderBy: { createdAt: "desc" },
-    });
-
-    return NextResponse.json({ sent, received });
+    const auth = await requireApiUser({ roles: ["PATIENT", "DOCTOR"] });
+    if (!auth.ok) return auth.response;
+    const user = auth.user;
+    const access = await getCollectionVisibility(user, "REFERRALS");
+    const referrals = await prisma.referral.findMany({ where: access.where("REFERRALS"), include: {
+      patient: { select: { id: true, user: { select: { firstName: true, lastName: true } } } },
+      referringDoctor: { include: { user: { select: { firstName: true, lastName: true } } } },
+      referredDoctor: { include: { user: { select: { firstName: true, lastName: true } } } },
+    }, orderBy: { createdAt: "desc" } });
+    await access.log("REFERRALS", referrals);
+    if (user.role === "PATIENT") return NextResponse.json({ referrals });
+    const received = await prisma.referral.findMany({ where: { referredDoctorId: user.doctor!.id }, select: { id: true, status: true, patientId: true, createdAt: true } });
+    return NextResponse.json({ sent: referrals, received: received.map(item => ({ ...item, accessLimited: true, reason: "Request patient approval to view referral details", patient: { user: { firstName: "Patient", lastName: "" } } })) });
   } catch (error) {
     console.error("GET /api/referrals error:", error);
     return NextResponse.json(

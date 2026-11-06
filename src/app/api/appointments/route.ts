@@ -1,3 +1,4 @@
+import { requireApiUser } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
@@ -11,24 +12,9 @@ import { moneyForJson } from "@/lib/money";
 
 export async function GET(req: NextRequest) {
   try {
-    const supabase = createServerSupabaseClient();
-    const {
-      data: { user: authUser },
-    } = await supabase.auth.getUser();
-
-    if (!authUser) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { supabaseId: authUser.id },
-      include: { patient: true, doctor: true },
-    });
-
-    if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
-    }
-
+    const auth = await requireApiUser({ roles: ["PATIENT", "DOCTOR"] });
+    if (!auth.ok) return auth.response;
+    const user = auth.user;
     const { searchParams } = new URL(req.url);
     const statusFilter = searchParams.get("status"); // upcoming | past | cancelled
 
@@ -65,13 +51,7 @@ export async function GET(req: NextRequest) {
             },
           },
         },
-        patient: {
-          include: {
-            user: {
-              select: { firstName: true, lastName: true, avatarUrl: true },
-            },
-          },
-        },
+        patient: { select: { id: true, user: { select: { firstName: true, lastName: true, avatarUrl: true } } } },
       },
       orderBy: { scheduledAt: statusFilter === "past" ? "desc" : "asc" },
     });

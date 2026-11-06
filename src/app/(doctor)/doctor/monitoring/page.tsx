@@ -33,15 +33,15 @@ import {
 interface PatientVitalSummary {
   id: string;
   name: string;
-  age: number;
+  age: number | string;
   gender: string;
   lastUpdated: string;
-  bloodPressure: { value: string; status: "normal" | "borderline" | "abnormal" };
-  heartRate: { value: string; status: "normal" | "borderline" | "abnormal" };
-  bloodSugar: { value: string; status: "normal" | "borderline" | "abnormal" };
-  oxygenSaturation: { value: string; status: "normal" | "borderline" | "abnormal" };
-  temperature: { value: string; status: "normal" | "borderline" | "abnormal" };
-  weight: { value: string; status: "normal" | "borderline" | "abnormal" };
+  bloodPressure: { value: string; status: "normal" | "borderline" | "abnormal" | "unavailable" };
+  heartRate: { value: string; status: "normal" | "borderline" | "abnormal" | "unavailable" };
+  bloodSugar: { value: string; status: "normal" | "borderline" | "abnormal" | "unavailable" };
+  oxygenSaturation: { value: string; status: "normal" | "borderline" | "abnormal" | "unavailable" };
+  temperature: { value: string; status: "normal" | "borderline" | "abnormal" | "unavailable" };
+  weight: { value: string; status: "normal" | "borderline" | "abnormal" | "unavailable" };
 }
 
 interface VitalHistoryPoint {
@@ -51,12 +51,14 @@ interface VitalHistoryPoint {
 }
 
 const STATUS_COLORS = {
+  unavailable: "bg-gray-100 text-gray-600",
   normal: "bg-green-100 text-green-700",
   borderline: "bg-amber-100 text-amber-700",
   abnormal: "bg-red-100 text-red-700",
 };
 
 const STATUS_DOT = {
+  unavailable: "bg-gray-400",
   normal: "bg-green-500",
   borderline: "bg-amber-500",
   abnormal: "bg-red-500",
@@ -64,24 +66,24 @@ const STATUS_DOT = {
 
 // ─── Status assessment helpers ─────────────────────────
 
-function assessStatus(val: number | null | undefined, min: number, max: number): "normal" | "borderline" | "abnormal" {
-  if (val == null) return "normal";
+function assessStatus(val: number | null | undefined, min: number, max: number): "normal" | "borderline" | "abnormal" | "unavailable" {
+  if (val == null) return "unavailable";
   if (val < min * 0.9 || val > max * 1.1) return "abnormal";
   if (val < min || val > max) return "borderline";
   return "normal";
 }
 
-function assessBpStatus(bp: string | null | undefined): "normal" | "borderline" | "abnormal" {
-  if (!bp) return "normal";
+function assessBpStatus(bp: string | null | undefined): "normal" | "borderline" | "abnormal" | "unavailable" {
+  if (!bp) return "unavailable";
   const [sys, dia] = bp.split("/").map(Number);
-  if (!sys || !dia) return "normal";
+  if (!sys || !dia) return "unavailable";
   if (sys > 140 || sys < 90 || dia > 90 || dia < 60) return "abnormal";
   if (sys > 125 || dia > 82) return "borderline";
   return "normal";
 }
 
-function calculateAge(dob: string | Date | null | undefined): number {
-  if (!dob) return 35;
+function calculateAge(dob: string | Date | null | undefined): number | string {
+  if (!dob) return "Unknown";
   const birth = new Date(dob);
   const diff = Date.now() - birth.getTime();
   return Math.max(1, Math.floor(diff / (1000 * 60 * 60 * 24 * 365.25)));

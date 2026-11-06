@@ -1,3 +1,6 @@
+import { requireApiUser } from "@/lib/auth";
+import { getRecordVisibility, workspacePatientWhere } from "@/lib/record-visibility";
+import { loadVisiblePatientRecord } from "@/lib/visible-patient-record";
 import { doctorHasPatientAccess } from "@/lib/access-control";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
@@ -56,62 +59,24 @@ function checkAnomalies(data: Record<string, unknown>): string[] {
 
 export async function GET(req: NextRequest) {
   try {
-    const supabase = createServerSupabaseClient();
-    const { data: { user: authUser } } = await supabase.auth.getUser();
-
-    if (!authUser) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { supabaseId: authUser.id },
-      include: { patient: true, doctor: true },
-    });
-
-    if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
-    }
-
-    const { searchParams } = new URL(req.url);
-    const limit = parseInt(searchParams.get("limit") || "30");
-    const patientIdParam = searchParams.get("patientId");
-
-    // Determine patient ID
-    let patientId: string | undefined;
-    if (user.role === "PATIENT" && user.patient) {
-      patientId = user.patient.id;
-    } else if (patientIdParam) {
-      patientId = patientIdParam;
-    }
-
+    const auth = await requireApiUser({ roles: ["PATIENT", "DOCTOR"] });
+    if (!auth.ok) return auth.response;
+    const user = auth.user;
+    const query = new URL(req.url).searchParams;
+    const patientId = user.role === "PATIENT" ? user.patient!.id : query.get("patientId");
+    const limit = Math.min(100, Math.max(1, Number(query.get("limit")) || 30));
     if (!patientId) {
-      // Doctor requesting all monitored patients' latest vitals
-      if (user.role === "DOCTOR" && user.doctor) {
-        const patients = await prisma.patient.findMany({
-          where: {
-            appointments: {
-              some: { doctorId: user.doctor.id },
-            },
-          },
-          include: {
-            user: { select: { firstName: true, lastName: true, avatarUrl: true } },
-            vitals: { orderBy: { recordedAt: "desc" }, take: 1 },
-          },
-        });
-
-        return NextResponse.json({ patients });
-      }
-
-      return NextResponse.json({ error: "Patient ID required" }, { status: 400 });
+      const targets = await prisma.patient.findMany({ where: workspacePatientWhere(user.doctor!.id), select: { id: true } });
+      const patients = await Promise.all(targets.map(async target => {
+        const record = await loadVisiblePatientRecord(user, target.id);
+        return { id: target.id, user: record.patient.user, vitals: record.vitals.slice(0, 1), accessLimited: true };
+      }));
+      return NextResponse.json({ patients });
     }
-
-    if (user.role === 'DOCTOR' && (!user.doctor || !await doctorHasPatientAccess(user.doctor.id, patientId))) return NextResponse.json({error:'Forbidden'}, {status:403});
-    const vitals = await prisma.vital.findMany({
-      where: { patientId },
-      orderBy: { recordedAt: "desc" },
-      take: limit,
-    });
-
+    if (user.role === "DOCTOR" && !await doctorHasPatientAccess(user.doctor!.id, patientId)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    const access = await getRecordVisibility(user, patientId);
+    const vitals = await prisma.vital.findMany({ where: access.where("VITALS"), orderBy: { recordedAt: "desc" }, take: limit });
+    await access.log("VITALS", vitals);
     return NextResponse.json({ vitals });
   } catch (error) {
     console.error("GET /api/vitals error:", error);

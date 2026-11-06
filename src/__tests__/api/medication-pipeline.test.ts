@@ -30,7 +30,9 @@ jest.mock("@/lib/prisma", () => ({
     user: {
       findUnique: (...a: unknown[]) => userFindUnique(...a),
     },
+    facilityMembership: { findMany: async () => [] }, recordAccessGrant: { findMany: async () => [] }, recordAccessLog: { createMany: async () => ({}) },
     patient: {
+      findFirst: async () => null,
       findUnique: (...a: unknown[]) => patientFindUnique(...a),
     },
     appointment: {
@@ -61,6 +63,7 @@ describe("Two-Sided Medication Pipeline & Adherence Suite", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    patientFindUnique.mockResolvedValue({ id: "pat-1", userId: "u-pat-1" });
     auditLogCreate.mockResolvedValue({ id: "audit-1" });
     createNotification.mockResolvedValue(true);
   });
@@ -73,7 +76,7 @@ describe("Two-Sided Medication Pipeline & Adherence Suite", () => {
 
       userFindUnique.mockResolvedValueOnce({
         id: "u-patient-1",
-        role: "PATIENT",
+        role: "PATIENT", isActive: true,
         patient: { id: "pat-1" },
         doctor: null,
       });
@@ -129,7 +132,7 @@ describe("Two-Sided Medication Pipeline & Adherence Suite", () => {
 
       userFindUnique.mockResolvedValueOnce({
         id: "u-patient-1",
-        role: "PATIENT",
+        role: "PATIENT", isActive: true,
         patient: { id: "pat-1" },
         doctor: null,
       });
@@ -186,7 +189,7 @@ describe("Two-Sided Medication Pipeline & Adherence Suite", () => {
 
       userFindUnique.mockResolvedValueOnce({
         id: "u-patient-1",
-        role: "PATIENT",
+        role: "PATIENT", isActive: true,
         patient: { id: "pat-1" },
         doctor: null,
       });
@@ -227,7 +230,7 @@ describe("Two-Sided Medication Pipeline & Adherence Suite", () => {
       });
       userFindUnique.mockResolvedValueOnce({
         id: "u-patient-1",
-        role: "PATIENT",
+        role: "PATIENT", isActive: true,
         patient: { id: "pat-1" },
         doctor: null,
       });
@@ -267,7 +270,7 @@ describe("Two-Sided Medication Pipeline & Adherence Suite", () => {
 
       userFindUnique.mockResolvedValueOnce({
         id: "u-patient-1",
-        role: "PATIENT",
+        role: "PATIENT", isActive: true,
         patient: { id: "pat-1" },
         doctor: null,
       });
@@ -311,8 +314,8 @@ describe("Two-Sided Medication Pipeline & Adherence Suite", () => {
 
       userFindUnique.mockResolvedValueOnce({
         id: "u-doc-1",
-        role: "DOCTOR",
-        doctor: { id: "doc-1" },
+        role: "DOCTOR", isActive: true,
+        doctor: { id: "doc-1", isVerified: true },
         patient: null,
       });
 
@@ -327,8 +330,8 @@ describe("Two-Sided Medication Pipeline & Adherence Suite", () => {
       });
       userFindUnique.mockResolvedValueOnce({
         id: "u-doc-1",
-        role: "DOCTOR",
-        doctor: { id: "doc-1" },
+        role: "DOCTOR", isActive: true,
+        doctor: { id: "doc-1", isVerified: true },
         patient: null,
       });
       appointmentFindFirst.mockResolvedValueOnce(null);
@@ -346,8 +349,8 @@ describe("Two-Sided Medication Pipeline & Adherence Suite", () => {
 
       userFindUnique.mockResolvedValueOnce({
         id: "u-doc-1",
-        role: "DOCTOR",
-        doctor: { id: "doc-1" },
+        role: "DOCTOR", isActive: true,
+        doctor: { id: "doc-1", isVerified: true },
         patient: null,
       });
 
@@ -382,21 +385,9 @@ describe("Two-Sided Medication Pipeline & Adherence Suite", () => {
       const data = await res.json();
 
       expect(res.status).toBe(200);
-      expect(prescriptionFindMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({
-            patientId: "pat-1",
-            AND: expect.arrayContaining([
-              {
-                OR: [
-                  { addedBy: "DOCTOR" },
-                  { isSharedWithDoctor: true },
-                ],
-              },
-            ]),
-          }),
-        })
-      );
+      expect(prescriptionFindMany).toHaveBeenCalledWith(expect.objectContaining({ where: { AND: expect.arrayContaining([
+        { patientId: "pat-1", OR: [{ authoredByDoctorId: "doc-1" }] },
+      ]) } }));
       expect(data.adherenceStats.window).toBe("6_months");
       expect(data.medications[0].medication).toBe("Metformin");
       expect(data.medications[0].totalLoggedDoses).toBe(1);
@@ -413,8 +404,8 @@ describe("Two-Sided Medication Pipeline & Adherence Suite", () => {
         id: "u-doc-1",
         firstName: "Gregory",
         lastName: "House",
-        role: "DOCTOR",
-        doctor: { id: "doc-1" },
+        role: "DOCTOR", isActive: true,
+        doctor: { id: "doc-1", isVerified: true },
         patient: null,
       });
 

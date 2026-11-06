@@ -65,6 +65,7 @@ jest.mock("@/lib/prisma", () => ({
       findMany: (...a: unknown[]) => doctorFindMany(...a),
     },
     patient: {
+      findFirst: async () => null,
       findUnique: (...a: unknown[]) => patientFindUnique(...a),
       findMany: (...a: unknown[]) => patientFindMany(...a),
       create: (...a: unknown[]) => patientCreate(...a),
@@ -246,12 +247,12 @@ describe("Patient Records Lifecycle & Privacy Suite", () => {
       expect(createNotification).toHaveBeenCalledTimes(2); // Both Doctor A and Doctor B notified
     });
 
-    it("should grant Doctor B access to patient records when referral is accepted", async () => {
+    it("does not turn accepted referral status into historical record approval", async () => {
       getUser.mockResolvedValueOnce({ data: { user: { id: "doc-b-sb-id" } } });
       userFindUnique.mockResolvedValueOnce({
         id: "u-doc-b",
-        role: "DOCTOR",
-        doctor: { id: "doc-b" },
+        role: "DOCTOR", isActive: true,
+        doctor: { id: "doc-b", isVerified: true },
       });
 
       // No direct appointment
@@ -271,7 +272,7 @@ describe("Patient Records Lifecycle & Privacy Suite", () => {
         params: { id: "p-1" },
       });
 
-      expect(res.status).toBe(200);
+      expect(res.status).toBe(403);
     });
 
     it("should deny Doctor B access if referral is pending or not accepted", async () => {

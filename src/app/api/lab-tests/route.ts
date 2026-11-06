@@ -1,3 +1,6 @@
+import { labResultVisibilityWhere } from "@/lib/record-visibility";
+import { requireApiUser } from "@/lib/auth";
+import { getCollectionVisibility } from "@/lib/record-visibility";
 import { doctorHasPatientAccess } from "@/lib/access-control";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
@@ -8,58 +11,14 @@ import { createServerSupabaseClient } from "@/lib/supabase-server";
 
 export async function GET(req: NextRequest) {
   try {
-    const supabase = createServerSupabaseClient();
-    const {
-      data: { user: authUser },
-    } = await supabase.auth.getUser();
-
-    if (!authUser) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { supabaseId: authUser.id },
-      include: { patient: true, doctor: true },
-    });
-
-    if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
-    }
-
-    const { searchParams } = new URL(req.url);
-    const status = searchParams.get("status"); // "pending" | "completed"
-
-    // Build where clause based on role
-    let whereClause: Record<string, unknown> = {};
-
-    if (user.role === "PATIENT" && user.patient) {
-      whereClause = { patientId: user.patient.id };
-    } else if (user.role === "DOCTOR" && user.doctor) {
-      whereClause = { doctorId: user.doctor.id };
-    } else {
-      return NextResponse.json(
-        { error: "No patient or doctor profile found" },
-        { status: 403 }
-      );
-    }
-
-    // Filter by status
-    if (status === "pending") {
-      whereClause.results = { none: {} };
-    } else if (status === "completed") {
-      whereClause.results = { some: {} };
-    }
-
+    const auth = await requireApiUser({ roles: ["PATIENT", "DOCTOR"] });
+    if (!auth.ok) return auth.response;
+    const user = auth.user;
+    const access = await getCollectionVisibility(user, "LAB_TESTS", new URL(req.url).searchParams.get("patientId") ?? undefined);
     const labOrders = await prisma.labOrder.findMany({
-      where: whereClause,
+      where: access.where("LAB_TESTS"),
       include: {
-        patient: {
-          include: {
-            user: {
-              select: { firstName: true, lastName: true },
-            },
-          },
-        },
+        patient: { select: { id: true, user: { select: { firstName: true, lastName: true, avatarUrl: true } } } },
         doctor: {
           include: {
             user: {
@@ -68,12 +27,15 @@ export async function GET(req: NextRequest) {
           },
         },
         results: {
+          where: labResultVisibilityWhere(access.where("LAB_TESTS")),
           orderBy: { completedAt: "desc" },
         },
       },
       orderBy: { orderedAt: "desc" },
     });
 
+    await access.log("LAB_TESTS", labOrders);
+    await access.log("LAB_RESULT", labOrders.flatMap(order => order.results.map(result => ({ ...result, patientId: order.patientId }))));
     return NextResponse.json({ labOrders });
   } catch (error) {
     console.error("GET /api/lab-tests error:", error);

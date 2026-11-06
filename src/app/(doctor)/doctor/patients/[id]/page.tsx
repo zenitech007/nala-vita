@@ -50,7 +50,7 @@ interface PatientUser {
 
 interface PatientDetail {
   id: string;
-  dateOfBirth: string;
+  dateOfBirth: string | null;
   gender: string;
   bloodType: string | null;
   allergies: string[];
@@ -140,7 +140,8 @@ type TabKey =
 
 // ─── Helpers ─────────────────────────────────────────────
 
-function calculateAge(dateOfBirth: string): number {
+function calculateAge(dateOfBirth: string | null): number | string {
+  if (!dateOfBirth) return "Unknown";
   return Math.floor(
     (Date.now() - new Date(dateOfBirth).getTime()) / 31557600000
   );
@@ -267,6 +268,7 @@ export default function PatientDetailPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <p role="status" className="px-6 py-3 text-sm bg-amber-50">Only your authored records and patient-approved records are shown. Missing details are unavailable. <a className="underline" href={`/doctor/record-access?patientId=${patient.id}`}>Request access</a></p>
       {/* ─── Sticky Patient Header ─── */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">

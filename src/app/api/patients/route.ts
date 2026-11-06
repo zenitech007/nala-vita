@@ -1,3 +1,5 @@
+import { workspacePatientWhere } from "@/lib/record-visibility";
+import { loadVisiblePatientRecord } from "@/lib/visible-patient-record";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
@@ -9,32 +11,16 @@ import { ConsentError } from "@/lib/record-access-requests";
 
 export async function GET(req: NextRequest) {
   try {
-    const supabase = createServerSupabaseClient();
-    const {
-      data: { user: authUser },
-    } = await supabase.auth.getUser();
-
-    if (!authUser) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { supabaseId: authUser.id },
-      include: { doctor: true },
-    });
-
-    if (!user || user.role !== "DOCTOR" || !user.doctor) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-
+    const auth = await requireApiUser({ roles: ["DOCTOR"], profile: "doctor" });
+    if (!auth.ok) return auth.response;
+    const user = auth.user;
     const { searchParams } = new URL(req.url);
     const search = searchParams.get("search") || "";
-    const all = searchParams.get("all") === "true";
     const page = Math.max(1, Number(searchParams.get("page")) || 1);
     const limit = Math.min(50, Math.max(1, Number(searchParams.get("limit")) || 10));
     const skip = (page - 1) * limit;
 
-    const doctorId = user.doctor.id;
+    const doctorId = user.doctor!.id;
 
     const searchFilter = search
       ? {
@@ -47,100 +33,15 @@ export async function GET(req: NextRequest) {
         }
       : {};
 
-    let where: Record<string, unknown>;
-    let patientIdList: string[] = [];
-
-    if (all) {
-      where = searchFilter;
-    } else {
-      const [apptPatientIds, refPatientIds] = await Promise.all([
-        prisma.appointment.findMany({
-          where: { doctorId },
-          select: { patientId: true },
-          distinct: ["patientId"],
-        }),
-        prisma.referral.findMany({
-          where: { referredDoctorId: doctorId, status: "ACCEPTED" },
-          select: { patientId: true },
-          distinct: ["patientId"],
-        }),
-      ]);
-
-      const idSet = new Set([
-        ...apptPatientIds.map((a) => a.patientId),
-        ...refPatientIds.map((r) => r.patientId),
-      ]);
-      patientIdList = Array.from(idSet);
-
-      if (patientIdList.length === 0) {
-        return NextResponse.json({ patients: [], total: 0, page, limit });
-      }
-
-      where = {
-        id: { in: patientIdList },
-        ...searchFilter,
-      };
-    }
-
-    const [patients, total] = await Promise.all([
-      prisma.patient.findMany({
-        where,
-        skip,
-        take: limit,
-        include: {
-          user: {
-            select: {
-              firstName: true,
-              lastName: true,
-              avatarUrl: true,
-              email: true,
-              phone: true,
-            },
-          },
-          appointments: {
-            where: { doctorId },
-            orderBy: { scheduledAt: "desc" },
-            take: 1,
-            select: { scheduledAt: true, status: true },
-          },
-        },
-      }),
-      prisma.patient.count({ where }),
+    const where = { AND: [workspacePatientWhere(doctorId), searchFilter] };
+    const [targets, total] = await Promise.all([
+      prisma.patient.findMany({ where, select: { id: true }, skip, take: limit }), prisma.patient.count({ where }),
     ]);
-
-    const result = patients.map((p) => {
-      const lastAppt = p.appointments[0] || null;
-      return {
-        id: p.id,
-        dateOfBirth: p.dateOfBirth,
-        gender: p.gender,
-        bloodType: p.bloodType,
-        allergies: p.allergies,
-        user: p.user,
-        lastAppointment: lastAppt
-          ? { date: lastAppt.scheduledAt, status: lastAppt.status }
-          : null,
-        totalAppointments: p.appointments.length,
-      };
-    });
-
-    // Get accurate total appointments count per patient
-    const returnedPatientIds = patients.map((p) => p.id);
-    const appointmentCounts = returnedPatientIds.length > 0
-      ? await prisma.appointment.groupBy({
-          by: ["patientId"],
-          where: { doctorId, patientId: { in: returnedPatientIds } },
-          _count: { id: true },
-        })
-      : [];
-
-    const countMap = new Map(appointmentCounts.map((c) => [c.patientId, c._count.id]));
-
-    const enriched = result.map((p) => ({
-      ...p,
-      totalAppointments: countMap.get(p.id) || 0,
+    const enriched = await Promise.all(targets.map(async target => {
+      const { patient, appointments, accessLimited, profileAvailable } = await loadVisiblePatientRecord(user, target.id);
+      const last = appointments.filter(a => a.doctorId === doctorId)[0];
+      return { ...patient, lastAppointment: last ? { date: last.scheduledAt, status: last.status } : null, totalAppointments: appointments.filter(a => a.doctorId === doctorId).length, accessLimited, profileAvailable };
     }));
-
     return NextResponse.json({ patients: enriched, total, page, limit });
   } catch (error) {
     console.error("[GET /api/patients]", error);

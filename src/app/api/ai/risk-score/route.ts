@@ -1,3 +1,6 @@
+import { requireApiUser } from "@/lib/auth";
+import { doctorHasPatientAccess } from "@/lib/access-control";
+import { loadVisiblePatientRecord } from "@/lib/visible-patient-record";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { ai, GEMINI_MODEL } from "@/lib/gemini";
@@ -15,79 +18,16 @@ const riskScoreSchema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
-    // Authenticate — doctors and admins only
-    const supabase = createServerSupabaseClient();
-    const {
-      data: { user: authUser },
-    } = await supabase.auth.getUser();
-
-    if (!authUser) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { supabaseId: authUser.id },
-    });
-
-    if (!user || (user.role !== "DOCTOR" && user.role !== "ADMIN")) {
-      return NextResponse.json(
-        { error: "Only doctors and admins can request risk scores" },
-        { status: 403 }
-      );
-    }
-
+    const auth = await requireApiUser({ roles: ["DOCTOR"], profile: "doctor" });
+    if (!auth.ok) return auth.response;
+    const user = auth.user;
     const body = await req.json();
     const validated = riskScoreSchema.parse(body);
 
-    // ─── Enforce doctor-patient relationship ─────────────
-    // Admins can access any patient; doctors must have an existing
-    // appointment with the patient (past or upcoming).
-    if (user.role === "DOCTOR") {
-      const doctor = await prisma.doctor.findUnique({
-        where: { userId: user.id },
-        select: { id: true },
-      });
-
-      if (!doctor) {
-        return NextResponse.json({ error: "Doctor profile not found" }, { status: 404 });
-      }
-
-      const relationship = await prisma.appointment.findFirst({
-        where: {
-          doctorId: doctor.id,
-          patientId: validated.patientId,
-        },
-        select: { id: true },
-      });
-
-      if (!relationship) {
-        return NextResponse.json(
-          { error: "You can only request risk scores for your own patients" },
-          { status: 403 }
-        );
-      }
-    }
-
-    // ─── Fetch patient data ──────────────────────────────
-
-    const patient = await prisma.patient.findUnique({
-      where: { id: validated.patientId },
-      include: {
-        user: { select: { firstName: true, lastName: true } },
-        vitals: { orderBy: { recordedAt: "desc" }, take: 10 },
-        prescriptions: { where: { isActive: true } },
-      },
-    });
-
-    if (!patient) {
-      return NextResponse.json(
-        { error: "Patient not found" },
-        { status: 404 }
-      );
-    }
-
-    // ─── Build context from real data ────────────────────
-
+    if (!await doctorHasPatientAccess(user.doctor!.id, validated.patientId)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    const record = await loadVisiblePatientRecord(user, validated.patientId);
+    const patient = { ...record.patient, vitals: record.vitals, prescriptions: record.prescriptions.filter(p => p.isActive) };
+    if (!record.profileAvailable || !patient.vitals.length) return NextResponse.json({ error: "Insufficient approved data for a risk assessment" }, { status: 422 });
     const age = patient.dateOfBirth
       ? Math.floor(
           (Date.now() - new Date(patient.dateOfBirth).getTime()) /
@@ -117,7 +57,7 @@ export async function POST(req: NextRequest) {
         ? patient.allergies.map((a) => `  - ${a}`).join("\n")
         : "  None reported";
 
-    const prompt = `You are a clinical risk assessment AI. Analyze the following patient data and compute a comprehensive health risk score.
+    const prompt = `You are a clinical risk assessment AI. Only visible records are supplied; missing data is unknown, never normal. Analyze the following patient data and compute a comprehensive health risk score.
 
 Patient Profile:
 - Name: ${patient.user.firstName} ${patient.user.lastName}

@@ -1,3 +1,5 @@
+import { getCollectionVisibility } from "@/lib/record-visibility";
+import { requireApiUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { TEMPERATURE, formatTemperature } from "@/lib/temperature";
 import { redirect } from "next/navigation";
@@ -5,11 +7,11 @@ import DoctorDashboardClient from "./_components/DoctorDashboardClient";
 import { getAuthenticatedUserWithProfile } from "@/lib/auth-cache";
 
 export default async function DoctorDashboardPage() {
-  const authData = await getAuthenticatedUserWithProfile();
-  if (!authData?.session || !authData.user?.doctor) redirect("/login");
-
-  const { user } = authData;
-  const doctorId = authData.user.doctor.id;
+  const auth = await requireApiUser({ roles: ["DOCTOR"], profile: "doctor" });
+  if (!auth.ok) redirect("/login");
+  const user = auth.user;
+  const doctorId = user.doctor!.id;
+  const vitalAccess = await getCollectionVisibility(user, "VITALS");
   const now = new Date();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const todayEnd = new Date(todayStart);
@@ -36,11 +38,7 @@ export default async function DoctorDashboardPage() {
       },
       orderBy: { scheduledAt: "asc" },
       include: {
-        patient: {
-          include: {
-            user: { select: { firstName: true, lastName: true } },
-          },
-        },
+        patient: { select: { id: true, user: { select: { firstName: true, lastName: true } } } },
       },
     }),
 
@@ -60,11 +58,7 @@ export default async function DoctorDashboardPage() {
       orderBy: { prescribedAt: "desc" },
       take: 3,
       include: {
-        patient: {
-          include: {
-            user: { select: { firstName: true, lastName: true } },
-          },
-        },
+        patient: { select: { id: true, user: { select: { firstName: true, lastName: true } } } },
       },
     }),
 
@@ -87,6 +81,7 @@ export default async function DoctorDashboardPage() {
   const abnormalVitalsRaw = patientIds.length > 0
     ? await prisma.vital.findMany({
         where: {
+          AND: [vitalAccess.where("VITALS")],
           patientId: { in: patientIds },
           recordedAt: { gte: twentyFourHoursAgo },
           OR: [
@@ -99,15 +94,14 @@ export default async function DoctorDashboardPage() {
           ],
         },
         include: {
-          patient: {
-            include: { user: { select: { firstName: true, lastName: true } } },
-          },
+          patient: { select: { id: true, user: { select: { firstName: true, lastName: true } } } },
         },
         orderBy: { recordedAt: "desc" },
         take: 5,
       })
     : [];
 
+  await vitalAccess.log("VITALS", abnormalVitalsRaw);
   const abnormalVitals = abnormalVitalsRaw.map((v) => {
     let metric = "Vital";
     let value = "";

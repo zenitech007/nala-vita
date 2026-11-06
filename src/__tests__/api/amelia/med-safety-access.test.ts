@@ -1,6 +1,6 @@
 const getUser=jest.fn(), findUser=jest.fn(), findPatient=jest.fn(), relationship=jest.fn(), analyze=jest.fn();
 jest.mock('@/lib/supabase-server',()=>({createServerSupabaseClient:()=>({auth:{getUser}})}));
-jest.mock('@/lib/prisma',()=>({prisma:{user:{findUnique:(...a:unknown[])=>findUser(...a)},patient:{findUnique:(...a:unknown[])=>findPatient(...a)},appointment:{findFirst:(...a:unknown[])=>relationship(...a)},referral:{findFirst:async()=>null}}}));
+jest.mock('@/lib/prisma',()=>({prisma:{user:{findUnique:(...a:unknown[])=>findUser(...a)},patient:{findFirst:async()=>null,findUnique:(...a:unknown[])=>findPatient(...a)},appointment:{findFirst:(...a:unknown[])=>relationship(...a)},referral:{findFirst:async()=>null}}}));
 jest.mock('@/lib/rate-limit',()=>({checkRateLimitAsync:async()=>({allowed:true})}));
 jest.mock('@/lib/amelia/medsafety',()=>({analyzeMedications:(...a:unknown[])=>analyze(...a)}));
 import {POST} from '@/app/api/amelia/med-safety/route';
