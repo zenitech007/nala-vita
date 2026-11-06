@@ -18,26 +18,9 @@ const createReferralSchema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = createServerSupabaseClient();
-    const {
-      data: { user: authUser },
-    } = await supabase.auth.getUser();
-
-    if (!authUser) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { supabaseId: authUser.id },
-      include: { doctor: true },
-    });
-
-    if (!user?.doctor) {
-      return NextResponse.json(
-        { error: "Only doctors can create referrals" },
-        { status: 403 }
-      );
-    }
+    const auth = await requireApiUser({ roles: ["DOCTOR"], profile: "doctor" });
+    if (!auth.ok) return auth.response;
+    const user = auth.user;
 
     const body = await req.json();
     const validated = createReferralSchema.parse(body);
@@ -57,17 +40,17 @@ export async function POST(req: NextRequest) {
     // Verify receiving doctor exists and is not the same doctor
     const receivingDoctor = await prisma.doctor.findUnique({
       where: { id: validated.referredDoctorId },
-      include: { user: { select: { id: true, firstName: true, lastName: true } } },
+      include: { user: { select: { id: true, firstName: true, lastName: true, isActive: true } } },
     });
 
-    if (!receivingDoctor) {
+    if (!receivingDoctor || !receivingDoctor.isVerified || !receivingDoctor.user.isActive) {
       return NextResponse.json(
         { error: "Receiving doctor not found" },
         { status: 404 }
       );
     }
 
-    if (receivingDoctor.id === user.doctor.id) {
+    if (receivingDoctor.id === user.doctor!.id) {
       return NextResponse.json(
         { error: "Cannot refer a patient to yourself" },
         { status: 400 }
@@ -78,18 +61,15 @@ export async function POST(req: NextRequest) {
     const referral = await prisma.referral.create({
       data: {
         patientId: validated.patientId,
-        referringDoctorId: user.doctor.id,
+        referringDoctorId: user.doctor!.id,
+        authoredByDoctorId: user.doctor!.id, authoredByUserId: user.id,
         referredDoctorId: validated.referredDoctorId,
         reason: validated.reason,
         notes: validated.notes || null,
         status: "PENDING",
       },
       include: {
-        patient: {
-          include: {
-            user: { select: { firstName: true, lastName: true } },
-          },
-        },
+        patient: { select: { id: true, user: { select: { firstName: true, lastName: true } } } },
         referringDoctor: {
           include: {
             user: { select: { firstName: true, lastName: true } },
@@ -107,7 +87,7 @@ export async function POST(req: NextRequest) {
     await createNotification(
       receivingDoctor.user.id,
       "New Referral Received",
-      `Dr. ${user.firstName} ${user.lastName} has referred patient ${patient.user.firstName} ${patient.user.lastName} to you. Reason: ${validated.reason}`,
+      "A referral is pending. Request patient approval before accessing clinical details.",
       "REFERRAL",
       { link: "/doctor/referrals" }
     );

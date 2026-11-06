@@ -53,26 +53,9 @@ const createPrescriptionSchema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = createServerSupabaseClient();
-    const {
-      data: { user: authUser },
-    } = await supabase.auth.getUser();
-
-    if (!authUser) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { supabaseId: authUser.id },
-      include: { doctor: true },
-    });
-
-    if (!user?.doctor) {
-      return NextResponse.json(
-        { error: "Only doctors can create prescriptions" },
-        { status: 403 }
-      );
-    }
+    const auth = await requireApiUser({ roles: ["DOCTOR"], profile: "doctor" });
+    if (!auth.ok) return auth.response;
+    const user = auth.user;
 
     const body = await req.json();
     const validated = createPrescriptionSchema.parse(body);
@@ -95,6 +78,7 @@ export async function POST(req: NextRequest) {
         data: {
           patientId: validated.patientId,
           doctorId: user.doctor!.id,
+          authoredByDoctorId: user.doctor!.id, authoredByUserId: user.id,
           medication: validated.medication,
           dosage: validated.dosage,
           frequency: validated.frequency,

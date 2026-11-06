@@ -1,3 +1,4 @@
+import { requireApiUser } from "@/lib/auth";
 import { doctorHasPatientAccess } from "@/lib/access-control";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
@@ -18,23 +19,9 @@ const createNoteSchema = z.object({
 export async function POST(req: NextRequest, { params }: RouteParams) {
   try {
     const { id } = await params;
-    const supabase = createServerSupabaseClient();
-    const {
-      data: { user: authUser },
-    } = await supabase.auth.getUser();
-
-    if (!authUser) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { supabaseId: authUser.id },
-      include: { doctor: true },
-    });
-
-    if (!user?.doctor) {
-      return NextResponse.json({ error: "Only doctors can create medical notes" }, { status: 403 });
-    }
+    const auth = await requireApiUser({ roles: ["DOCTOR"], profile: "doctor" });
+    if (!auth.ok) return auth.response;
+    const user = auth.user;
 
     if (!await doctorHasPatientAccess(user.doctor!.id, id)) return NextResponse.json({error:'Forbidden'}, {status:403});
 
@@ -53,7 +40,8 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
     const note = await prisma.medicalNote.create({
       data: {
         patientId: id,
-        doctorId: user.doctor.id,
+        doctorId: user.doctor!.id,
+        authoredByDoctorId: user.doctor!.id, authoredByUserId: user.id,
         title: validated.title,
         content: validated.content,
         category: validated.category || null,

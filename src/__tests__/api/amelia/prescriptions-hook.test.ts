@@ -42,10 +42,10 @@ describe("POST /api/prescriptions med-safety hook", () => {
   it("calls checkNewPrescriptionSafety after a successful create", async () => {
     getUser.mockResolvedValue({ data: { user: { id: "sub1" } } });
     userFindUnique.mockResolvedValue({
-      id: "u1",
+      id: "u1", role: "DOCTOR", isActive: true,
       firstName: "A",
       lastName: "B",
-      doctor: { id: "doc1" },
+      doctor: { id: "doc1", isVerified: true },
     });
     patientFindUnique.mockResolvedValue({
       id: "pat1",
@@ -68,6 +68,6 @@ describe("POST /api/prescriptions med-safety hook", () => {
       })
     );
     expect(res.status).toBe(201);
-    expect(checkNewPrescriptionSafety).toHaveBeenCalledWith("pat1", "Amoxicillin", expect.objectContaining({ doctor: { id: "doc1" } }));
+    expect(checkNewPrescriptionSafety).toHaveBeenCalledWith("pat1", "Amoxicillin", expect.objectContaining({ doctor: { id: "doc1", isVerified: true } }));
   });
 });
