@@ -1,3 +1,4 @@
+jest.mock('@/lib/visible-patient-record',()=>({loadVisiblePatientRecord:async()=>({patient:{allergies:[]},prescriptions:[],profileAvailable:true})}));
 const getUser=jest.fn(), findUser=jest.fn(), findPatient=jest.fn(), relationship=jest.fn(), analyze=jest.fn();
 jest.mock('@/lib/supabase-server',()=>({createServerSupabaseClient:()=>({auth:{getUser}})}));
 jest.mock('@/lib/prisma',()=>({prisma:{user:{findUnique:(...a:unknown[])=>findUser(...a)},patient:{findFirst:async()=>null,findUnique:(...a:unknown[])=>findPatient(...a)},appointment:{findFirst:(...a:unknown[])=>relationship(...a)},referral:{findFirst:async()=>null}}}));

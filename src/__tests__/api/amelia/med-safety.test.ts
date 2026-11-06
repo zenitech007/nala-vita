@@ -1,3 +1,4 @@
+jest.mock("@/lib/visible-patient-record", () => ({ loadVisiblePatientRecord: async () => ({ patient: { allergies: ["penicillin"] }, prescriptions: [{ medication: "Aspirin", dosage: "81mg", isActive: true }] }) }));
 import { describe, it, expect, jest, beforeEach } from "@jest/globals";
 
 const getUser = jest.fn();
@@ -46,7 +47,7 @@ describe("GET /api/amelia/med-safety", () => {
   it("returns the analysis for the patient's active meds", async () => {
     getUser.mockResolvedValue({ data: { user: { id: "u1" } } });
     userFindUnique.mockResolvedValue({
-      id: "u1",
+      id: "u1", role: "PATIENT", isActive: true,
       patient: {
         id: "pat1",
         allergies: ["penicillin"],

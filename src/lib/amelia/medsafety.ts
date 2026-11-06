@@ -1,3 +1,5 @@
+import { loadVisiblePatientRecord } from "@/lib/visible-patient-record";
+import type { RecordViewer } from "@/lib/record-visibility";
 // src/lib/amelia/medsafety.ts
 import { prisma } from "@/lib/prisma";
 import { chat } from "./llm";
@@ -98,13 +100,9 @@ export async function getCachedOrAnalyze(patientId: string, meds: MedInput[], al
   return result;
 }
 
-export async function checkNewPrescriptionSafety(patientId: string, newMedName: string): Promise<void> {
-  const patient = await prisma.patient.findUnique({
-    where: { id: patientId },
-    include: { prescriptions: { where: { isActive: true } } },
-  });
-  if (!patient) return;
-
+export async function checkNewPrescriptionSafety(patientId: string, newMedName: string, viewer: RecordViewer): Promise<void> {
+  const record = await loadVisiblePatientRecord(viewer, patientId);
+  const patient = { ...record.patient, prescriptions: record.prescriptions.filter(p => p.isActive) };
   const meds: MedInput[] = patient.prescriptions.map((p) => ({ medication: p.medication, dosage: p.dosage }));
   const result = await analyzeMedications(meds, patient.allergies);
 
@@ -120,7 +118,7 @@ export async function checkNewPrescriptionSafety(patientId: string, newMedName: 
 
   if (relevant) {
     await createNotification(
-      patient.userId,
+      (await prisma.patient.findUniqueOrThrow({ where: { id: patientId }, select: { userId: true } })).userId,
       "Medication safety",
       "Amelia flagged a possible interaction with your new medication — review it.",
       "MED_SAFETY",

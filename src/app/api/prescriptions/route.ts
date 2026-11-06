@@ -134,7 +134,7 @@ export async function POST(req: NextRequest) {
     // Phase 2 med-coach: best-effort safety check on the new medication
     // (never block or break prescribing).
     try {
-      await checkNewPrescriptionSafety(validated.patientId, validated.medication);
+      await checkNewPrescriptionSafety(validated.patientId, validated.medication, user);
     } catch (safetyErr) {
       console.error("Medication safety check failed:", safetyErr);
     }

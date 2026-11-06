@@ -68,6 +68,6 @@ describe("POST /api/prescriptions med-safety hook", () => {
       })
     );
     expect(res.status).toBe(201);
-    expect(checkNewPrescriptionSafety).toHaveBeenCalledWith("pat1", "Amoxicillin");
+    expect(checkNewPrescriptionSafety).toHaveBeenCalledWith("pat1", "Amoxicillin", expect.objectContaining({ doctor: { id: "doc1" } }));
   });
 });
