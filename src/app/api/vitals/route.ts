@@ -87,6 +87,7 @@ export async function GET(req: NextRequest) {
 // ─── POST: Save vital reading with anomaly check ─────────
 
 const createVitalSchema = z.object({
+  patientId: z.string().min(1).optional(),
   bloodPressure: z.string().optional(),
   heartRate: z.number().optional(),
   temperature: z.number().optional(),
@@ -104,24 +105,16 @@ const createVitalSchema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = createServerSupabaseClient();
-    const { data: { user: authUser } } = await supabase.auth.getUser();
-
-    if (!authUser) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { supabaseId: authUser.id },
-      include: { patient: true },
-    });
-
-    if (!user?.patient) {
-      return NextResponse.json({ error: "Patient profile not found" }, { status: 404 });
-    }
-
+    const auth = await requireApiUser({ roles: ["PATIENT", "DOCTOR"] });
+    if (!auth.ok) return auth.response;
+    const user = auth.user;
     const body = await req.json();
     const validated = createVitalSchema.parse(body);
+    const patientId = user.role === "PATIENT" ? user.patient?.id : validated.patientId;
+    if (!patientId) return NextResponse.json({ error: "Patient profile or target required" }, { status: 403 });
+    if (user.role === "DOCTOR" && !await doctorHasPatientAccess(user.doctor!.id, patientId)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    const target = user.role === "PATIENT" ? { userId: user.id } : await prisma.patient.findUnique({ where: { id: patientId }, select: { userId: true } });
+    if (!target) return NextResponse.json({ error: "Patient not found" }, { status: 404 });
 
     // Check for anomalies
     const canonicalTemperature = validated.temperature === undefined ? null : temperatureToCelsius(validated.temperature, validated.temperatureUnit!);
@@ -130,7 +123,8 @@ export async function POST(req: NextRequest) {
     // Create vital record
     const vital = await prisma.vital.create({
       data: {
-        patientId: user.patient.id,
+        patientId,
+        authoredByUserId: user.id, authoredByDoctorId: user.role === "DOCTOR" ? user.doctor!.id : null,
         bloodPressure: validated.bloodPressure || null,
         heartRate: validated.heartRate ?? null,
         temperature: canonicalTemperature,
@@ -155,7 +149,7 @@ export async function POST(req: NextRequest) {
       // Notify patient
       await prisma.notification.create({
         data: {
-          userId: user.id,
+          userId: target.userId,
           title: "Abnormal Vital Reading",
           message: alertMessage,
           type: "VITAL_ALERT",
@@ -163,28 +157,8 @@ export async function POST(req: NextRequest) {
         },
       });
 
-      // Notify doctors who have appointments with this patient
-      const recentDoctors = await prisma.appointment.findMany({
-        where: {
-          patientId: user.patient.id,
-          status: { in: ["SCHEDULED", "CONFIRMED", "COMPLETED"] },
-        },
-        select: { doctor: { select: { userId: true } } },
-        distinct: ["doctorId"],
-        take: 5,
-      });
-
-      for (const appt of recentDoctors) {
-        await prisma.notification.create({
-          data: {
-            userId: appt.doctor.userId,
-            title: "Patient Vital Alert",
-            message: `${user.firstName} ${user.lastName}: ${alertMessage}`,
-            type: "VITAL_ALERT",
-            link: "/doctor/monitoring",
-          },
-        });
-      }
+      // Appointment membership alone does not authorize disclosure of vital values.
+      // The patient notification above is private; providers read through scoped monitoring.
     }
 
     return NextResponse.json(
