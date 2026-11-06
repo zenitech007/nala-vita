@@ -1,3 +1,4 @@
+import { requireApiUser } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
@@ -15,20 +16,9 @@ const bodySchema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = createServerSupabaseClient();
-    const { data: { user: authUser } } = await supabase.auth.getUser();
-    if (!authUser)
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-    const user = await prisma.user.findUnique({
-      where: { supabaseId: authUser.id },
-      include: { patient: true },
-    });
-    if (!user?.patient)
-      return NextResponse.json(
-        { error: "Patient profile not found" },
-        { status: 404 }
-      );
+    const auth = await requireApiUser({ roles: ["PATIENT"], profile: "patient" });
+    if (!auth.ok) return auth.response;
+    const user = auth.user;
 
     const limit = await checkRateLimitAsync(
       `amelia:lab-photo:${user.id}`,

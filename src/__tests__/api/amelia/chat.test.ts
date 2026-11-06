@@ -87,7 +87,7 @@ describe("POST /api/amelia/chat", () => {
 
   it("returns Amelia's reply on the happy path", async () => {
     getUser.mockResolvedValue({ data: { user: { id: "sub-1" } } });
-    userFindUnique.mockResolvedValue({ id: "u1", patient: { id: "pat1" } });
+    userFindUnique.mockResolvedValue({ id: "u1", role: "PATIENT", isActive: true, patient: { id: "pat1" } });
     convoCreate.mockResolvedValue({ id: "c1" });
     msgCreate.mockResolvedValue({ id: "um1" });
     msgFindMany.mockResolvedValue([{ role: "user", content: "I have a sore throat" }]);
@@ -104,7 +104,7 @@ describe("POST /api/amelia/chat", () => {
 
   it("includes a reminderSuggestion when a reminder is detected", async () => {
     getUser.mockResolvedValue({ data: { user: { id: "sub-1" } } });
-    userFindUnique.mockResolvedValue({ id: "u1", patient: { id: "pat1" } });
+    userFindUnique.mockResolvedValue({ id: "u1", role: "PATIENT", isActive: true, patient: { id: "pat1" } });
     convoCreate.mockResolvedValue({ id: "c1" });
     msgCreate.mockResolvedValue({ id: "um1" });
     msgFindMany.mockResolvedValue([{ role: "user", content: "remind me to take meds at 8" }]);
@@ -123,7 +123,7 @@ describe("POST /api/amelia/chat", () => {
 describe("POST /api/amelia/chat (streaming)", () => {
   beforeEach(() => {
     getUser.mockResolvedValue({ data: { user: { id: "sub-1" } } });
-    userFindUnique.mockResolvedValue({ id: "u1", patient: { id: "pat1" } });
+    userFindUnique.mockResolvedValue({ id: "u1", role: "PATIENT", isActive: true, patient: { id: "pat1" } });
     convoCreate.mockResolvedValue({ id: "c1" });
     msgCreate.mockResolvedValue({ id: "um1" });
     msgFindMany.mockResolvedValue([{ role: "user", content: "I feel dizzy" }]);
@@ -197,6 +197,6 @@ describe("POST /api/amelia/chat (streaming)", () => {
   });
 });
 
-it.each([false,true])('F02 propagates unavailable image status (stream=%s)',async(stream)=>{getUser.mockResolvedValue({data:{user:{id:'a'}}});userFindUnique.mockResolvedValue({id:'u',patient:{id:'p'}});convoCreate.mockResolvedValue({id:'c'});msgCreate.mockResolvedValue({id:'m'});msgFindMany.mockResolvedValue([]);extractLabsFromImage.mockResolvedValue({status:'unavailable',results:[],summary:'Unavailable',overallNote:'Retry'});runAmeliaTurn.mockResolvedValue({content:'reply',urgency:'routine',redFlags:[],disclaimer:'d'});runAmeliaTurnStream.mockImplementation(async function*(){yield {type:'start',meta:{urgency:'routine',redFlags:[],disclaimer:'d'}};yield {type:'delta',text:'reply'};});const res=await POST(req({message:'image',imageDataUrl:'data:image/png;base64,AAA',stream}));if(stream){expect(await readFrames(res)).toEqual(expect.arrayContaining([expect.objectContaining({type:'meta',imageStatus:'unavailable'})]));}else expect(await res.json()).toHaveProperty('imageStatus','unavailable');});
+it.each([false,true])('F02 propagates unavailable image status (stream=%s)',async(stream)=>{getUser.mockResolvedValue({data:{user:{id:'a'}}});userFindUnique.mockResolvedValue({id:'u',role:'PATIENT',isActive:true,patient:{id:'p'}});convoCreate.mockResolvedValue({id:'c'});msgCreate.mockResolvedValue({id:'m'});msgFindMany.mockResolvedValue([]);extractLabsFromImage.mockResolvedValue({status:'unavailable',results:[],summary:'Unavailable',overallNote:'Retry'});runAmeliaTurn.mockResolvedValue({content:'reply',urgency:'routine',redFlags:[],disclaimer:'d'});runAmeliaTurnStream.mockImplementation(async function*(){yield {type:'start',meta:{urgency:'routine',redFlags:[],disclaimer:'d'}};yield {type:'delta',text:'reply'};});const res=await POST(req({message:'image',imageDataUrl:'data:image/png;base64,AAA',stream}));if(stream){expect(await readFrames(res)).toEqual(expect.arrayContaining([expect.objectContaining({type:'meta',imageStatus:'unavailable'})]));}else expect(await res.json()).toHaveProperty('imageStatus','unavailable');});
 
-describe('F03 latest message window',()=>{it.each([19,20,21,100].flatMap(count=>[false,true].map(stream=>({count,stream}))))('includes newest input at $count (SSE=$stream)',async({count,stream})=>{getUser.mockResolvedValue({data:{user:{id:'a'}}});userFindUnique.mockResolvedValue({id:'u',patient:{id:'p'}});convoCreate.mockResolvedValue({id:'c'});msgCreate.mockResolvedValue({id:'latest'});const stored=Array.from({length:count},(_,i)=>({id:i===count-1?'latest':'m'+i,role:'user',content:i===count-1?'newest chest pain':'old'+i}));msgFindMany.mockImplementation(async(q:any)=>q.orderBy.createdAt==='desc'?[...stored].reverse().slice(0,q.take):stored.slice(0,q.take));runAmeliaTurn.mockResolvedValue({content:'reply',urgency:'routine',redFlags:[],disclaimer:'d'});runAmeliaTurnStream.mockImplementation(async function*(){yield {type:'start',meta:{urgency:'routine',redFlags:[],disclaimer:'d'}};yield {type:'delta',text:'reply'};});const res=await POST(req({message:'newest chest pain',stream}));await res.text();const mock=stream?runAmeliaTurnStream:runAmeliaTurn;const input=(mock.mock.calls[0] as any[])[0];expect(input.messages.at(-1).content).toBe('newest chest pain');expect(input.messages).toHaveLength(Math.min(count,20));expect(input.rawMessage).toBe('newest chest pain');});});
+describe('F03 latest message window',()=>{it.each([19,20,21,100].flatMap(count=>[false,true].map(stream=>({count,stream}))))('includes newest input at $count (SSE=$stream)',async({count,stream})=>{getUser.mockResolvedValue({data:{user:{id:'a'}}});userFindUnique.mockResolvedValue({id:'u',role:'PATIENT',isActive:true,patient:{id:'p'}});convoCreate.mockResolvedValue({id:'c'});msgCreate.mockResolvedValue({id:'latest'});const stored=Array.from({length:count},(_,i)=>({id:i===count-1?'latest':'m'+i,role:'user',content:i===count-1?'newest chest pain':'old'+i}));msgFindMany.mockImplementation(async(q:any)=>q.orderBy.createdAt==='desc'?[...stored].reverse().slice(0,q.take):stored.slice(0,q.take));runAmeliaTurn.mockResolvedValue({content:'reply',urgency:'routine',redFlags:[],disclaimer:'d'});runAmeliaTurnStream.mockImplementation(async function*(){yield {type:'start',meta:{urgency:'routine',redFlags:[],disclaimer:'d'}};yield {type:'delta',text:'reply'};});const res=await POST(req({message:'newest chest pain',stream}));await res.text();const mock=stream?runAmeliaTurnStream:runAmeliaTurn;const input=(mock.mock.calls[0] as any[])[0];expect(input.messages.at(-1).content).toBe('newest chest pain');expect(input.messages).toHaveLength(Math.min(count,20));expect(input.rawMessage).toBe('newest chest pain');});});

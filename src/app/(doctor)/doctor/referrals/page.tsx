@@ -36,6 +36,7 @@ interface PatientOption {
 }
 
 interface IncomingReferral {
+  patientId: string;
   id: string;
   patientName: string;
   referringDoctorName: string;
@@ -128,11 +129,12 @@ export default function DoctorReferralsPage() {
         const rData = await referralsRes.json();
         if (Array.isArray(rData.received)) {
           setIncomingReferrals(
-            rData.received.map((r: { id: string; patient?: { user?: { firstName?: string; lastName?: string } }; referringDoctor?: { user?: { firstName?: string; lastName?: string }; specialization?: string }; reason: string; notes?: string | null; status: string; createdAt: string }) => ({
+            rData.received.map((r: { patientId: string; id: string; patient?: { user?: { firstName?: string; lastName?: string } }; referringDoctor?: { user?: { firstName?: string; lastName?: string }; specialization?: string }; reason: string; notes?: string | null; status: string; createdAt: string }) => ({
               id: r.id,
               patientName: `${r.patient?.user?.firstName || ""} ${r.patient?.user?.lastName || ""}`.trim() || "Patient",
-              referringDoctorName: `Dr. ${r.referringDoctor?.user?.firstName || ""} ${r.referringDoctor?.user?.lastName || ""}`.trim(),
-              referringDoctorSpeciality: r.referringDoctor?.specialization || "General Practice",
+              patientId: r.patientId,
+              referringDoctorName: r.referringDoctor ? `Dr. ${r.referringDoctor.user?.firstName || ""} ${r.referringDoctor.user?.lastName || ""}`.trim() : "Provider details require approval",
+              referringDoctorSpeciality: r.referringDoctor?.specialization || "Access restricted",
               reason: r.reason,
               notes: r.notes ?? null,
               status: r.status,
@@ -233,6 +235,7 @@ export default function DoctorReferralsPage() {
         }),
       });
 
+      if (!res.ok) { const error = await res.json(); setSubmitError(error.error || "Unable to update referral"); return; }
       if (res.ok) {
         setIncomingReferrals((prev) =>
           prev.map((r) => (r.id === referralId ? { ...r, status: action } : r))
@@ -627,7 +630,8 @@ export default function DoctorReferralsPage() {
                     </div>
 
                     {isPending && (
-                      <div className="flex gap-3 mt-4 ml-13">
+                      <div className="flex flex-wrap gap-3 mt-4 ml-13">
+                        <Link className="text-sm underline py-2" href={`/doctor/record-access?patientId=${ref.patientId}`}>Request patient approval</Link>
                         <button
                           onClick={() => handleReferralAction(ref.id, "ACCEPTED")}
                           disabled={isProcessing}

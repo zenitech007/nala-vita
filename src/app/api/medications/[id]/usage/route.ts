@@ -1,3 +1,4 @@
+import { requireApiUser } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
@@ -16,35 +17,17 @@ export async function POST(
   { params }: { params: { id: string } | Promise<{ id: string }> }
 ) {
   try {
-    const supabase = createServerSupabaseClient();
-    const {
-      data: { user: authUser },
-    } = await supabase.auth.getUser();
-
-    if (!authUser) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { supabaseId: authUser.id },
-      include: { patient: true },
-    });
-
-    if (!user || !user.patient) {
-      return NextResponse.json(
-        { error: "Forbidden: Only patients can log their medication usage" },
-        { status: 403 }
-      );
-    }
-
+    const auth = await requireApiUser({ roles: ["PATIENT"], profile: "patient" });
+    if (!auth.ok) return auth.response;
+    const user = auth.user;
     const resolvedParams = await Promise.resolve(params);
     const prescriptionId = resolvedParams.id;
 
-    const medication = await prisma.prescription.findUnique({
-      where: { id: prescriptionId },
+    const medication = await prisma.prescription.findFirst({
+      where: { id: prescriptionId, patientId: user.patient!.id },
     });
 
-    if (!medication || medication.patientId !== user.patient.id) {
+    if (!medication || medication.patientId !== user.patient!.id) {
       return NextResponse.json(
         { error: "Medication not found or does not belong to your account" },
         { status: 404 }
@@ -83,7 +66,7 @@ export async function POST(
     }
 
     const updated = await prisma.prescription.update({
-      where: { id: prescriptionId },
+      where: { id: prescriptionId, patientId: user.patient!.id },
       data: { usageLogs: updatedLogs },
     });
 

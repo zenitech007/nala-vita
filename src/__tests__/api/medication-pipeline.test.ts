@@ -43,6 +43,7 @@ jest.mock("@/lib/prisma", () => ({
     },
     prescription: {
       findUnique: (...a: unknown[]) => prescriptionFindUnique(...a),
+      findFirst: (...a: unknown[]) => prescriptionFindUnique(...a),
       findMany: (...a: unknown[]) => prescriptionFindMany(...a),
       create: (...a: unknown[]) => prescriptionCreate(...a),
       update: (...a: unknown[]) => prescriptionUpdate(...a),
@@ -220,7 +221,7 @@ describe("Two-Sided Medication Pipeline & Adherence Suite", () => {
       expect(res.status).toBe(200);
       expect(data.action).toBe("LOGGED");
       expect(prescriptionUpdate).toHaveBeenCalledWith({
-        where: { id: "rx-1" },
+        where: { id: "rx-1", patientId: "pat-1" },
         data: { usageLogs: [todayStr] },
       });
 
@@ -258,7 +259,7 @@ describe("Two-Sided Medication Pipeline & Adherence Suite", () => {
       expect(res2.status).toBe(200);
       expect(data2.action).toBe("UNLOGGED");
       expect(prescriptionUpdate).toHaveBeenCalledWith({
-        where: { id: "rx-1" },
+        where: { id: "rx-1", patientId: "pat-1" },
         data: { usageLogs: [] },
       });
     });
@@ -300,7 +301,7 @@ describe("Two-Sided Medication Pipeline & Adherence Suite", () => {
       expect(res.status).toBe(200);
       expect(data.isSharedWithDoctor).toBe(false);
       expect(prescriptionUpdate).toHaveBeenCalledWith({
-        where: { id: "rx-supp-1" },
+        where: { id: "rx-supp-1", patientId: "pat-1" },
         data: { isSharedWithDoctor: false },
       });
     });

@@ -1,3 +1,4 @@
+import { requireApiUser } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { ai, GEMINI_MODEL } from "@/lib/gemini";
@@ -30,28 +31,10 @@ const diagnosisSupportSchema = z.object({
 export async function POST(req: NextRequest) {
   try {
     // Authenticate — only doctors may use this endpoint
-    const supabase = createServerSupabaseClient();
-    const {
-      data: { user: authUser },
-    } = await supabase.auth.getUser();
+    const auth = await requireApiUser({ roles: ["DOCTOR"], profile: "doctor" });
+    if (!auth.ok) return auth.response;
+    const user = auth.user;
 
-    if (!authUser) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { supabaseId: authUser.id },
-      include: { doctor: true },
-    });
-
-    if (!user?.doctor) {
-      return NextResponse.json(
-        { error: "Only doctors can access clinical decision support" },
-        { status: 403 }
-      );
-    }
-
-    // ─── Rate limit (10 calls / 60s per user) ────────────
     const limit = await checkRateLimitAsync(`ai:diagnosis-support:${user.id}`);
     if (!limit.allowed) {
       return NextResponse.json(

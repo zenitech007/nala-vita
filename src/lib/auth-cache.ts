@@ -7,10 +7,10 @@ import { prisma } from "@/lib/prisma";
  */
 export const getCachedSession = cache(async () => {
   const supabase = createServerSupabaseClient();
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  return session;
+  const { data: { user }, error } = await supabase.auth.getUser();
+  if (error || !user) return null;
+  const { data: { session } } = await supabase.auth.getSession();
+  return session?.user.id === user.id ? session : null;
 });
 
 /**
@@ -28,10 +28,11 @@ export const getAuthenticatedUserWithProfile = cache(async () => {
         select: { id: true, dateOfBirth: true, gender: true, bloodType: true },
       },
       doctor: {
-        select: { id: true, specialization: true, licenseNumber: true },
+        select: { id: true, specialization: true, licenseNumber: true, isVerified: true },
       },
     },
   });
 
+  if (!user?.isActive || (user.role === "DOCTOR" && !user.doctor?.isVerified)) return null;
   return { session, user };
 });

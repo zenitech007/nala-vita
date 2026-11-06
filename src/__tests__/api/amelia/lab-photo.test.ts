@@ -48,7 +48,7 @@ describe("POST /api/ai/lab-photo", () => {
 
   it("422s when the body is not a base64 image", async () => {
     getUser.mockResolvedValue({ data: { user: { id: "sub1" } } });
-    userFindUnique.mockResolvedValue({ id: "u1", patient: { id: "pat1" } });
+    userFindUnique.mockResolvedValue({ id: "u1", role: "PATIENT", isActive: true, patient: { id: "pat1" } });
     const res = await POST(
       req({ imageDataUrl: "https://example.com/x.png" })
     );
@@ -57,7 +57,7 @@ describe("POST /api/ai/lab-photo", () => {
 
   it("returns the extracted result on the happy path", async () => {
     getUser.mockResolvedValue({ data: { user: { id: "sub1" } } });
-    userFindUnique.mockResolvedValue({ id: "u1", patient: { id: "pat1" } });
+    userFindUnique.mockResolvedValue({ id: "u1", role: "PATIENT", isActive: true, patient: { id: "pat1" } });
     extractLabsFromImage.mockResolvedValue({
       results: [
         {

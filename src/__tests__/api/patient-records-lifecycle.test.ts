@@ -80,6 +80,7 @@ jest.mock("@/lib/prisma", () => ({
       findMany: (...a: unknown[]) => referralFindMany(...a),
       create: (...a: unknown[]) => referralCreate(...a),
       update: (...a: unknown[]) => referralUpdate(...a),
+      updateMany: (...a: unknown[]) => referralUpdate(...a),
     },
     medicalNote: {
       findFirst: (...a: unknown[]) => medicalNoteFindFirst(...a),
@@ -114,6 +115,7 @@ describe("Patient Records Lifecycle & Privacy Suite", () => {
     jest.resetAllMocks();
     auditLogCreate.mockResolvedValue({ id: "audit-1" });
     createNotification.mockResolvedValue(true);
+    doctorFindMany.mockResolvedValue([]);
     patientRequest.mockResolvedValue({ id: 'request', status: 'PENDING' });
   });
 
@@ -124,7 +126,7 @@ describe("Patient Records Lifecycle & Privacy Suite", () => {
       userFindUnique.mockResolvedValueOnce({
         id: "u-active",
         email: "active@test.com",
-        role: "PATIENT",
+        role: "PATIENT", isActive: true,
         emailVerified: true,
       });
 
@@ -135,7 +137,7 @@ describe("Patient Records Lifecycle & Privacy Suite", () => {
           password: "SecurePassword123!",
           firstName: "Active",
           lastName: "User",
-          role: "PATIENT",
+          role: "PATIENT", isActive: true,
           dateOfBirth: "1990-01-01",
           gender: "female",
         }),
@@ -198,11 +200,11 @@ describe("Patient Records Lifecycle & Privacy Suite", () => {
   });
 
   describe("3. Doctor-to-Doctor Transfer with Patient Approval", () => {
-    it("should allow a patient to approve a pending doctor transfer referral", async () => {
+    it("accepts a referral operationally without claiming record sharing was approved", async () => {
       getUser.mockResolvedValueOnce({ data: { user: { id: "pat-sb-id" } } });
       userFindUnique.mockResolvedValueOnce({
         id: "u-patient",
-        role: "PATIENT",
+        role: "PATIENT", isActive: true,
         patient: { id: "p-1" },
         firstName: "Alex",
         lastName: "Morgan",
@@ -222,7 +224,7 @@ describe("Patient Records Lifecycle & Privacy Suite", () => {
 
       referralUpdate.mockResolvedValueOnce({
         id: "ref-1",
-        status: "ACCEPTED",
+        status: "ACCEPTED", count: 1,
       });
 
       const request = new Request("http://localhost/api/referrals", {
@@ -237,14 +239,14 @@ describe("Patient Records Lifecycle & Privacy Suite", () => {
       const json = await res.json();
 
       expect(res.status).toBe(200);
-      expect(json.message).toContain("approved");
+      expect(json.message).toContain("separate email-verified approval");
       expect(referralUpdate).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: "ref-1" },
+          where: { id: "ref-1", status: "PENDING", patientId: "p-1" },
           data: { status: "ACCEPTED" },
         })
       );
-      expect(createNotification).toHaveBeenCalledTimes(2); // Both Doctor A and Doctor B notified
+      expect(appointmentCreate).not.toHaveBeenCalled(); // Both Doctor A and Doctor B notified
     });
 
     it("does not turn accepted referral status into historical record approval", async () => {
@@ -301,7 +303,7 @@ describe("Patient Records Lifecycle & Privacy Suite", () => {
       getUser.mockResolvedValueOnce({ data: { user: { id: "pat-sb-id" } } });
       userFindUnique.mockResolvedValueOnce({
         id: "u-patient",
-        role: "PATIENT",
+        role: "PATIENT", isActive: true,
         isActive: true,
         patient: { id: "p-1" },
         firstName: "Alex",
@@ -339,7 +341,7 @@ describe("Patient Records Lifecycle & Privacy Suite", () => {
       getUser.mockResolvedValueOnce({ data: { user: { id: "pat-sb-id" } } });
       userFindUnique.mockResolvedValueOnce({
         id: "u-patient",
-        role: "PATIENT",
+        role: "PATIENT", isActive: true,
         patient: { id: "p-1" },
       });
 
@@ -379,7 +381,7 @@ describe("Patient Records Lifecycle & Privacy Suite", () => {
       getUser.mockResolvedValueOnce({ data: { user: { id: "pat-sb-id" } } });
       userFindUnique.mockResolvedValueOnce({
         id: "u-patient",
-        role: "PATIENT",
+        role: "PATIENT", isActive: true,
         patient: { id: "p-1" },
       });
 

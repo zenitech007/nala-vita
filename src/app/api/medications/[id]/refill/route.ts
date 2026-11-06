@@ -1,3 +1,4 @@
+import { requireApiUser } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
@@ -9,26 +10,11 @@ export async function PATCH(
 ) {
   try {
     const { id: prescriptionId } = await params;
-    const supabase = createServerSupabaseClient();
-    const {
-      data: { user: authUser },
-    } = await supabase.auth.getUser();
-
-    if (!authUser) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { supabaseId: authUser.id },
-      include: { patient: true },
-    });
-
-    if (!user || !user.patient) {
-      return NextResponse.json({ error: "Patient not found" }, { status: 404 });
-    }
-
-    const prescription = await prisma.prescription.findUnique({
-      where: { id: prescriptionId },
+    const auth = await requireApiUser({ roles: ["PATIENT"], profile: "patient" });
+    if (!auth.ok) return auth.response;
+    const user = auth.user;
+    const prescription = await prisma.prescription.findFirst({
+      where: { id: prescriptionId, patientId: user.patient!.id },
       include: {
         doctor: {
           include: { user: { select: { id: true, firstName: true, lastName: true } } },
@@ -36,7 +22,7 @@ export async function PATCH(
       },
     });
 
-    if (!prescription || prescription.patientId !== user.patient.id) {
+    if (!prescription || prescription.patientId !== user.patient!.id) {
       return NextResponse.json({ error: "Prescription not found" }, { status: 404 });
     }
 

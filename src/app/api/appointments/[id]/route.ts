@@ -1,3 +1,4 @@
+import { doctorHasPatientAccess } from "@/lib/access-control";
 import { requireApiUser } from "@/lib/auth";
 import { loadVisiblePatientRecord } from "@/lib/visible-patient-record";
 import { NextRequest, NextResponse } from "next/server";
@@ -11,20 +12,6 @@ interface RouteParams {
 }
 
 // ─── Helper: Authenticate and get user ───────────────────
-
-async function getAuthenticatedUser() {
-  const supabase = createServerSupabaseClient();
-  const {
-    data: { user: authUser },
-  } = await supabase.auth.getUser();
-
-  if (!authUser) return null;
-
-  return prisma.user.findUnique({
-    where: { supabaseId: authUser.id },
-    include: { patient: true, doctor: true },
-  });
-}
 
 // ─── GET: Single appointment with full patient EHR context ─
 
@@ -59,13 +46,12 @@ const updateSchema = z.object({
 export async function PATCH(req: NextRequest, { params }: RouteParams) {
   try {
     const { id } = await params;
-    const user = await getAuthenticatedUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await requireApiUser({ roles: ["PATIENT", "DOCTOR"] });
+    if (!auth.ok) return auth.response;
+    const user = auth.user;
 
     const appointment = await prisma.appointment.findUnique({
-      where: { id },
+      where: { id }, select: { id: true, patientId: true, doctorId: true, status: true },
     });
 
     if (!appointment) {
@@ -75,11 +61,13 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
     // Authorization
     const isPatient = user.patient?.id === appointment.patientId;
     const isDoctor = user.doctor?.id === appointment.doctorId;
-    const isAdmin = user.role === "ADMIN";
 
-    if (!isPatient && !isDoctor && !isAdmin) {
+
+    if (!isPatient && !isDoctor) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
+
+    if (isDoctor && !await doctorHasPatientAccess(user.doctor!.id, appointment.patientId)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
     const body = await req.json();
     const validated = updateSchema.parse(body);
@@ -112,7 +100,8 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
           },
         },
         patient: {
-          include: {
+          select: {
+            id: true,
             user: {
               select: { firstName: true, lastName: true, avatarUrl: true },
             },
@@ -143,13 +132,12 @@ const deleteSchema = z.object({
 export async function DELETE(req: NextRequest, { params }: RouteParams) {
   try {
     const { id } = await params;
-    const user = await getAuthenticatedUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await requireApiUser({ roles: ["PATIENT", "DOCTOR"] });
+    if (!auth.ok) return auth.response;
+    const user = auth.user;
 
     const appointment = await prisma.appointment.findUnique({
-      where: { id },
+      where: { id }, select: { id: true, patientId: true, doctorId: true, status: true },
     });
 
     if (!appointment) {
@@ -159,9 +147,9 @@ export async function DELETE(req: NextRequest, { params }: RouteParams) {
     // Authorization
     const isPatient = user.patient?.id === appointment.patientId;
     const isDoctor = user.doctor?.id === appointment.doctorId;
-    const isAdmin = user.role === "ADMIN";
 
-    if (!isPatient && !isDoctor && !isAdmin) {
+
+    if (!isPatient && !isDoctor) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -172,6 +160,8 @@ export async function DELETE(req: NextRequest, { params }: RouteParams) {
         { status: 400 }
       );
     }
+
+    if (isDoctor && !await doctorHasPatientAccess(user.doctor!.id, appointment.patientId)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
     const body = await req.json();
     const validated = deleteSchema.parse(body);

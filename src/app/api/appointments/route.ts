@@ -123,6 +123,7 @@ export async function POST(req: NextRequest) {
         data: {
           patientId: user.patient!.id,
           doctorId: validated.doctorId,
+          authoredByDoctorId: validated.doctorId,
           scheduledAt: scheduledDate,
           duration,
           consultationType: validated.consultationType,

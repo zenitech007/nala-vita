@@ -49,3 +49,9 @@ it('F13 rejects deactivated patient', async () => {
   findUser.mockResolvedValue({ id: 'user', role: 'PATIENT', isActive: false, patient: { id: 'patient' } });
   expect((await book()).status).toBe(403); expect(createAppointment).not.toHaveBeenCalled();
 });
+it('F09 keeps provider appointments out of grants for patient-entered records', async () => {
+  expect((await book()).status).toBe(201);
+  const data = createAppointment.mock.calls[0][0].data;
+  expect(data.authoredByDoctorId).toBe('doctor');
+  expect(data.authoredByUserId).toBeUndefined();
+});

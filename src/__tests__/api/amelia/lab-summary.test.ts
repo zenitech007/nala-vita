@@ -25,7 +25,7 @@ describe("POST /api/ai/lab-summary", () => {
 
   it("returns a plain-language summary", async () => {
     getUser.mockResolvedValue({ data: { user: { id: "sub1" } } });
-    userFindUnique.mockResolvedValue({ id: "u1" });
+    userFindUnique.mockResolvedValue({ id: "u1", role: "PATIENT", isActive: true, patient: { id: "pat1" } });
     chat.mockResolvedValue("Your results look mostly normal. Please confirm with a doctor.");
     const res = await POST(req({ testName: "HbA1c", results: [{ resultValue: "6.1", unit: "%", isAbnormal: false }] }));
     const json = await res.json();

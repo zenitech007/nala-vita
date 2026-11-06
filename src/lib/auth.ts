@@ -91,6 +91,8 @@ export async function requireApiUser(
     return errorResponse(403, "Doctor account is pending verification");
   }
 
+  if (user.role === "PATIENT" && !user.patient) return errorResponse(403, "Required patient profile not found");
+
   if (options.profile && !user[options.profile]) {
     return errorResponse(403, `Required ${options.profile} profile not found`);
   }
