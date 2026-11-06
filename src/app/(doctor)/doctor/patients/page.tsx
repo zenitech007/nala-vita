@@ -114,6 +114,8 @@ function IntakePatientModal({
   const [initialNotes, setInitialNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pendingMessage, setPendingMessage] = useState<string | null>(null);
+  useEffect(() => { if (!isOpen) setPendingMessage(null); }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -121,6 +123,7 @@ function IntakePatientModal({
     e.preventDefault();
     setSubmitting(true);
     setError(null);
+    setPendingMessage(null);
 
     try {
       const res = await fetch("/api/patients", {
@@ -147,6 +150,7 @@ function IntakePatientModal({
       }
 
       onSuccess(data.message || "Patient successfully registered in clinic directory");
+      if (res.status === 202) { setPendingMessage(data.message); return; }
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Registration error");
@@ -179,6 +183,7 @@ function IntakePatientModal({
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-4">
+          {pendingMessage && <p role="status" className="text-sm text-gray-800">{pendingMessage} Keep your draft. After approval, open the scoped patient record to add notes. <Link href="/doctor/record-access" className="underline">View request status</Link></p>}
           {error && (
             <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 shrink-0" />
@@ -426,6 +431,7 @@ export default function DoctorPatientsPage() {
               </span>
 
               {/* Register In-Person Patient button */}
+              <Link href="/doctor/record-access" className="rounded-xl border border-gray-300 px-3 py-2 text-sm font-medium text-gray-800">Record requests</Link>
               <button
                 onClick={() => setShowIntakeModal(true)}
                 className="inline-flex items-center gap-2 px-3.5 py-2 bg-[var(--primary)] hover:opacity-95 text-white text-sm font-semibold rounded-xl shadow-sm transition"

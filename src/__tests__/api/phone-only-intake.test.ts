@@ -1,7 +1,7 @@
 const createUser = jest.fn();
 jest.mock('@/lib/supabase-server', () => ({ createServerSupabaseClient: () => ({ auth: { getUser: async () => ({ data: { user: { id: 'auth' } } }) } }) }));
 jest.mock('@/lib/prisma', () => ({ prisma: {
-  user: { findUnique: async () => ({ id: 'u-doctor', role: 'DOCTOR', isActive: true, doctor: { id: 'd', isVerified: true } }), findFirst: async () => null, create: (...a: unknown[]) => createUser(...a) },
+  user: { findUnique: async () => ({ id: 'u-doctor', role: 'DOCTOR', isActive: true, doctor: { id: 'd', isVerified: true } }), findFirst: async () => null, findMany: async () => [], create: (...a: unknown[]) => createUser(...a) },
   appointment: { create: async () => ({}) }, medicalNote: { create: async () => ({}) }, auditLog: { create: async () => ({}) },
   patient: { findUnique: async () => ({ id: 'p', user: { firstName: 'Synthetic', lastName: 'Patient', email: null } }) },
 } }));

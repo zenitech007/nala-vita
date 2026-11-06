@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { requireApiUser } from "@/lib/auth";
+import { requestRecordAccess } from "@/lib/record-access-requests";
+import { RECORD_SCOPES } from "@/lib/record-scope";
+import { ConsentError } from "@/lib/record-access-requests";
 
 export async function GET(req: NextRequest) {
   try {
@@ -148,6 +151,7 @@ export async function GET(req: NextRequest) {
 // ─── POST: Doctor/Clinic registers an in-person patient ───
 
 const createPatientSchema = z.object({
+  facilityId: z.string().min(1).optional(),
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
   email: z.string().trim().email("Invalid email address").optional(),
@@ -166,68 +170,42 @@ const createPatientSchema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = createServerSupabaseClient();
-    const {
-      data: { user: authUser },
-    } = await supabase.auth.getUser();
-
-    if (!authUser) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const doctorUser = await prisma.user.findUnique({
-      where: { supabaseId: authUser.id },
-      include: { doctor: true },
-    });
-
-    if (!doctorUser || doctorUser.role !== "DOCTOR" || !doctorUser.doctor) {
-      return NextResponse.json(
-        { error: "Forbidden: Only authorized doctors can intake patients" },
-        { status: 403 }
-      );
-    }
+    const auth = await requireApiUser({ roles: ["DOCTOR"], profile: "doctor" });
+    if (!auth.ok) return auth.response;
+    const doctorUser = auth.user;
 
     const body = await req.json();
     const validated = createPatientSchema.parse(body);
 
-    const doctorId = doctorUser.doctor.id;
+    const doctorId = doctorUser.doctor!.id;
+    const facilityId = validated.facilityId ?? null;
+    if (facilityId && !await prisma.facilityMembership.findFirst({ where: { doctorId, facilityId, isActive: true, facility: { isActive: true } } }))
+      return NextResponse.json({ error: "Forbidden facility" }, { status: 403 });
 
     // Check if user already exists
     let existingUser = validated.email ? await prisma.user.findUnique({
       where: { email: validated.email },
-      include: { patient: true },
+      select: { id: true, role: true, patient: { select: { id: true, createdByDoctorId: true, createdByFacilityId: true } } },
     }) : null;
 
     if (!existingUser && validated.phone) {
-      existingUser = await prisma.user.findFirst({
+      const phoneMatches = await prisma.user.findMany({
         where: { phone: validated.phone, role: "PATIENT" },
-        include: { patient: true },
+        select: { id: true, role: true, patient: { select: { id: true, createdByDoctorId: true, createdByFacilityId: true } } },
+        take: 2,
       });
+      if (phoneMatches.length > 1) return NextResponse.json({ error: "This phone matches multiple records. Confirm a unique email or ask the patient to use their clinic invitation." }, { status: 409 });
+      existingUser = phoneMatches[0] ?? null;
     }
 
     let patientId: string;
 
     if (existingUser) {
-      // User exists
-      if (!existingUser.patient) {
-        const newPatient = await prisma.patient.create({
-          data: {
-            userId: existingUser.id,
-            dateOfBirth: new Date(validated.dateOfBirth),
-            gender: validated.gender,
-            bloodType: validated.bloodType || null,
-            allergies: validated.allergies,
-            address: validated.address || null,
-            emergencyName: validated.emergencyName || null,
-            emergencyPhone: validated.emergencyPhone || null,
-            insuranceProvider: validated.insuranceProvider || null,
-            insuranceNumber: validated.insuranceNumber || null,
-          },
-        });
-        patientId = newPatient.id;
-      } else {
-        patientId = existingUser.patient.id;
-      }
+      if (existingUser.role !== "PATIENT" || !existingUser.patient) return NextResponse.json({ error: "This contact is not eligible for patient intake" }, { status: 409 });
+      const source = existingUser.patient.createdByFacilityId ? { sourceFacilityId: existingUser.patient.createdByFacilityId }
+        : existingUser.patient.createdByDoctorId ? { sourceDoctorId: existingUser.patient.createdByDoctorId } : { sourceUserId: existingUser.id };
+      const request = await requestRecordAccess(doctorUser, { patientId: existingUser.patient.id, scope: [...RECORD_SCOPES], requesterFacilityId: facilityId, ...source });
+      return NextResponse.json({ request, message: "Patient approval requested. Existing records remain private. Submitted clinical details and initial notes have not been written." }, { status: 202 });
     } else {
       // Create provisional User and Patient record
       const newUser = await prisma.user.create({
@@ -242,6 +220,7 @@ export async function POST(req: NextRequest) {
           patient: {
             create: {
               createdByDoctorId: doctorId,
+              createdByFacilityId: facilityId,
               dateOfBirth: new Date(validated.dateOfBirth),
               gender: validated.gender,
               bloodType: validated.bloodType || null,
@@ -259,25 +238,14 @@ export async function POST(req: NextRequest) {
       patientId = newUser.patient!.id;
     }
 
-    // Connect this doctor to the patient via an initial intake appointment
-    await prisma.appointment.create({
-      data: {
-        patientId,
-        doctorId,
-        scheduledAt: new Date(),
-        consultationType: "IN_PERSON",
-        status: "CONFIRMED",
-        reason: "Clinical Intake & Patient Registration",
-        notes: validated.initialNotes || "In-person patient registered by healthcare provider.",
-      },
-    });
-
     // If initial notes provided, record a medical note
     if (validated.initialNotes?.trim()) {
       await prisma.medicalNote.create({
         data: {
           patientId,
           doctorId,
+          authoredByDoctorId: doctorId,
+          authoredByFacilityId: facilityId,
           title: "Intake & Clinical History",
           content: validated.initialNotes.trim(),
           category: "consultation",
@@ -325,6 +293,7 @@ export async function POST(req: NextRequest) {
       { status: 201 }
     );
   } catch (error) {
+    if (error instanceof ConsentError) return NextResponse.json({ error: error.message }, { status: error.status });
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: "Validation failed", details: error.issues },

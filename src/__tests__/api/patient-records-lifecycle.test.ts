@@ -22,6 +22,8 @@ jest.mock("@/lib/supabase-admin", () => ({
 
 // Mock Notifications
 const createNotification = jest.fn();
+const patientRequest = jest.fn();
+jest.mock('@/lib/record-access-requests', () => ({ createPatientRecordRequest: (...args: unknown[]) => patientRequest(...args), ConsentError: class extends Error {} }));
 jest.mock("@/lib/notifications", () => ({
   createNotification: (...args: unknown[]) => createNotification(...args),
 }));
@@ -54,6 +56,7 @@ jest.mock("@/lib/prisma", () => ({
     user: {
       findUnique: (...a: unknown[]) => userFindUnique(...a),
       findFirst: (...a: unknown[]) => userFindFirst(...a),
+      findMany: async () => [],
       create: (...a: unknown[]) => userCreate(...a),
       update: (...a: unknown[]) => userUpdate(...a),
     },
@@ -110,6 +113,7 @@ describe("Patient Records Lifecycle & Privacy Suite", () => {
     jest.resetAllMocks();
     auditLogCreate.mockResolvedValue({ id: "audit-1" });
     createNotification.mockResolvedValue(true);
+    patientRequest.mockResolvedValue({ id: 'request', status: 'PENDING' });
   });
 
   describe("1. Patient Account Claiming (Hospital Pre-registered Profile)", () => {
@@ -147,7 +151,8 @@ describe("Patient Records Lifecycle & Privacy Suite", () => {
       userFindUnique.mockResolvedValueOnce({
         id: "u-doc",
         role: "DOCTOR",
-        doctor: { id: "doc-1" },
+        isActive: true,
+        doctor: { id: "doc-1", isVerified: true },
       });
 
       // No existing user
@@ -186,7 +191,7 @@ describe("Patient Records Lifecycle & Privacy Suite", () => {
 
       expect(res.status).toBe(201);
       expect(json.message).toContain("registered successfully");
-      expect(appointmentCreate).toHaveBeenCalled();
+      expect(appointmentCreate).not.toHaveBeenCalled();
       expect(medicalNoteCreate).toHaveBeenCalled();
     });
   });
@@ -291,11 +296,12 @@ describe("Patient Records Lifecycle & Privacy Suite", () => {
   });
 
   describe("4. Patient Direct Self-Share to Doctor", () => {
-    it("should allow a patient to share their records directly with a doctor", async () => {
+    it("prepares a pending request; email approval is a separate step", async () => {
       getUser.mockResolvedValueOnce({ data: { user: { id: "pat-sb-id" } } });
       userFindUnique.mockResolvedValueOnce({
         id: "u-patient",
         role: "PATIENT",
+        isActive: true,
         patient: { id: "p-1" },
         firstName: "Alex",
         lastName: "Morgan",
@@ -320,18 +326,10 @@ describe("Patient Records Lifecycle & Privacy Suite", () => {
       const res = await shareHandler(request as never);
       const json = await res.json();
 
-      expect(res.status).toBe(200);
-      expect(json.success).toBe(true);
-      expect(appointmentCreate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            patientId: "p-1",
-            doctorId: "doc-target",
-            status: "CONFIRMED",
-          }),
-        })
-      );
-      expect(createNotification).toHaveBeenCalled();
+      expect(res.status).toBe(202);
+      expect(json.request).toEqual({ id: 'request', status: 'PENDING' });
+      expect(appointmentCreate).not.toHaveBeenCalled();
+      expect(patientRequest).toHaveBeenCalled();
     });
   });
 
