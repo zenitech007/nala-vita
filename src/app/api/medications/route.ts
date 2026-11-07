@@ -1,3 +1,4 @@
+import { logAudit } from "@/lib/audit";
 import { requireApiUser } from "@/lib/auth";
 import { getRecordVisibility } from "@/lib/record-visibility";
 import { doctorHasPatientAccess } from "@/lib/access-control";
@@ -302,18 +303,12 @@ export async function POST(req: NextRequest) {
       );
 
       // Audit Log
-      await prisma.auditLog.create({
-        data: {
-          userId: user.id,
-          action: "DOCTOR_PRESCRIBE_MEDICATION",
-          resourceType: "PRESCRIPTION",
-          resourceId: prescription.id,
-          metadata: JSON.stringify({
-            patientId: validated.patientId,
-            medication: validated.medication,
-          }),
-        },
-      }).catch(() => {});
+      await logAudit({
+        userId: user.id,
+        action: "DOCTOR_PRESCRIBE_MEDICATION",
+        resourceType: "PRESCRIPTION",
+        resourceId: prescription.id,
+      });
 
       return NextResponse.json(
         {
@@ -349,18 +344,13 @@ export async function POST(req: NextRequest) {
       });
 
       // Audit Log
-      await prisma.auditLog.create({
-        data: {
-          userId: user.id,
-          action: "PATIENT_ADD_MEDICATION",
-          resourceType: "PRESCRIPTION",
-          resourceId: prescription.id,
-          metadata: JSON.stringify({
-            medication: validated.medication,
-            isSharedWithDoctor: validated.isSharedWithDoctor,
-          }),
-        },
-      }).catch(() => {});
+      await logAudit({
+        userId: user.id,
+        action: "PATIENT_ADD_MEDICATION",
+        resourceType: "PRESCRIPTION",
+        resourceId: prescription.id,
+        metadata: { isSharedWithDoctor: validated.isSharedWithDoctor },
+      });
 
       return NextResponse.json(
         {

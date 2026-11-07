@@ -1,3 +1,4 @@
+import { logAudit } from "@/lib/audit";
 import { requireApiUser } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
@@ -37,18 +38,13 @@ export async function PATCH(req: NextRequest) {
     });
 
     // Audit log for compliance & HIPAA traceability
-    await prisma.auditLog.create({
-      data: {
-        userId: user.id,
-        action: validated.isPrivate ? "RESTRICT_RECORD" : "UNRESTRICT_RECORD",
-        resourceType: "MEDICAL_NOTE",
-        resourceId: validated.noteId,
-        metadata: JSON.stringify({
-          noteTitle: note.title,
-          isPrivate: validated.isPrivate,
-        }),
-      },
-    }).catch(() => {});
+    await logAudit({
+      userId: user.id,
+      action: validated.isPrivate ? "RESTRICT_RECORD" : "UNRESTRICT_RECORD",
+      resourceType: "MEDICAL_NOTE",
+      resourceId: validated.noteId,
+      metadata: { isPrivate: validated.isPrivate },
+    });
 
     return NextResponse.json({
       success: true,

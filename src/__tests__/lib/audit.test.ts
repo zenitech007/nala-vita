@@ -1,5 +1,5 @@
 /**
- * Unit tests for the HIPAA audit log utility.
+ * Unit tests for the audit log utility.
  *
  * We mock Prisma so no database connection is needed.
  */
@@ -28,6 +28,25 @@ beforeEach(() => {
 });
 
 describe("logAudit", () => {
+  it("F42 drops contact data even when it is stored under an innocuous metadata key", async () => {
+    await logAudit({
+      userId: "u1", action: "UPDATE", resourceType: "RECORD", resourceId: "r1",
+      metadata: { status: "COMPLETED", detail: "fixture@example.test", tags: ["203-555-0100"] },
+    });
+    expect(JSON.parse(mockCreate.mock.calls[0][0].data.metadata)).toEqual({ status: "COMPLETED" });
+  });
+
+  it("F42 emits a structured monitoring event without leaking the database error", async () => {
+    const monitoring = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      mockCreate.mockRejectedValue(new Error("fixture@example.test"));
+      await logAudit({ userId: "u1", action: "READ", resourceType: "RECORD", resourceId: "r1" });
+      expect(monitoring).toHaveBeenCalledWith(expect.stringContaining('"event":"audit.write_failed"'));
+      expect(JSON.stringify(monitoring.mock.calls)).not.toContain("fixture@example.test");
+    } finally {
+      monitoring.mockRestore();
+    }
+  });
   it("creates an audit log entry with correct fields", async () => {
     await logAudit({
       userId: "user-123",
@@ -83,11 +102,11 @@ describe("logAudit", () => {
     expect(meta.appointmentId).toBe("apt-1");
     expect(meta.status).toBe("COMPLETED");
 
-    // PHI fields should be redacted
-    expect(meta.name).toBe("[REDACTED]");
-    expect(meta.email).toBe("[REDACTED]");
-    expect(meta.phone).toBe("[REDACTED]");
-    expect(meta.dob).toBe("[REDACTED]");
+    // Contact and identity details are omitted
+    expect(meta.name).toBeUndefined();
+    expect(meta.email).toBeUndefined();
+    expect(meta.phone).toBeUndefined();
+    expect(meta.dob).toBeUndefined();
   });
 
   it("does not throw if prisma.auditLog.create fails", async () => {

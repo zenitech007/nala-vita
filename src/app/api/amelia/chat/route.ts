@@ -9,7 +9,7 @@ import { checkRateLimitAsync } from "@/lib/rate-limit";
 import { runAmeliaTurn, runAmeliaTurnStream } from "@/lib/amelia/engine";
 import { extractMemories, saveMemories } from "@/lib/amelia/memory";
 import { detectReminder, computeNextFireAt, describeSchedule } from "@/lib/amelia/reminders";
-import { logAmeliaAudit } from "@/lib/amelia/audit";
+import { logAudit } from "@/lib/audit";
 import { extractLabsFromImage } from "@/lib/amelia/labvision";
 
 const bodySchema = z.object({
@@ -139,11 +139,11 @@ export async function POST(req: NextRequest) {
 
       const reminderSuggestion = await runPostTurn(patientId, userMsg.id, message, reply.content);
 
-      await logAmeliaAudit({
+      await logAudit({
         userId: user.id,
         action: "amelia.chat",
-        conversationId: convoId,
-        summary: `urgency=${reply.urgency} redFlags=${reply.redFlags.length}`,
+        resourceType: "AMELIA_CONVERSATION", resourceId: convoId,
+        metadata: { urgency: reply.urgency, redFlagCount: reply.redFlags.length },
       });
 
       return NextResponse.json({ conversationId: convoId, reply, reminderSuggestion, imageStatus });
@@ -188,11 +188,11 @@ export async function POST(req: NextRequest) {
 
           const reminderSuggestion = await runPostTurn(patientId, userMsg.id, message, full);
 
-          await logAmeliaAudit({
+          await logAudit({
             userId: user.id,
             action: "amelia.chat",
-            conversationId: convoId,
-            summary: `urgency=${urgency} redFlags=${redFlagCount} streamed=1`,
+            resourceType: "AMELIA_CONVERSATION", resourceId: convoId,
+            metadata: { urgency, redFlagCount, streamed: true },
           });
 
           send({ type: "done", conversationId: convoId, reminderSuggestion });

@@ -1,3 +1,4 @@
+import { logAudit } from "@/lib/audit";
 import { requireApiUser } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
@@ -71,19 +72,13 @@ export async function POST(
     });
 
     // Record audit log for adherence tracking traceability
-    await prisma.auditLog.create({
-      data: {
-        userId: user.id,
-        action: isTaken ? "MEDICATION_DOSE_TAKEN" : "MEDICATION_DOSE_UNMARKED",
-        resourceType: "PRESCRIPTION",
-        resourceId: prescriptionId,
-        metadata: JSON.stringify({
-          medication: medication.medication,
-          date: targetDate,
-          taken: isTaken,
-        }),
-      },
-    }).catch(() => {});
+    await logAudit({
+      userId: user.id,
+      action: isTaken ? "MEDICATION_DOSE_TAKEN" : "MEDICATION_DOSE_UNMARKED",
+      resourceType: "PRESCRIPTION",
+      resourceId: prescriptionId,
+      metadata: { date: targetDate, taken: isTaken },
+    });
 
     return NextResponse.json({
       success: true,

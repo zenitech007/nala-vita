@@ -40,7 +40,7 @@ jest.mock("@/lib/amelia/reminders", () => ({
   computeNextFireAt: () => new Date(2026, 5, 12, 8, 0),
   describeSchedule: () => "every day at 8:00 AM",
 }));
-jest.mock("@/lib/amelia/audit", () => ({ logAmeliaAudit: async () => undefined }));
+jest.mock("@/lib/audit", () => ({ logAudit: async () => undefined }));
 
 const extractLabsFromImage = jest.fn();
 jest.mock('@/lib/amelia/labvision',()=>({extractLabsFromImage:(...a: unknown[])=>extractLabsFromImage(...a)}));

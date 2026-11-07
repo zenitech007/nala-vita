@@ -1,3 +1,4 @@
+import { logAudit } from "@/lib/audit";
 import { workspacePatientWhere } from "@/lib/record-visibility";
 import { loadVisiblePatientRecord } from "@/lib/visible-patient-record";
 import { NextRequest, NextResponse } from "next/server";
@@ -156,19 +157,12 @@ export async function POST(req: NextRequest) {
     }
 
     // Audit log
-    await prisma.auditLog.create({
-      data: {
-        userId: doctorUser.id,
-        action: "CLINIC_REGISTER_PATIENT",
-        resourceType: "PATIENT_RECORD",
-        resourceId: patientId,
-        metadata: JSON.stringify({
-          doctorId,
-          email: validated.email,
-          phone: validated.phone,
-        }),
-      },
-    }).catch(() => {});
+    await logAudit({
+      userId: doctorUser.id,
+      action: "CLINIC_REGISTER_PATIENT",
+      resourceType: "PATIENT_RECORD",
+      resourceId: patientId,
+    });
 
     const patientRecord = await prisma.patient.findUnique({
       where: { id: patientId },
