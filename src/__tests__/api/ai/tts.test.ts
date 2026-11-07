@@ -8,6 +8,7 @@ jest.mock("@/lib/supabase-server", () => ({
   }),
 }));
 
+jest.mock("@/lib/prisma", () => ({ prisma: { user: { findUnique: async () => ({ id: "u1", role: "PATIENT", isActive: true, patient: { id: "p" } }) } } }));
 const generateSpeech = jest.fn();
 jest.mock("@/lib/gemini", () => ({
   generateSpeech: (...args: unknown[]) => generateSpeech(...args),

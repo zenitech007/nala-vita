@@ -2,6 +2,7 @@ import { createHmac, randomInt, randomUUID, timingSafeEqual } from "node:crypto"
 import type { OtpChallenge, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { selectOtpChannel, type OtpChannel } from "@/lib/otp-channel";
+import { checkRateLimitAsync } from "@/lib/rate-limit";
 
 export function otpDigest(value: string): string {
   const secret = process.env.OTP_HASH_SECRET;
@@ -16,6 +17,8 @@ interface IssueInput {
 export async function issueEmailOtp(input: IssueInput, injectedChannel?: OtpChannel): Promise<{ challengeId: string }> {
   const now = new Date(), challengeId = randomUUID(), email = normalizeEmail(input.email);
   const recipientHash = otpDigest(`email:${email}`), ipHash = otpDigest(`ip:${input.ip}`);
+  const budget = await checkRateLimitAsync(`otp:send:${ipHash}`, { maxRequests: 20, windowMs: 3_600_000 });
+  if (!budget.allowed) return { challengeId };
   const code = randomInt(0, 1_000_000).toString().padStart(6, "0");
   const stored = await prisma.$transaction(async tx => {
     for (const key of [`otp:email:${recipientHash}`, `otp:ip:${ipHash}`].sort())
@@ -43,8 +46,10 @@ export async function consumeEmailOtp<T = boolean>(
   proof: { challengeId: string; code: string; purpose: string; binding: string; ip?: string },
   action?: (tx: Prisma.TransactionClient, challenge: OtpChallenge) => Promise<T>
 ): Promise<T | false> {
+  const budgetId = otpDigest(`verify-ip:${proof.ip ?? "unknown"}`);
+  const limit = await checkRateLimitAsync(`otp:verify:${budgetId}`, { maxRequests: 30, windowMs: 60_000 });
+  if (!limit.allowed) return false;
   return prisma.$transaction(async tx => {
-    const budgetId = otpDigest(`verify-ip:${proof.ip ?? "unknown"}`);
     await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${budgetId}, 0))::text`;
     const windowStart = new Date(Math.floor(Date.now() / 60000) * 60000);
     const budget = await tx.otpVerificationBudget.findUnique({ where: { id: budgetId } });

@@ -1,3 +1,5 @@
+const edgeBudget = jest.fn();
+jest.mock('@/lib/rate-limit', () => ({ checkRateLimitAsync: (...args: unknown[]) => edgeBudget(...args) }));
 let rows: any[] = [], queue = Promise.resolve();
 let budgets = new Map<string, any>();
 const matches = (row: any, where: any) => (!where.id || row.id === where.id)
@@ -29,7 +31,7 @@ const input = { email: 'synthetic@example.test', ip: '203.0.113.1', purpose: 'CL
 const oldSecret = process.env.OTP_HASH_SECRET;
 beforeAll(async () => { process.env.OTP_HASH_SECRET = 'synthetic-otp-secret-at-least-32-characters'; otp = await import('@/lib/email-otp'); });
 afterAll(() => { if (oldSecret === undefined) delete process.env.OTP_HASH_SECRET; else process.env.OTP_HASH_SECRET = oldSecret; });
-beforeEach(() => { rows = []; budgets = new Map(); queue = Promise.resolve(); send.mockReset().mockResolvedValue(undefined); jest.useFakeTimers().setSystemTime(new Date('2030-01-01')); });
+beforeEach(() => { edgeBudget.mockReset().mockResolvedValue({ allowed: true }); rows = []; budgets = new Map(); queue = Promise.resolve(); send.mockReset().mockResolvedValue(undefined); jest.useFakeTimers().setSystemTime(new Date('2030-01-01')); });
 afterEach(() => jest.useRealTimers());
 async function issue(patch = {}) { return otp.issueEmailOtp({ ...input, ...patch }, { send }); }
 const proof = (challengeId: string, code = send.mock.calls[0][1], binding = input.binding) => ({ challengeId, code, purpose: input.purpose, binding });
@@ -67,4 +69,13 @@ it('F01 enforces per-email and per-IP hourly issuance limits', async () => {
 it('F01 verification requests also have a durable per-IP budget', async () => {
   for (let i = 0; i < 31; i++) await otp.consumeEmailOtp({ challengeId: 'unknown', code: '123456', purpose: 'CLAIM', binding: 'unknown', ip: '203.0.113.1' });
   expect([...budgets.values()]).toEqual([expect.objectContaining({ count: 30 })]);
+});
+
+it('F37 keeps the neutral issuance and verification responses when the edge budget is exhausted', async () => {
+  edgeBudget.mockResolvedValue({ allowed: false });
+  expect(await issue()).toEqual({ challengeId: expect.any(String) });
+  expect(send).not.toHaveBeenCalled();
+  expect(rows).toHaveLength(0);
+  expect(await otp.consumeEmailOtp({ challengeId: 'unknown', code: '123456', purpose: 'CLAIM', binding: 'unknown', ip: input.ip })).toBe(false);
+  expect(budgets.size).toBe(0);
 });

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { limitByTrustedIp } from "@/lib/request-rate-limit";
 
 // ─── Shared base fields ───────────────────────────────────
 
@@ -51,6 +52,8 @@ const registerSchema = z.discriminatedUnion("role", [patientSchema, doctorSchema
 export async function POST(req: NextRequest) {
   let createdAuthId: string | null = null;
   try {
+    const limited = await limitByTrustedIp(req, "register", { maxRequests: 10, windowMs: 3_600_000 });
+    if (limited) return limited;
     const body = await req.json();
     const validated = registerSchema.parse(body);
 
