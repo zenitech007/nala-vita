@@ -38,7 +38,7 @@ export async function detectReminder(userText: string, assistantText: string): P
       },
       { role: "user", content: `Patient said: ${userText}\nAmelia replied: ${assistantText}` },
     ],
-    { model: "gpt-4o-mini", temperature: 0, maxTokens: 200 }
+    { temperature: 0, maxTokens: 200 }
   );
 
   let parsed: unknown;

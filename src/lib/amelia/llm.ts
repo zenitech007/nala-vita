@@ -16,7 +16,6 @@ export interface ChatTurn {
 export interface ChatOptions {
   temperature?: number;
   maxTokens?: number;
-  model?: string;
   context?: AmeliaContext;
   signal?: AbortSignal;
 }
@@ -47,7 +46,7 @@ export async function chat(
   if (geminiKey) {
     try {
       const response = await withProviderDeadline(signal => ai.models.generateContent({
-        model: opts?.model ?? GEMINI_MODEL,
+        model: GEMINI_MODEL,
         contents: input,
         config: {
           abortSignal: signal,
@@ -122,7 +121,7 @@ export async function* chatStream(
   if (geminiKey) {
     try {
       const stream = withProviderStreamDeadline(signal => ai.models.generateContentStream({
-        model: opts?.model ?? GEMINI_MODEL,
+        model: GEMINI_MODEL,
         contents: input,
         config: {
           abortSignal: signal,
@@ -191,7 +190,7 @@ export async function* chatStream(
 export async function visionChat(
   prompt: string,
   imageDataUrl: string,
-  opts?: { temperature?: number; maxTokens?: number; model?: string; signal?: AbortSignal }
+  opts?: { temperature?: number; maxTokens?: number; signal?: AbortSignal }
 ): Promise<string> {
   let mimeType = "image/jpeg";
   let base64Data = imageDataUrl;
@@ -207,7 +206,7 @@ export async function visionChat(
   if (geminiKey) {
     try {
       const response = await withProviderDeadline(signal => ai.models.generateContent({
-        model: opts?.model ?? GEMINI_MODEL,
+        model: GEMINI_MODEL,
         contents: [
           {
             role: "user",

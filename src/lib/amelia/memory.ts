@@ -20,7 +20,7 @@ export async function extractMemories(userText: string, assistantText: string): 
       },
       { role: "user", content: `Patient said: ${userText}\nAmelia replied: ${assistantText}` },
     ],
-    { model: "gpt-4o-mini", temperature: 0, maxTokens: 300 }
+    { temperature: 0, maxTokens: 300 }
   );
 
   let parsed: unknown;
