@@ -14,16 +14,14 @@ import {
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 
-// ─── ICE Server Config ───────────────────────────────────
+import { callTopic, privateChannel, receivedCallSignal, type Signal } from "@/lib/realtime-events";
 
-const ICE_SERVERS: RTCConfiguration = {
-  iceServers: [
-    { urls: "stun:stun.l.google.com:19302" },
-    { urls: "stun:stun1.l.google.com:19302" },
-  ],
-};
-
-// ─── Types ───────────────────────────────────────────────
+interface CallMembership {
+  selfId: string;
+  peerId: string;
+  initiator: boolean;
+  iceServers: RTCIceServer[];
+}
 
 interface VideoCallPanelProps {
   appointmentId: string;
@@ -33,17 +31,10 @@ interface VideoCallPanelProps {
   className?: string;
 }
 
-type SignalPayload = {
-  type: "offer" | "answer" | "ice-candidate" | "end-call";
-  sender: string;
-  data: string;
-};
-
 // ─── Component ───────────────────────────────────────────
 
 export default function VideoCallPanel({
   appointmentId,
-  userId,
   isInitiator,
   onCallEnd,
   className,
@@ -61,7 +52,11 @@ export default function VideoCallPanel({
   const [isConnecting, setIsConnecting] = useState(true);
   const [callDuration, setCallDuration] = useState(0);
 
-  const channelName = `video_sessions:${appointmentId}`;
+  const membership = useRef<CallMembership | null>(null);
+  const pendingCandidates = useRef<RTCIceCandidateInit[]>([]);
+  const receivedEvents = useRef(new Set<string>());
+  const [callError, setCallError] = useState("");
+  const signalEndpoint = `/api/appointments/${encodeURIComponent(appointmentId)}/signal`;
 
   // ─── Call duration timer ─────────────────────────────────
 
@@ -81,25 +76,32 @@ export default function VideoCallPanel({
 
   // ─── Send signaling message ──────────────────────────────
 
-  const sendSignal = useCallback(
-    (type: SignalPayload["type"], data: string) => {
-      supabase.channel(channelName).send({
-        type: "broadcast",
-        event: "signal",
-        payload: { type, sender: userId, data } as SignalPayload,
+  const sendSignal = useCallback(async (signal: Signal) => {
+    try {
+      const response = await fetch(signalEndpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(signal),
+        signal: AbortSignal.timeout(5000),
       });
-    },
-    [channelName, userId]
-  );
+      if (!response.ok) throw new Error("Signal delivery failed");
+    } catch {
+      setCallError("Video signaling is unavailable. Rejoin the call to retry.");
+      setIsConnecting(false);
+    }
+  }, [signalEndpoint]);
 
   // ─── Create peer connection ──────────────────────────────
 
   const createPeerConnection = useCallback(() => {
-    const pc = new RTCPeerConnection(ICE_SERVERS);
+    const pc = new RTCPeerConnection({ iceServers: membership.current?.iceServers });
 
     pc.onicecandidate = (event) => {
-      if (event.candidate) {
-        sendSignal("ice-candidate", JSON.stringify(event.candidate));
+      if (event.candidate?.candidate) {
+        void sendSignal({
+          type: "ice-candidate",
+          data: { ...event.candidate.toJSON(), candidate: event.candidate.candidate },
+        });
       }
     };
 
@@ -127,98 +129,116 @@ export default function VideoCallPanel({
 
   // ─── Handle incoming signal ──────────────────────────────
 
-  const handleSignal = useCallback(
-    async (payload: SignalPayload) => {
-      if (payload.sender === userId) return; // ignore own messages
+  const offerToPeer = useCallback(async (pc: RTCPeerConnection) => {
+    if (pc.signalingState === "stable") await pc.setLocalDescription(await pc.createOffer());
+    const description = pc.localDescription;
+    if (pc.signalingState === "have-local-offer" && description?.sdp) {
+      await sendSignal({ type: "offer", data: description.sdp });
+    }
+  }, [sendSignal]);
 
-      const pc = pcRef.current || createPeerConnection();
+  const handleSignal = useCallback(async (raw: unknown) => {
+    const member = membership.current;
+    const pc = pcRef.current;
+    if (!member || !pc || pc.signalingState === "closed") return;
+    const event = receivedCallSignal(raw, appointmentId, member.selfId, member.peerId);
+    if (!event || receivedEvents.current.has(event.eventId)) return;
+    receivedEvents.current.add(event.eventId);
+    if (receivedEvents.current.size > 256) {
+      const oldest = receivedEvents.current.values().next().value;
+      if (oldest) receivedEvents.current.delete(oldest);
+    }
 
-      switch (payload.type) {
-        case "offer": {
-          await pc.setRemoteDescription(
-            new RTCSessionDescription(JSON.parse(payload.data))
-          );
-          const answer = await pc.createAnswer();
-          await pc.setLocalDescription(answer);
-          sendSignal("answer", JSON.stringify(answer));
-          break;
-        }
-        case "answer": {
-          await pc.setRemoteDescription(
-            new RTCSessionDescription(JSON.parse(payload.data))
-          );
-          break;
-        }
-        case "ice-candidate": {
-          const candidate = new RTCIceCandidate(JSON.parse(payload.data));
-          await pc.addIceCandidate(candidate);
-          break;
-        }
-        case "end-call": {
-          endCall(false);
-          break;
-        }
-      }
-    },
+    const signal = event.signal;
+    if (signal.type === "end-call") {
+      endCall(false);
+      return;
+    }
+    if (signal.type === "ready" && member.initiator) {
+      await offerToPeer(pc);
+      return;
+    }
+    if (signal.type === "ice-candidate") {
+      if (pc.remoteDescription) await pc.addIceCandidate(signal.data);
+      else if (pendingCandidates.current.length < 128) pendingCandidates.current.push(signal.data);
+      return;
+    }
+    if (signal.type === "offer" && !member.initiator) {
+      await pc.setRemoteDescription({ type: "offer", sdp: signal.data });
+      await pc.setLocalDescription(await pc.createAnswer());
+      if (pc.localDescription?.sdp) await sendSignal({ type: "answer", data: pc.localDescription.sdp });
+    } else if (signal.type === "answer" && member.initiator && pc.signalingState === "have-local-offer") {
+      await pc.setRemoteDescription({ type: "answer", sdp: signal.data });
+    }
+    if (pc.remoteDescription) {
+      for (const candidate of pendingCandidates.current.splice(0)) await pc.addIceCandidate(candidate);
+    }
+    // endCall uses the callback from this call's render, as before.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [userId, createPeerConnection, sendSignal]
-  );
-
-  // ─── Init: get media, subscribe, start call ──────────────
+  }, [appointmentId, offerToPeer, sendSignal]);
 
   useEffect(() => {
     let channel: ReturnType<typeof supabase.channel> | null = null;
+    let closed = false;
+    let signalQueue = Promise.resolve();
+    const controller = new AbortController();
 
     async function init() {
-      // Get local media
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: true,
-          audio: true,
-        });
-        localStreamRef.current = stream;
-
-        if (localVideoRef.current) {
-          localVideoRef.current.srcObject = stream;
+        const response = await fetch(signalEndpoint, { cache: "no-store", signal: controller.signal });
+        if (!response.ok) throw new Error("Video appointment unavailable");
+        const member = await response.json() as CallMembership;
+        if (closed) return;
+        membership.current = member;
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        if (closed) {
+          stream.getTracks().forEach(track => track.stop());
+          return;
         }
+        localStreamRef.current = stream;
+        if (localVideoRef.current) localVideoRef.current.srcObject = stream;
 
-        // Create peer connection and add tracks
         const pc = createPeerConnection();
-        stream.getTracks().forEach((track) => pc.addTrack(track, stream));
-
-        // Subscribe to Supabase Realtime signaling channel
-        channel = supabase.channel(channelName);
-
-        channel
+        stream.getTracks().forEach(track => pc.addTrack(track, stream));
+        channel = supabase.channel(callTopic(appointmentId, member.selfId), privateChannel)
           .on("broadcast", { event: "signal" }, ({ payload }) => {
-            handleSignal(payload as SignalPayload);
+            signalQueue = signalQueue.then(() => handleSignal(payload)).catch(() => {
+              setCallError("The video connection could not be established. Rejoin to retry.");
+              setIsConnecting(false);
+            });
           })
-          .subscribe(async (status) => {
-            if (status === "SUBSCRIBED" && isInitiator) {
-              // Doctor creates offer
-              const offer = await pc.createOffer();
-              await pc.setLocalDescription(offer);
-              sendSignal("offer", JSON.stringify(offer));
-            }
+          .subscribe(status => {
+            if (closed) return;
             if (status === "SUBSCRIBED") {
-              setIsConnecting(true);
+              signalQueue = signalQueue.then(() => member.initiator ? offerToPeer(pc) : sendSignal({ type: "ready" }))
+                .catch(() => setCallError("The video connection could not be established."));
+            } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+              setCallError("Private video signaling is unavailable.");
+              setIsConnecting(false);
             }
           });
-      } catch (err) {
-        console.error("Failed to get media devices:", err);
-        setIsConnecting(false);
+      } catch {
+        if (!closed) {
+          setCallError("Video could not start. Check appointment access and camera permissions.");
+          setIsConnecting(false);
+        }
       }
     }
 
-    init();
-
+    void init();
+    const eventIds = receivedEvents.current;
     return () => {
-      channel?.unsubscribe();
-      localStreamRef.current?.getTracks().forEach((t) => t.stop());
+      closed = true;
+      controller.abort();
+      if (channel) void supabase.removeChannel(channel);
+      membership.current = null;
+      pendingCandidates.current = [];
+      eventIds.clear();
+      localStreamRef.current?.getTracks().forEach(track => track.stop());
       pcRef.current?.close();
+      pcRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [appointmentId, createPeerConnection, handleSignal, offerToPeer, sendSignal, signalEndpoint]);
 
   // ─── Controls ────────────────────────────────────────────
 
@@ -297,11 +317,12 @@ export default function VideoCallPanel({
 
   const endCall = (sendEndSignal = true) => {
     if (sendEndSignal) {
-      sendSignal("end-call", "");
+      void sendSignal({ type: "end-call" });
     }
     localStreamRef.current?.getTracks().forEach((t) => t.stop());
     pcRef.current?.close();
     pcRef.current = null;
+    membership.current = null;
     setIsConnected(false);
     setIsConnecting(false);
     onCallEnd?.();
@@ -317,6 +338,7 @@ export default function VideoCallPanel({
         className
       )}
     >
+      {callError && <p role="alert" className="px-4 py-2 text-sm text-white">{callError}</p>}
       {/* Remote video (main) */}
       <div className="relative flex-1 min-h-[300px]">
         <video

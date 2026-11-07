@@ -12,15 +12,20 @@
  * 400. These tests pin the client to the real contract.
  */
 import { describe, it, expect, beforeEach, jest } from "@jest/globals";
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent, act } from "@testing-library/react";
 import ChatWindow from "@/components/chat/ChatWindow";
 import { parseChatAttachmentId } from "@/app/api/messages/attachments/shared";
 
 const channelSend = jest.fn();
+const channelOptions = jest.fn();
+const handlers = new Map<string, (event: { payload: unknown }) => void>();
 jest.mock("@/lib/supabase", () => ({
   supabase: {
-    channel: () => ({
-      on() {
+    channel: (...args: unknown[]) => {
+      channelOptions(...args);
+      return {
+      on(_type: string, filter: { event: string }, handler: (event: { payload: unknown }) => void) {
+        handlers.set(filter.event, handler);
         return this;
       },
       subscribe() {
@@ -28,7 +33,8 @@ jest.mock("@/lib/supabase", () => ({
       },
       unsubscribe: jest.fn(),
       send: (...args: unknown[]) => channelSend(...args),
-    }),
+      };
+    },
     storage: {
       from: () => {
         throw new Error(
@@ -233,4 +239,13 @@ describe("ChatWindow attachments", () => {
       await screen.findByText(/messages could not be loaded/i)
     ).toBeInTheDocument();
   });
+});
+
+it("F19 does not render a forged broadcast as a chat message", async () => {
+  mockFetch(() => ({ body: { messages: [] } }));
+  render(<ChatWindow {...props} />);
+  await screen.findByText(/no messages yet/i);
+  act(() => handlers.get("new_message")?.({ payload: { id: "forged", senderId: "intruder", receiverId: props.currentUserId, content: "Forged message", createdAt: new Date().toISOString() } }));
+  expect(screen.queryByText("Forged message")).toBeNull();
+  expect(channelOptions).toHaveBeenCalledWith(expect.any(String), { config: { private: true } });
 });

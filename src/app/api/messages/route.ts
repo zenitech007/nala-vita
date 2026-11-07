@@ -1,3 +1,5 @@
+import { chatTopic } from "@/lib/realtime-events";
+import { publishPrivateEvent } from "@/lib/realtime-publish";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
@@ -224,6 +226,9 @@ export async function POST(req: NextRequest) {
       return message;
     });
 
+    if (!await publishPrivateEvent(chatTopic(receiver.id), "invalidate", { senderId: user.id, receiverId: receiver.id })) {
+      console.warn("Private chat update unavailable");
+    }
     return NextResponse.json({ message: result }, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -237,7 +242,7 @@ export async function POST(req: NextRequest) {
 // ─── PATCH: Mark messages as read ────────────────────────
 
 const markReadSchema = z.object({
-  messageIds: z.array(z.string()).min(1),
+  messageIds: z.array(z.string().min(1).max(128)).min(1).max(100),
 });
 
 export async function PATCH(req: NextRequest) {
@@ -251,14 +256,17 @@ export async function PATCH(req: NextRequest) {
     const validated = markReadSchema.parse(body);
 
     // Only mark messages where the current user is the receiver
-    await prisma.message.updateMany({
-      where: {
-        id: { in: validated.messageIds },
-        receiverId: user.id,
-      },
+    const changed = await prisma.message.updateManyAndReturn({
+      where: { id: { in: validated.messageIds }, receiverId: user.id, isRead: false },
       data: { isRead: true },
+      select: { senderId: true },
     });
-
+    const recipients = [...new Set(changed.map(message => message.senderId))];
+    await Promise.all(recipients.map(async receiverId => {
+      if (!await publishPrivateEvent(chatTopic(receiverId), "invalidate", { senderId: user.id, receiverId })) {
+        console.warn("Private read receipt update unavailable");
+      }
+    }));
     return NextResponse.json({ success: true });
   } catch (error) {
     if (error instanceof z.ZodError) {

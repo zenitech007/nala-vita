@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
+import { chatEventSchema, chatTopic, privateChannel } from "@/lib/realtime-events";
 
 export function useMessages(userId: string | null, threadId?: string) {
   const qc = useQueryClient();
@@ -15,21 +16,13 @@ export function useMessages(userId: string | null, threadId?: string) {
 
   useEffect(() => {
     if (!userId) return;
-    const channel = supabase
-      .channel(`messages:${userId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "messages",
-          filter: `receiver_id=eq.${userId}`,
-        },
-        () => {
-          qc.invalidateQueries({ queryKey: ["messages", threadId] });
+    const channel = supabase.channel(chatTopic(userId), privateChannel)
+      .on("broadcast", { event: "invalidate" }, ({ payload }) => {
+        const event = chatEventSchema.safeParse(payload);
+        if (event.success && event.data.receiverId === userId && (!threadId || event.data.senderId === threadId)) {
+          void qc.invalidateQueries({ queryKey: ["messages", threadId] });
         }
-      )
-      .subscribe();
+      }).subscribe();
     return () => {
       supabase.removeChannel(channel);
     };

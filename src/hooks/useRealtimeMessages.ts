@@ -13,8 +13,9 @@
 
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { supabase } from "@/lib/supabase";
+import { chatEventSchema, chatTopic, privateChannel } from "@/lib/realtime-events";
 
 export interface RealtimeMessage {
   id: string;
@@ -39,22 +40,32 @@ export function useRealtimeMessages(
   const [isConnected, setIsConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
+  const seenMessages = useRef(new Set<string>());
+
   // ── Fetch existing message thread ──────────────────────
-  const fetchMessages = useCallback(async () => {
+  const fetchMessages = useCallback(async (liveUpdate = false) => {
     if (!currentUserId || !otherUserId) return;
     setIsLoading(true);
     try {
       const res = await fetch(`/api/messages?otherUserId=${otherUserId}`);
       if (res.ok) {
         const data = await res.json();
-        setMessages(data.messages ?? []);
+        const rows: RealtimeMessage[] = Array.isArray(data.messages) ? data.messages : [];
+        if (liveUpdate) {
+          const unread = rows.filter(row => row.senderId === otherUserId && row.receiverId === currentUserId && !seenMessages.current.has(row.id));
+          for (const row of unread) options.onNewMessage?.(row);
+          if (unread.length) void fetch("/api/messages", { method: "PATCH", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ messageIds: unread.map(row => row.id) }) }).catch(() => undefined);
+        }
+        seenMessages.current = new Set(rows.map(row => row.id));
+        setMessages(rows);
       }
     } catch (err) {
       console.error("[useRealtimeMessages] fetch error:", err);
     } finally {
       setIsLoading(false);
     }
-  }, [currentUserId, otherUserId]);
+  }, [currentUserId, otherUserId, options.onNewMessage]);
 
   // ── Subscribe to new messages via Supabase Realtime ───
   useEffect(() => {
@@ -62,36 +73,13 @@ export function useRealtimeMessages(
 
     fetchMessages();
 
-    const channelName = [currentUserId, otherUserId].sort().join(":");
-
-    const channel = supabase
-      .channel(`messages:${channelName}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "messages",
-          // Only receive messages relevant to this conversation
-          filter: `sender_id=eq.${otherUserId},receiver_id=eq.${currentUserId}`,
-        },
-        (payload) => {
-          const newMsg = payload.new as RealtimeMessage;
-          setMessages((prev) => [...prev, newMsg]);
-          options.onNewMessage?.(newMsg);
-
-          // Auto-mark as read since the user is looking at the thread
-          fetch("/api/messages", {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ messageIds: [newMsg.id] }),
-          }).catch(() => {});
+    const channel = supabase.channel(chatTopic(currentUserId), privateChannel)
+      .on("broadcast", { event: "invalidate" }, ({ payload }) => {
+        const event = chatEventSchema.safeParse(payload);
+        if (event.success && event.data.senderId === otherUserId && event.data.receiverId === currentUserId) {
+          void fetchMessages(true);
         }
-      )
-      .subscribe((status) => {
-        setIsConnected(status === "SUBSCRIBED");
-      });
-
+      }).subscribe(status => setIsConnected(status === "SUBSCRIBED"));
     return () => {
       supabase.removeChannel(channel);
       setIsConnected(false);

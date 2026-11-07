@@ -15,6 +15,7 @@ import {
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
+import { chatEventSchema, chatTopic, privateChannel } from "@/lib/realtime-events";
 import { format } from "date-fns";
 
 // ─── Types ───────────────────────────────────────────────
@@ -113,29 +114,16 @@ export default function ChatWindow({
   // ─── Supabase Realtime subscription ────────────────────
 
   useEffect(() => {
-    const channel = supabase
-      .channel(`messages:${[currentUserId, otherUserId].sort().join("-")}`)
-      .on("broadcast", { event: "new_message" }, ({ payload }) => {
-        const msg = payload as ChatMessage;
-        setMessages((prev) => {
-          if (prev.some((m) => m.id === msg.id)) return prev;
-          return [...prev, msg];
-        });
-      })
-      .on("broadcast", { event: "read_receipt" }, ({ payload }) => {
-        const { messageIds } = payload as { messageIds: string[] };
-        setMessages((prev) =>
-          prev.map((m) =>
-            messageIds.includes(m.id) ? { ...m, isRead: true } : m
-          )
-        );
+    const channel = supabase.channel(chatTopic(currentUserId), privateChannel)
+      .on("broadcast", { event: "invalidate" }, ({ payload }) => {
+        const event = chatEventSchema.safeParse(payload);
+        if (event.success && event.data.senderId === otherUserId && event.data.receiverId === currentUserId) {
+          void fetchMessages();
+        }
       })
       .subscribe();
-
-    return () => {
-      channel.unsubscribe();
-    };
-  }, [currentUserId, otherUserId]);
+    return () => { void channel.unsubscribe(); };
+  }, [currentUserId, otherUserId, fetchMessages]);
 
   // ─── Auto-scroll ───────────────────────────────────────
 
@@ -170,14 +158,6 @@ export default function ChatWindow({
       body: JSON.stringify({ messageIds: ids }),
     }).catch(() => {});
 
-    // Broadcast read receipt
-    supabase
-      .channel(`messages:${[currentUserId, otherUserId].sort().join("-")}`)
-      .send({
-        type: "broadcast",
-        event: "read_receipt",
-        payload: { messageIds: ids },
-      });
   }, [messages, otherUserId, currentUserId]);
 
   // ─── File attachment ───────────────────────────────────
@@ -282,16 +262,7 @@ export default function ChatWindow({
       const msg = data.message as ChatMessage;
 
       // Add to local state immediately
-      setMessages((prev) => [...prev, msg]);
-
-      // Broadcast via realtime
-      supabase
-        .channel(`messages:${[currentUserId, otherUserId].sort().join("-")}`)
-        .send({
-          type: "broadcast",
-          event: "new_message",
-          payload: msg,
-        });
+      setMessages((prev) => prev.some(existing => existing.id === msg.id) ? prev : [...prev, msg]);
 
       setNewMessage("");
       removeAttachment();
