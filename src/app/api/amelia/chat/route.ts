@@ -1,3 +1,5 @@
+import { BodyReadError, readBoundedJson } from "@/lib/bounded-body";
+import { imageDataUrlSchema, MAX_IMAGE_DATA_URL } from "@/lib/image-data-url";
 import { requireApiUser } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
@@ -13,7 +15,7 @@ import { extractLabsFromImage } from "@/lib/amelia/labvision";
 const bodySchema = z.object({
   conversationId: z.string().optional(),
   message: z.string().min(1).max(4000),
-  imageDataUrl: z.string().optional(),
+  imageDataUrl: imageDataUrlSchema.optional(),
   /** When false the client gets a single JSON body instead of an SSE stream. */
   stream: z.boolean().optional(),
 });
@@ -77,7 +79,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { conversationId, message, imageDataUrl, stream } = bodySchema.parse(await req.json());
+    const { conversationId, message, imageDataUrl, stream } = bodySchema.parse(await readBoundedJson(req, MAX_IMAGE_DATA_URL + 32_768));
     const patientId = user.patient!.id;
 
     let convo = conversationId
@@ -223,6 +225,7 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (error) {
+    if (error instanceof BodyReadError) return NextResponse.json({ error: error.message }, { status: error.status });
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: "Validation failed", details: error.issues }, { status: 422 });
     }

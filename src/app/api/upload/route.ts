@@ -1,126 +1,27 @@
-import { requireApiUser } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { supabaseAdmin } from "@/lib/supabase-admin";
-
-const BUCKET = "medical-files";
-const SIGNED_URL_EXPIRY = 3600; // 1 hour in seconds
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
-const ALLOWED_MIME_TYPES = [
-  "image/jpeg",
-  "image/png",
-  "image/gif",
-  "image/webp",
-  "application/pdf",
-];
-
-// ─── POST: Upload file to Supabase Storage ───────────────
+import { requireApiUser } from "@/lib/auth";
+import { BodyReadError } from "@/lib/bounded-body";
+import { readUploadForm, storeUserUpload } from "@/lib/user-upload";
 
 export async function POST(req: NextRequest) {
   try {
-    // Authenticate
     const auth = await requireApiUser({ roles: ["PATIENT", "DOCTOR", "ADMIN"] });
     if (!auth.ok) return auth.response;
-    const user = auth.user;
-
-    // Parse multipart form data
-    const formData = await req.formData();
-    const file = formData.get("file") as File | null;
-    const category = (formData.get("category") as string) || "general";
-
-    if (!file) {
-      return NextResponse.json({ error: "No file provided" }, { status: 400 });
+    const form = await readUploadForm(req);
+    const file = form.get("file");
+    const category = form.get("category") ?? "general";
+    if (!(file instanceof File)) return NextResponse.json({ error: "A file is required" }, { status: 400 });
+    if (typeof category !== "string" || !/^[a-zA-Z0-9_-]{1,64}$/.test(category)) {
+      return NextResponse.json({ error: "Invalid file category" }, { status: 400 });
     }
-
-    // Validate file type
-    if (!ALLOWED_MIME_TYPES.includes(file.type)) {
-      return NextResponse.json(
-        {
-          error: `File type not allowed. Accepted: ${ALLOWED_MIME_TYPES.join(", ")}`,
-        },
-        { status: 400 }
-      );
-    }
-
-    // Validate file size
-    if (file.size > MAX_FILE_SIZE) {
-      return NextResponse.json(
-        { error: "File too large. Maximum size is 10 MB." },
-        { status: 400 }
-      );
-    }
-
-    // Build unique storage path
-    const timestamp = Date.now();
-    const sanitizedName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-    const storagePath = `${user.id}/${timestamp}-${sanitizedName}`;
-
-    // Read file buffer
-    const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-
-    // Upload to Supabase Storage (using admin client for service-level access)
-    const { error: uploadError } = await supabaseAdmin.storage
-      .from(BUCKET)
-      .upload(storagePath, buffer, {
-        contentType: file.type,
-        upsert: false,
-      });
-
-    if (uploadError) {
-      console.error("Supabase upload error:", uploadError);
-      return NextResponse.json(
-        { error: "File upload failed" },
-        { status: 500 }
-      );
-    }
-
-    // Generate signed URL (valid for 1 hour)
-    const { data: signedUrlData, error: signedUrlError } =
-      await supabaseAdmin.storage
-        .from(BUCKET)
-        .createSignedUrl(storagePath, SIGNED_URL_EXPIRY);
-
-    if (signedUrlError || !signedUrlData) {
-      console.error("Signed URL error:", signedUrlError);
-      return NextResponse.json(
-        { error: "Failed to generate signed URL" },
-        { status: 500 }
-      );
-    }
-
-    // Save metadata in the database
-    const fileRecord = await prisma.fileUpload.create({
-      data: {
-        userId: user.id,
-        fileName: file.name,
-        fileSize: file.size,
-        mimeType: file.type,
-        storagePath,
-        category,
-      },
-    });
-
-    return NextResponse.json(
-      {
-        message: "File uploaded successfully",
-        file: {
-          id: fileRecord.id,
-          fileName: fileRecord.fileName,
-          fileSize: fileRecord.fileSize,
-          mimeType: fileRecord.mimeType,
-          category: fileRecord.category,
-          signedUrl: signedUrlData.signedUrl,
-          createdAt: fileRecord.createdAt,
-        },
-      },
-      { status: 201 }
-    );
+    const { record, signedUrl } = await storeUserUpload({ userId: auth.user.id, file, category, signedUrl: true });
+    return NextResponse.json({ message: "File uploaded successfully", file: {
+      id: record.id, fileName: record.fileName, fileSize: record.fileSize, mimeType: record.mimeType,
+      category: record.category, signedUrl, createdAt: record.createdAt,
+    } }, { status: 201 });
   } catch (error) {
-    console.error("POST /api/upload error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    if (error instanceof BodyReadError) return NextResponse.json({ error: error.message }, { status: error.status });
+    console.error(JSON.stringify({ event: "file.upload_failed" }));
+    return NextResponse.json({ error: "File upload failed" }, { status: 500 });
   }
 }

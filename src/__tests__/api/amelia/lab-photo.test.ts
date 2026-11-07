@@ -41,7 +41,7 @@ describe("POST /api/ai/lab-photo", () => {
     getUser.mockResolvedValue({ data: { user: null } });
     expect(
       (
-        await POST(req({ imageDataUrl: "data:image/jpeg;base64,AAA" }))
+        await POST(req({ imageDataUrl: "data:image/jpeg;base64,/9j/AA==" }))
       ).status
     ).toBe(401);
   });
@@ -71,12 +71,12 @@ describe("POST /api/ai/lab-photo", () => {
       summary: "Slightly high.",
       overallNote: "Confirm with your doctor.",
     });
-    const res = await POST(req({ imageDataUrl: "data:image/jpeg;base64,AAA" }));
+    const res = await POST(req({ imageDataUrl: "data:image/jpeg;base64,/9j/AA==" }));
     const json = await res.json();
     expect(res.status).toBe(200);
     expect(json.results[0].name).toBe("Glucose");
     expect(extractLabsFromImage).toHaveBeenCalledWith(
-      "data:image/jpeg;base64,AAA"
+      "data:image/jpeg;base64,/9j/AA=="
     );
   });
 });
