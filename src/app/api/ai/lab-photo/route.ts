@@ -1,3 +1,4 @@
+import { ProviderTimeoutError, providerTimeoutResponse } from "@/lib/provider-deadline";
 import { BodyReadError, readBoundedJson } from "@/lib/bounded-body";
 import { imageDataUrlSchema, MAX_IMAGE_DATA_URL } from "@/lib/image-data-url";
 import { requireApiUser } from "@/lib/auth";
@@ -27,9 +28,10 @@ export async function POST(req: NextRequest) {
       );
 
     const { imageDataUrl } = bodySchema.parse(await readBoundedJson(req, MAX_IMAGE_DATA_URL + 32_768));
-    const result = await extractLabsFromImage(imageDataUrl);
+    const result = await extractLabsFromImage(imageDataUrl, req.signal);
     return NextResponse.json(result);
   } catch (error) {
+    if (error instanceof ProviderTimeoutError) return providerTimeoutResponse();
     if (error instanceof BodyReadError) return NextResponse.json({ error: error.message }, { status: error.status });
     if (error instanceof z.ZodError) {
       return NextResponse.json(

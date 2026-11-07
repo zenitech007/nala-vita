@@ -1,3 +1,4 @@
+import { ProviderTimeoutError, withProviderDeadline } from "@/lib/provider-deadline";
 import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { paystackMinorUnits } from "@/lib/money";
@@ -6,7 +7,7 @@ export class CheckoutError extends Error {
   constructor(message: string, public status: number) { super(message); }
 }
 
-export async function initializeCheckout(patientId: string, email: string, appointmentId: string) {
+export async function initializeCheckout(patientId: string, email: string, appointmentId: string, requestSignal?: AbortSignal) {
   const secret = process.env.PAYSTACK_SECRET_KEY;
   if (!secret?.startsWith("sk_test_")) throw new CheckoutError("Test payment configuration is unavailable", 503);
   const attempt = await prisma.$transaction(async tx => {
@@ -37,21 +38,25 @@ export async function initializeCheckout(patientId: string, email: string, appoi
   const claimed = await prisma.paymentAttempt.updateMany({ where: { id: attempt.id, status: "INITIATING" }, data: { status: "INITIALIZATION_UNKNOWN" } });
   if (!claimed.count) throw new CheckoutError("Checkout is being processed; wait for reconciliation", 409);
   try {
-    const response = await fetch("https://api.paystack.co/transaction/initialize", {
-      method: "POST", headers: { Authorization: `Bearer ${secret}`, "Content-Type": "application/json" },
-      signal: AbortSignal.timeout(15_000),
-      body: JSON.stringify({ email, amount: Number(attempt.amountMinor), currency: attempt.currency, reference: attempt.reference,
-        callback_url: `${process.env.NEXT_PUBLIC_APP_URL}/patient/payments?status=success`,
-        metadata: { appointmentId: attempt.appointmentId, patientId: attempt.patientId } }),
-    });
-    const body = await response.json();
+    const { response, body } = await withProviderDeadline(async signal => {
+      const response = await fetch("https://api.paystack.co/transaction/initialize", {
+        method: "POST", headers: { Authorization: `Bearer ${secret}`, "Content-Type": "application/json" },
+        signal,
+        body: JSON.stringify({ email, amount: Number(attempt.amountMinor), currency: attempt.currency, reference: attempt.reference,
+          callback_url: `${process.env.NEXT_PUBLIC_APP_URL}/patient/payments?status=success`,
+          metadata: { appointmentId: attempt.appointmentId, patientId: attempt.patientId } }),
+      });
+      const body = await response.json();
+      return { response, body };
+    }, requestSignal);
     if (!response.ok || !body.status || body.data?.reference !== attempt.reference
       || typeof body.data.authorization_url !== "string" || typeof body.data.access_code !== "string"
       || new URL(body.data.authorization_url).origin !== "https://checkout.paystack.com") throw new Error("Invalid checkout response");
     const data = { authorizationUrl: body.data.authorization_url as string, accessCode: body.data.access_code as string, status: "INITIALIZED" };
     await prisma.paymentAttempt.updateMany({ where: { id: attempt.id, status: "INITIALIZATION_UNKNOWN" }, data });
     return checkoutResult({ ...attempt, ...data });
-  } catch {
+  } catch (error) {
+    if (error instanceof ProviderTimeoutError) throw new CheckoutError("Checkout timed out. Wait for reconciliation before retrying.", 504);
     // The durable reference remains available for signed settlement even after a timeout.
     throw new CheckoutError("Checkout could not be confirmed; wait before retrying", 502);
   }

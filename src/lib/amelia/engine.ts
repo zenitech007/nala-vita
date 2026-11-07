@@ -43,7 +43,7 @@ export async function runAmeliaTurn(input: AmeliaTurnInput): Promise<AmeliaReply
   }
 
   const { turns, redFlags, ctx } = await prepareTurn(input);
-  const content = await chat(turns, { context: ctx });
+  const content = await chat(turns, { context: ctx, signal: input.signal });
 
   return { content, urgency: urgencyFromRedFlags(redFlags), redFlags, disclaimer: PATIENT_DISCLAIMER };
 }
@@ -83,7 +83,7 @@ export async function* runAmeliaTurnStream(
     meta: { urgency: urgencyFromRedFlags(redFlags), redFlags, disclaimer: PATIENT_DISCLAIMER },
   };
 
-  for await (const delta of chatStream(turns, { context: ctx })) {
+  for await (const delta of chatStream(turns, { context: ctx, signal: input.signal })) {
     yield { type: "delta", text: delta };
   }
 }

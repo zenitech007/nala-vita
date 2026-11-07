@@ -33,6 +33,7 @@ export interface AmeliaContext {
 export interface AmeliaTurnInput {
   /** Raw submitted text, screened independently of history and image extraction. */
   rawMessage?: string;
+  signal?: AbortSignal;
   viewer?: import("@/lib/record-visibility").RecordViewer;
   audience: Audience;
   patientId: string;

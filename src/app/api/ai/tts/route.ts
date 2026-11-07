@@ -1,3 +1,4 @@
+import { ProviderTimeoutError, providerTimeoutResponse } from "@/lib/provider-deadline";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { generateSpeech } from "@/lib/gemini";
@@ -29,6 +30,7 @@ export async function POST(req: NextRequest) {
 
     const { audioBase64, mimeType } = await generateSpeech({
       text: plainText,
+      signal: req.signal,
       voiceName: voice,
     });
 
@@ -48,6 +50,7 @@ export async function POST(req: NextRequest) {
       message: "Server TTS unavailable, client speech synthesis recommended",
     });
   } catch (error) {
+    if (error instanceof ProviderTimeoutError) return providerTimeoutResponse({ fallback: true });
     console.error("TTS generation error:", error);
     return NextResponse.json(
       { success: false, fallback: true, error: "Failed to generate speech" },

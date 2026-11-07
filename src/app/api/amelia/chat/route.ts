@@ -1,3 +1,4 @@
+import { ProviderTimeoutError, providerTimeoutResponse } from "@/lib/provider-deadline";
 import { BodyReadError, readBoundedJson } from "@/lib/bounded-body";
 import { imageDataUrlSchema, MAX_IMAGE_DATA_URL } from "@/lib/image-data-url";
 import { requireApiUser } from "@/lib/auth";
@@ -94,7 +95,7 @@ export async function POST(req: NextRequest) {
     let effectiveMessage = message;
     if (imageDataUrl) {
       try {
-        const labResult = await extractLabsFromImage(imageDataUrl);
+        const labResult = await extractLabsFromImage(imageDataUrl, req.signal);
         imageStatus = labResult.status ?? (labResult.results.length ? "available" : "unavailable");
         if (imageStatus !== "unavailable" && labResult.results.length > 0) {
           const labDetails = labResult.results
@@ -130,7 +131,7 @@ export async function POST(req: NextRequest) {
 
     // ---- Buffered path (explicit opt-out, and the shape the tests assert) ----
     if (stream === false) {
-      const reply = await runAmeliaTurn({ audience: "patient", patientId, viewer: user, messages, rawMessage: message });
+      const reply = await runAmeliaTurn({ audience: "patient", patientId, viewer: user, messages, rawMessage: message, signal: req.signal });
 
       await prisma.ameliaMessage.create({
         data: { conversationId: convoId, role: "assistant", content: reply.content },
@@ -163,7 +164,7 @@ export async function POST(req: NextRequest) {
         try {
           send({ type: "meta", conversationId: convoId, imageStatus });
 
-          for await (const evt of runAmeliaTurnStream({ audience: "patient", patientId, viewer: user, messages, rawMessage: message })) {
+          for await (const evt of runAmeliaTurnStream({ audience: "patient", patientId, viewer: user, messages, rawMessage: message, signal: req.signal })) {
             if (evt.type === "start") {
               urgency = evt.meta.urgency;
               redFlagCount = evt.meta.redFlags.length;
@@ -225,6 +226,7 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (error) {
+    if (error instanceof ProviderTimeoutError) return providerTimeoutResponse();
     if (error instanceof BodyReadError) return NextResponse.json({ error: error.message }, { status: error.status });
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: "Validation failed", details: error.issues }, { status: 422 });

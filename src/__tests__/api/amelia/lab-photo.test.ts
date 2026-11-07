@@ -76,7 +76,8 @@ describe("POST /api/ai/lab-photo", () => {
     expect(res.status).toBe(200);
     expect(json.results[0].name).toBe("Glucose");
     expect(extractLabsFromImage).toHaveBeenCalledWith(
-      "data:image/jpeg;base64,/9j/AA=="
+      "data:image/jpeg;base64,/9j/AA==",
+      expect.any(AbortSignal)
     );
   });
 });

@@ -1,3 +1,4 @@
+import { ProviderTimeoutError, providerTimeoutResponse, withProviderDeadline } from "@/lib/provider-deadline";
 import { requireApiUser } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
@@ -145,17 +146,19 @@ Guidelines:
     const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
     if (geminiKey) {
       try {
-        const response = await ai.models.generateContent({
+        const response = await withProviderDeadline(signal => ai.models.generateContent({
           model: GEMINI_MODEL,
           contents: prompt,
           config: {
+          abortSignal: signal,
             systemInstruction:
               "You are an expert clinical decision support AI. You assist licensed physicians by providing evidence-based differential diagnoses, drug interaction checks, test recommendations, treatment options, and red flag alerts. You always return valid JSON. This is a decision support tool, not a replacement for clinical judgment.",
             maxOutputTokens: 2000,
           },
-        });
+        }), req.signal);
         responseText = response.text?.trim() || "";
       } catch (gemErr) {
+        if (gemErr instanceof ProviderTimeoutError || req.signal.aborted) throw gemErr;
         console.warn("Gemini diagnosis-support error, using clinical fallback:", gemErr);
       }
     }
@@ -201,6 +204,7 @@ Guidelines:
       generatedAt: new Date().toISOString(),
     });
   } catch (error) {
+    if (error instanceof ProviderTimeoutError) return providerTimeoutResponse();
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: "Validation failed", details: error.issues },

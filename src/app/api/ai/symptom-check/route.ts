@@ -1,3 +1,4 @@
+import { ProviderTimeoutError, providerTimeoutResponse, withProviderDeadline } from "@/lib/provider-deadline";
 import { requireApiUser } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
@@ -74,17 +75,19 @@ Provide 2-4 possible conditions, a clear recommendation, and 3-5 self-care tips.
     const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
     if (geminiKey) {
       try {
-        const response = await ai.models.generateContent({
+        const response = await withProviderDeadline(signal => ai.models.generateContent({
           model: GEMINI_MODEL,
           contents: prompt,
           config: {
+          abortSignal: signal,
             systemInstruction:
               "You are a medical triage assistant that returns structured JSON responses. Never provide definitive diagnoses. Always recommend professional medical consultation.",
             maxOutputTokens: 1000,
           },
-        });
+        }), req.signal);
         responseText = response.text?.trim() || "";
       } catch (gemErr) {
+        if (gemErr instanceof ProviderTimeoutError || req.signal.aborted) throw gemErr;
         console.warn("Gemini symptom-check error, using clinical triage fallback:", gemErr);
       }
     }
@@ -128,6 +131,7 @@ Provide 2-4 possible conditions, a clear recommendation, and 3-5 self-care tips.
       }
     );
   } catch (error) {
+    if (error instanceof ProviderTimeoutError) return providerTimeoutResponse();
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: "Validation failed", details: error.issues },

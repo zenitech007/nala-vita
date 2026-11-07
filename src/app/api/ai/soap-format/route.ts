@@ -1,3 +1,4 @@
+import { ProviderTimeoutError, providerTimeoutResponse, withProviderDeadline } from "@/lib/provider-deadline";
 import { requireApiUser } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
@@ -62,16 +63,18 @@ Keep it concise, professional, clinically accurate, and organized with bullet po
     const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
     if (geminiKey) {
       try {
-        const response = await ai.models.generateContent({
+        const response = await withProviderDeadline(signal => ai.models.generateContent({
           model: GEMINI_MODEL,
           contents: prompt,
           config: {
+          abortSignal: signal,
             systemInstruction:
               "You are an expert clinical scribe specialized in converting medical transcripts into structured SOAP notes. Output clear, well-formatted markdown.",
           },
-        });
+        }), req.signal);
         formattedSoap = response.text?.trim() || "";
       } catch (gemErr) {
+        if (gemErr instanceof ProviderTimeoutError || req.signal.aborted) throw gemErr;
         console.warn("Gemini soap-format error, using clinical scribe fallback:", gemErr);
       }
     }
@@ -83,6 +86,7 @@ Keep it concise, professional, clinically accurate, and organized with bullet po
 
     return NextResponse.json({ formattedSoap });
   } catch (error) {
+    if (error instanceof ProviderTimeoutError) return providerTimeoutResponse();
     console.error("SOAP formatting error:", error);
     return NextResponse.json(
       { error: "Failed to generate structured SOAP note" },
