@@ -197,8 +197,8 @@ export async function POST(req: NextRequest) {
           });
 
           send({ type: "done", conversationId: convoId, reminderSuggestion });
-        } catch (streamErr) {
-          console.error("Amelia stream error:", streamErr);
+        } catch {
+          console.error("Amelia stream failed");
           // Save whatever arrived so the turn isn't silently lost.
           if (full) {
             try {
@@ -210,7 +210,7 @@ export async function POST(req: NextRequest) {
               console.error("Amelia partial-reply save failed:", saveErr);
             }
           }
-          send({ type: "error", error: "Amelia was interrupted. Please try again." });
+          send({ type: full ? "interrupted" : "error", error: "Amelia was interrupted. Please try again." });
         } finally {
           controller.close();
         }

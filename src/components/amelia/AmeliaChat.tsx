@@ -243,7 +243,7 @@ export default function AmeliaChat({
               }));
             }
             void refreshList();
-          } else if (evt.type === "error") {
+          } else if (evt.type === "interrupted" || evt.type === "error") {
             const msg = (evt.error as string) ?? "Amelia was interrupted.";
             if (opened) {
               updateLastAssistant((prev) => ({

@@ -175,7 +175,7 @@ describe("POST /api/amelia/chat (streaming)", () => {
     expect((done.reminderSuggestion as { label: string }).label).toBe("take meds");
   });
 
-  it("emits an error frame and saves the partial reply when the stream breaks", async () => {
+  it("emits an interrupted frame and saves the partial reply when the stream breaks", async () => {
     runAmeliaTurnStream.mockImplementation(async function* () {
       yield { type: "start", meta: { urgency: "routine", redFlags: [], disclaimer: "d" } };
       yield { type: "delta", text: "Partial" };
@@ -183,7 +183,7 @@ describe("POST /api/amelia/chat (streaming)", () => {
     });
 
     const frames = await readFrames((await POST(streamReq({ message: "I feel dizzy" }))) as Response);
-    expect(frames[frames.length - 1].type).toBe("error");
+    expect(frames[frames.length - 1].type).toBe("interrupted");
     expect(msgCreate).toHaveBeenCalledTimes(2);
     expect(msgCreate.mock.calls[1]).toEqual([
       { data: { conversationId: "c1", role: "assistant", content: "Partial" } },

@@ -116,6 +116,8 @@ export async function* chatStream(
           .map((m) => `${m.role === "assistant" ? "Assistant" : "User"}: ${m.content}`)
           .join("\n\n");
 
+  let streamedAny = false;
+
   // 1. Try Gemini streaming
   const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
   if (geminiKey) {
@@ -131,7 +133,6 @@ export async function* chatStream(
         },
       }), opts?.signal);
 
-      let streamedAny = false;
       for await (const chunk of stream) {
         const text = chunk.text;
         if (text) {
@@ -141,7 +142,7 @@ export async function* chatStream(
       }
       if (streamedAny) return;
     } catch (geminiError) {
-      if (geminiError instanceof ProviderTimeoutError || opts?.signal?.aborted) throw geminiError;
+      if (streamedAny || geminiError instanceof ProviderTimeoutError || opts?.signal?.aborted) throw geminiError;
       console.warn("AI provider request failed");
     }
   }
@@ -163,7 +164,6 @@ export async function* chatStream(
         stream: true,
       }, { signal }), opts?.signal);
 
-      let streamedAny = false;
       for await (const chunk of stream) {
         const text = chunk.choices[0]?.delta?.content;
         if (text) {
@@ -173,7 +173,7 @@ export async function* chatStream(
       }
       if (streamedAny) return;
     } catch (openAiError) {
-      if (openAiError instanceof ProviderTimeoutError || opts?.signal?.aborted) throw openAiError;
+      if (streamedAny || openAiError instanceof ProviderTimeoutError || opts?.signal?.aborted) throw openAiError;
       console.warn("AI provider request failed");
     }
   }
