@@ -16,3 +16,11 @@ it.each([PatientLayout, DoctorLayout, AdminLayout])('F10 layout denies inactive 
   identity.mockResolvedValue({ session: { user: {} }, user: { role: 'ADMIN', isActive: false, admin: { id: 'a' } } });
   await expect(layout({ children: null })).rejects.toThrow('REDIRECT:/login');
 });
+import AmeliaLauncher from '@/components/amelia/AmeliaLauncher';
+
+it('keeps the patient assistant out of the clinician layout', async () => {
+  identity.mockResolvedValue({ session: { user: {} }, user: { role: 'DOCTOR', isActive: true, doctor: { id: 'd', isVerified: true } } });
+  const layout = await DoctorLayout({ children: null });
+  const children = layout.props.children as Array<{ type: unknown }>;
+  expect(children.map(child => child.type)).not.toContain(AmeliaLauncher);
+});
