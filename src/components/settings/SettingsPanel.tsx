@@ -1037,57 +1037,15 @@ export default function SettingsPanel({
               transition={{ duration: 0.2 }}
               className="space-y-6"
             >
-              {/* HIPAA / Security Status */}
+              {/* Security information */}
               <section className="bg-white rounded-2xl border border-gray-200/80 p-6 shadow-xs">
                 <div className="flex items-center gap-3 mb-5">
                   <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center">
                     <Shield className="w-5 h-5 text-emerald-700" />
                   </div>
                   <div>
-                    <h2 className="text-base font-semibold text-gray-900">Data Security & Encryption</h2>
-                    <p className="text-sm text-gray-500">HIPAA & GDPR-aligned clinical protection protocols.</p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 mb-6">
-                  <div className="p-4 rounded-xl bg-gray-50 border border-gray-100 flex items-start gap-3">
-                    <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
-                    <div>
-                      <p className="text-sm font-semibold text-gray-900">End-to-End In Transit</p>
-                      <p className="text-xs text-gray-500 mt-0.5">
-                        TLS 1.3 encryption across all telehealth video channels and patient records.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="p-4 rounded-xl bg-gray-50 border border-gray-100 flex items-start gap-3">
-                    <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
-                    <div>
-                      <p className="text-sm font-semibold text-gray-900">PHI Redaction Engine</p>
-                      <p className="text-xs text-gray-500 mt-0.5">
-                        Automatic stripping of Protected Health Information from audit records.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="p-4 rounded-xl bg-gray-50 border border-gray-100 flex items-start gap-3">
-                    <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
-                    <div>
-                      <p className="text-sm font-semibold text-gray-900">Supabase Row-Level Security</p>
-                      <p className="text-xs text-gray-500 mt-0.5">
-                        Strict multi-tenant role isolation ensuring only authorized doctors access records.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="p-4 rounded-xl bg-gray-50 border border-gray-100 flex items-start gap-3">
-                    <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
-                    <div>
-                      <p className="text-sm font-semibold text-gray-900">Session Guard</p>
-                      <p className="text-xs text-gray-500 mt-0.5">
-                        Cryptographically signed JWT tokens with automatic timeout protection.
-                      </p>
-                    </div>
+                    <h2 className="text-base font-semibold text-gray-900">Record access information</h2>
+                    <p className="text-sm text-gray-500">Review your sharing choices before sharing records with a clinician.</p>
                   </div>
                 </div>
 
@@ -1161,13 +1119,7 @@ export default function SettingsPanel({
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-xs font-semibold text-emerald-700">
-                    <span className="relative flex h-2.5 w-2.5">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
-                    </span>
-                    Operational
-                  </div>
+                  <p className="text-sm text-gray-600">Live service status unavailable.</p>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 relative z-10">
@@ -1201,59 +1153,7 @@ export default function SettingsPanel({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                  <div className="flex items-center justify-between p-4 rounded-xl bg-gray-50 border border-gray-100">
-                    <div className="flex items-center gap-3">
-                      <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-                      <div>
-                        <p className="text-sm font-semibold text-gray-900">PostgreSQL (Prisma 7)</p>
-                        <p className="text-xs text-gray-500">Connection pool active</p>
-                      </div>
-                    </div>
-                    <span className="text-xs font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">
-                      Healthy
-                    </span>
-                  </div>
-
-                  <div className="flex items-center justify-between p-4 rounded-xl bg-gray-50 border border-gray-100">
-                    <div className="flex items-center gap-3">
-                      <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-                      <div>
-                        <p className="text-sm font-semibold text-gray-900">Supabase Storage & Realtime</p>
-                        <p className="text-xs text-gray-500">Websockets connected</p>
-                      </div>
-                    </div>
-                    <span className="text-xs font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">
-                      Connected
-                    </span>
-                  </div>
-
-                  <div className="flex items-center justify-between p-4 rounded-xl bg-gray-50 border border-gray-100">
-                    <div className="flex items-center gap-3">
-                      <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-                      <div>
-                        <p className="text-sm font-semibold text-gray-900">Paystack Gateway</p>
-                        <p className="text-xs text-gray-500">Webhooks ready</p>
-                      </div>
-                    </div>
-                    <span className="text-xs font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">
-                      Operational
-                    </span>
-                  </div>
-
-                  <div className="flex items-center justify-between p-4 rounded-xl bg-gray-50 border border-gray-100">
-                    <div className="flex items-center gap-3">
-                      <div className="w-2.5 h-2.5 rounded-full bg-blue-500" />
-                      <div>
-                        <p className="text-sm font-semibold text-gray-900">App Version</p>
-                        <p className="text-xs text-gray-500">Nala Vita MediConnect</p>
-                      </div>
-                    </div>
-                    <span className="text-xs font-mono font-medium text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md">
-                      v0.1.0-prod
-                    </span>
-                  </div>
-                </div>
+                <p className="text-sm text-gray-600">Live infrastructure status is unavailable. Contact support if a service fails.</p>
               </section>
             </motion.div>
           )}

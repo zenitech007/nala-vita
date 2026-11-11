@@ -316,7 +316,7 @@ export default function AmeliaChat({
                 </div>
                 <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-700 text-[11px] font-semibold rounded-full border border-emerald-200/60" title={PRIVACY_NOTICE}>
                   <ShieldCheck className="w-3.5 h-3.5" />
-                  <span>Strict Data Isolation &middot; HIPAA Protected</span>
+                  <span>Record access information</span>
                 </div>
               </div>
             )}

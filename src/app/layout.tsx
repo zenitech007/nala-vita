@@ -35,7 +35,7 @@ export const metadata: Metadata = {
     template: "%s | Nala Vita",
   },
   description:
-    "Nala Vita connects patients, doctors, and administrators. Book appointments, access telemedicine, manage prescriptions, and monitor health — all in one secure, HIPAA-aware platform.",
+    "Nala Vita connects patients, doctors, and administrators. Book appointments, access telemedicine, manage prescriptions, and monitor health — all in one platform.",
   keywords: [
     "healthcare",
     "telemedicine",

@@ -308,10 +308,6 @@ export default function ChatWindow({
           <p className="font-semibold text-gray-900 text-sm">{otherUserName}</p>
           <p className="text-xs text-gray-500">{otherUserRole}</p>
         </div>
-        <div className="ml-auto flex items-center gap-1.5">
-          <div className="w-2 h-2 bg-green-500 rounded-full" />
-          <span className="text-xs text-gray-400">Online</span>
-        </div>
       </div>
 
       {/* Messages area */}
