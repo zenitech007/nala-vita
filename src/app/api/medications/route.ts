@@ -1,3 +1,4 @@
+import { medicationAdherence } from "@/lib/medication-adherence";
 import { logAudit } from "@/lib/audit";
 import { requireApiUser } from "@/lib/auth";
 import { getRecordVisibility } from "@/lib/record-visibility";
@@ -77,51 +78,28 @@ export async function GET(req: NextRequest) {
       });
 
       await access.log("PRESCRIPTIONS", prescriptions);
-      // Filter usageLogs strictly to the last 6 months (180 days)
-      const sixMonthsDays: string[] = [];
-      for (let i = 180; i >= 0; i--) {
-        const d = new Date(now);
-        d.setDate(d.getDate() - i);
-        sixMonthsDays.push(d.toISOString().split("T")[0]);
-      }
-
       let totalExpectedDoses = 0;
       let totalLoggedDoses = 0;
-
       const enriched = prescriptions.map((p) => {
-        const logs = Array.isArray(p.usageLogs) ? p.usageLogs : [];
-        const sixMonthLogs = logs.filter((logEntry) => {
-          const dateStr = logEntry.includes("T") ? logEntry.split("T")[0] : logEntry;
-          return dateStr >= sixMonthsDays[0] && dateStr <= todayStr;
-        });
-
-        const loggedCount = sixMonthLogs.length;
-        totalLoggedDoses += loggedCount;
-
-        // Estimate adherence percentage based on active days (max 180 days)
-        const pDate = new Date(p.prescribedAt);
-        const daysActive = Math.min(
-          180,
-          Math.max(1, Math.floor((now.getTime() - pDate.getTime()) / (1000 * 60 * 60 * 24)))
-        );
-        totalExpectedDoses += daysActive;
-
-        const adherenceRate = Math.min(100, Math.round((loggedCount / daysActive) * 100));
-
+        const adherence = medicationAdherence(p, now, 180);
+        totalExpectedDoses += adherence.expectedDoses;
+        totalLoggedDoses += adherence.loggedDoses;
         return {
           ...p,
-          usageLogs: sixMonthLogs,
+          usageLogs: adherence.logs,
           nextDoseAt: p.isActive ? computeNextDoseAt(p.frequency) : null,
-          adherenceRate,
-          totalLoggedDoses: loggedCount,
-          daysTracked: daysActive,
+          adherenceRate: adherence.rate,
+          adherenceStatus: adherence.status,
+          expectedDoses: adherence.expectedDoses,
+          totalLoggedDoses: adherence.loggedDoses,
+          daysTracked: adherence.daysTracked,
         };
       });
 
       const overallAdherence =
         totalExpectedDoses > 0
           ? Math.min(100, Math.round((totalLoggedDoses / totalExpectedDoses) * 100))
-          : 0;
+          : null;
 
       return NextResponse.json({
         medications: enriched,
@@ -129,6 +107,8 @@ export async function GET(req: NextRequest) {
           window: "6_months",
           overallAdherenceRate: overallAdherence,
           totalLoggedDoses,
+          expectedDoses: totalExpectedDoses,
+          basis: "Estimated from UTC daily entries; individual dose events are unavailable.",
           activeMedicationsCount: enriched.filter((m) => m.isActive).length,
         },
       });
@@ -162,43 +142,28 @@ export async function GET(req: NextRequest) {
       });
 
       let totalLogged7Days = 0;
-      const totalPossible7Days = prescriptions.length * 7;
-
+      let totalPossible7Days = 0;
       const enriched = prescriptions.map((p) => {
-        const logs = Array.isArray(p.usageLogs) ? p.usageLogs : [];
-        const sevenDayLogs = logs.filter((logEntry) => {
-          const dateStr = logEntry.includes("T") ? logEntry.split("T")[0] : logEntry;
-          return last7Days.includes(dateStr);
-        });
-
-        const takenDaysCount = new Set(
-          sevenDayLogs.map((l) => (l.includes("T") ? l.split("T")[0] : l))
-        ).size;
-
-        totalLogged7Days += takenDaysCount;
-
-        const takenToday = sevenDayLogs.some((l) => {
-          const dateStr = l.includes("T") ? l.split("T")[0] : l;
-          return dateStr === todayStr;
-        });
-
-        const adherenceRate7Days = Math.round((takenDaysCount / 7) * 100);
-
+        const adherence = medicationAdherence(p, now, 7);
+        totalLogged7Days += adherence.loggedDoses;
+        totalPossible7Days += adherence.expectedDoses;
         return {
           ...p,
-          usageLogs: sevenDayLogs, // strictly filtered to last 7 days
-          last7DaysLogs: sevenDayLogs,
+          usageLogs: adherence.logs,
+          last7DaysLogs: adherence.logs,
           nextDoseAt: p.isActive ? computeNextDoseAt(p.frequency) : null,
-          takenToday,
-          adherenceRate7Days,
-          takenDaysCount,
+          takenToday: adherence.logs.includes(todayStr),
+          adherenceRate7Days: adherence.rate,
+          adherenceStatus: adherence.status,
+          expectedDoses: adherence.expectedDoses,
+          takenDaysCount: adherence.loggedDoses,
         };
       });
 
       const weeklyAdherence =
         totalPossible7Days > 0
           ? Math.round((totalLogged7Days / totalPossible7Days) * 100)
-          : 0;
+          : null;
 
       return NextResponse.json({
         medications: enriched,
@@ -208,6 +173,8 @@ export async function GET(req: NextRequest) {
           window: "7_days",
           weeklyAdherenceRate: weeklyAdherence,
           totalLogged7Days,
+          expectedDoses: totalPossible7Days,
+          basis: "Estimated from UTC daily entries; individual dose events are unavailable.",
           totalPrescriptions: prescriptions.length,
         },
       });

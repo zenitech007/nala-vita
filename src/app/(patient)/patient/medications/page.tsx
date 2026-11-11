@@ -52,7 +52,7 @@ interface Medication {
   usageLogs?: string[];
   last7DaysLogs?: string[];
   takenToday?: boolean;
-  adherenceRate7Days?: number;
+  adherenceRate7Days?: number | null;
   takenDaysCount?: number;
   doctor?: {
     user: { firstName: string; lastName: string };
@@ -61,7 +61,7 @@ interface Medication {
 
 interface AdherenceStats {
   window?: string;
-  weeklyAdherenceRate?: number;
+  weeklyAdherenceRate?: number | null;
   totalLogged7Days?: number;
   totalPrescriptions?: number;
 }
@@ -514,6 +514,7 @@ export default function PatientMedicationsPage() {
 
         {/* ────────────────────────────────────────────────── */}
         {/* Strict 7-Day Adherence Tracker Hero Card           */}
+        <p className="mb-3 text-sm text-gray-600">Estimated from daily entries in UTC and prescribed frequency. Individual dose events are unavailable. PRN, unknown schedules and inactive courses are excluded.</p>
         {/* ────────────────────────────────────────────────── */}
         <section className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 sm:p-8 overflow-hidden relative">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
@@ -546,7 +547,7 @@ export default function PatientMedicationsPage() {
                 </svg>
                 <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
                   <span className="text-xl font-bold text-gray-900 leading-none">
-                    {weeklyRate}%
+                    {adherenceStats?.weeklyAdherenceRate == null ? "—" : `${weeklyRate}%`}
                   </span>
                   <span className="text-[10px] text-gray-400 font-medium mt-0.5">
                     Adherence
@@ -561,7 +562,7 @@ export default function PatientMedicationsPage() {
                   </span>
                 </div>
                 <h2 className="text-lg font-bold text-gray-900 mt-1">
-                  7-Day Adherence Overview
+                  7-Day Adherence Estimate
                 </h2>
                 <p className="text-xs text-gray-500">
                   {dosesTakenCount} dose(s) logged across {activeMedications.length} active medication(s).

@@ -391,7 +391,8 @@ describe("Two-Sided Medication Pipeline & Adherence Suite", () => {
       ]) } }));
       expect(data.adherenceStats.window).toBe("6_months");
       expect(data.medications[0].medication).toBe("Metformin");
-      expect(data.medications[0].totalLoggedDoses).toBe(1);
+      // A 30-day course begun 30 days ago ended yesterday. Today is outside the course.
+      expect(data.medications[0].totalLoggedDoses).toBe(0);
     });
 
     it("should allow a doctor to prescribe medication to a patient", async () => {

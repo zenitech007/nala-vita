@@ -69,7 +69,7 @@ interface DoctorMedicationView {
   addedBy: "DOCTOR" | "PATIENT" | string;
   isSharedWithDoctor: boolean;
   usageLogs: string[];
-  adherenceRate: number;
+  adherenceRate: number | null;
   totalLoggedDoses: number;
   daysTracked: number;
   doctor?: {
@@ -79,7 +79,7 @@ interface DoctorMedicationView {
 
 interface AdherenceStats {
   window: string;
-  overallAdherenceRate: number;
+  overallAdherenceRate: number | null;
   totalLoggedDoses: number;
   activeMedicationsCount: number;
 }
@@ -592,7 +592,7 @@ export default function DoctorPrescriptionsPage() {
                         </svg>
                         <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
                           <span className="text-xl font-bold text-gray-900 leading-none">
-                            {adherenceStats?.overallAdherenceRate ?? 0}%
+                            {adherenceStats?.overallAdherenceRate == null ? "—" : `${adherenceStats.overallAdherenceRate}%`}
                           </span>
                           <span className="text-[9px] text-gray-400 font-medium mt-0.5">
                             6-Mo Rate
@@ -721,32 +721,32 @@ export default function DoctorPrescriptionsPage() {
                             <div>
                               <div className="flex items-center justify-between text-xs font-semibold mb-1.5">
                                 <span className="text-gray-500">
-                                  Adherence Progression ({med.daysTracked} days tracked)
+                                  Adherence Estimate ({med.daysTracked} days tracked)
                                 </span>
                                 <span
                                   className={cn(
                                     "font-bold",
-                                    med.adherenceRate >= 80
+                                    (med.adherenceRate ?? 0) >= 80
                                       ? "text-emerald-600"
-                                      : med.adherenceRate >= 50
+                                      : (med.adherenceRate ?? 0) >= 50
                                       ? "text-amber-600"
                                       : "text-blue-600"
                                   )}
                                 >
-                                  {med.adherenceRate}% &middot; {med.totalLoggedDoses} doses logged
+                                  {med.adherenceRate == null ? "Unavailable" : `${med.adherenceRate}% estimated`} &middot; {med.totalLoggedDoses} daily entries
                                 </span>
                               </div>
                               <div className="w-full h-2.5 bg-gray-100 rounded-full overflow-hidden">
                                 <div
                                   className={cn(
                                     "h-full rounded-full transition-all",
-                                    med.adherenceRate >= 80
+                                    (med.adherenceRate ?? 0) >= 80
                                       ? "bg-emerald-500"
-                                      : med.adherenceRate >= 50
+                                      : (med.adherenceRate ?? 0) >= 50
                                       ? "bg-amber-500"
                                       : "bg-blue-500"
                                   )}
-                                  style={{ width: `${Math.min(100, Math.max(5, med.adherenceRate))}%` }}
+                                  style={{ width: `${Math.min(100, Math.max(0, med.adherenceRate ?? 0))}%` }}
                                 />
                               </div>
                             </div>
