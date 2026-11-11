@@ -11,5 +11,3 @@ Allow: /$
 Allow: /login
 Allow: /register
 Allow: /forgot-password
-
-Sitemap: https://mediconnect.app/sitemap.xml

@@ -1,7 +1,10 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import PatientSidebar from "@/components/layout/PatientSidebar";
 import AmeliaLauncher from "@/components/amelia/AmeliaLauncher";
 import { getAuthenticatedUserWithProfile } from "@/lib/auth-cache";
+
+export const metadata: Metadata = { robots: { index: false, follow: false } };
 
 export default async function PatientLayout({ children }: { children: React.ReactNode }) {
   const authData = await getAuthenticatedUserWithProfile();
