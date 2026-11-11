@@ -6,7 +6,7 @@ function mockFetch(result: unknown, ok = true) {
   (global as unknown as { fetch: jest.Mock }).fetch = jest.fn(async () => ({ ok, json: async () => ({ result }) })) as unknown as jest.Mock;
 }
 
-beforeEach(() => mockFetch({ interactions: [], dosingNotes: [], allergyConflicts: [], overallNote: "Confirm with a professional." }));
+beforeEach(() => mockFetch({ status: "available", interactions: [], dosingNotes: [], allergyConflicts: [], overallNote: "Confirm with a professional." }));
 
 describe("MedSafetyPanel", () => {
   it("shows the no-concerns state when clean", async () => {
@@ -16,7 +16,7 @@ describe("MedSafetyPanel", () => {
   });
 
   it("renders an interaction with its severity", async () => {
-    mockFetch({ interactions: [{ drugs: ["aspirin", "warfarin"], severity: "high", note: "bleeding risk" }], dosingNotes: [], allergyConflicts: [], overallNote: "x" });
+    mockFetch({ status: "available", interactions: [{ drugs: ["aspirin", "warfarin"], severity: "high", note: "bleeding risk" }], dosingNotes: [], allergyConflicts: [], overallNote: "x" });
     render(<MedSafetyPanel />);
     await waitFor(() => expect(screen.getByText(/bleeding risk/)).toBeInTheDocument());
     expect(screen.getByText(/high interaction/i)).toBeInTheDocument();
@@ -27,4 +27,12 @@ describe("MedSafetyPanel", () => {
     render(<MedSafetyPanel />);
     await waitFor(() => expect(screen.getByText(/unavailable/i)).toBeInTheDocument());
   });
+});
+
+
+it("shows unavailable analysis without a no-concerns claim", async () => {
+  mockFetch({ status: "unavailable", interactions: [], dosingNotes: [], allergyConflicts: [], overallNote: "Analysis unavailable." });
+  render(<MedSafetyPanel />);
+  await waitFor(() => expect(screen.getByText(/analysis unavailable/i)).toBeInTheDocument());
+  expect(screen.queryByText(/No concerns found/i)).not.toBeInTheDocument();
 });
