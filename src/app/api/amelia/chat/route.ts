@@ -27,6 +27,7 @@ interface ReminderSuggestion {
   frequency: string;
   nextFireAt: string;
   schedule: string;
+  timeZone: string;
 }
 
 /**
@@ -38,7 +39,8 @@ async function runPostTurn(
   patientId: string,
   userMessageId: string,
   message: string,
-  replyContent: string
+  replyContent: string,
+  timeZone: string | null
 ): Promise<ReminderSuggestion | null> {
   try {
     const candidates = await extractMemories(message, replyContent);
@@ -49,14 +51,15 @@ async function runPostTurn(
 
   try {
     const candidate = await detectReminder(message, replyContent);
-    if (candidate) {
-      const nextFireAt = computeNextFireAt(candidate, new Date());
+    if (candidate && timeZone) {
+      const nextFireAt = computeNextFireAt(candidate, new Date(), timeZone);
       return {
         kind: candidate.kind,
         label: candidate.label,
         frequency: candidate.frequency,
         nextFireAt: nextFireAt.toISOString(),
-        schedule: describeSchedule(candidate.frequency, nextFireAt),
+        schedule: describeSchedule(candidate.frequency, nextFireAt, timeZone),
+        timeZone,
       };
     }
   } catch (remErr) {
@@ -138,7 +141,7 @@ export async function POST(req: NextRequest) {
       });
       await touchConversation();
 
-      const reminderSuggestion = await runPostTurn(patientId, userMsg.id, message, reply.content);
+      const reminderSuggestion = await runPostTurn(patientId, userMsg.id, message, reply.content, user.timeZone);
 
       await logAudit({
         userId: user.id,
@@ -187,7 +190,7 @@ export async function POST(req: NextRequest) {
           });
           await touchConversation();
 
-          const reminderSuggestion = await runPostTurn(patientId, userMsg.id, message, full);
+          const reminderSuggestion = await runPostTurn(patientId, userMsg.id, message, full, user.timeZone);
 
           await logAudit({
             userId: user.id,

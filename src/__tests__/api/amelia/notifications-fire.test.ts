@@ -21,8 +21,8 @@ function req() { return new Request("http://localhost/api/notifications") as nev
 
 beforeEach(() => [getUser, userFindUnique, notifFindMany, notifCount, fireDueReminders].forEach((m) => m.mockReset()));
 
-describe("GET /api/notifications fires reminders for patients", () => {
-  it("calls fireDueReminders with patientId + userId then returns notifications", async () => {
+describe("GET /api/notifications is read-only", () => {
+  it("returns notifications without firing reminder jobs", async () => {
     getUser.mockResolvedValue({ data: { user: { id: "sub1" } } });
     userFindUnique.mockResolvedValue({ id: "u1", role: "PATIENT", isActive: true, patient: { id: "pat1" } });
     fireDueReminders.mockResolvedValue(1);
@@ -32,7 +32,7 @@ describe("GET /api/notifications fires reminders for patients", () => {
     const res = await GET(req());
     const json = await res.json();
     expect(res.status).toBe(200);
-    expect(fireDueReminders).toHaveBeenCalledWith("pat1", "u1");
+    expect(fireDueReminders).not.toHaveBeenCalled();
     expect(json.notifications).toHaveLength(1);
   });
 

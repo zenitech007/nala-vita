@@ -21,15 +21,15 @@ beforeEach(() => { create.mockReset(); findMany.mockReset(); updateMany.mockRese
 describe("reminder CRUD (patient-scoped)", () => {
   it("creates a reminder", async () => {
     create.mockResolvedValue({});
-    const when = new Date(2026, 5, 12, 8, 0);
-    await createReminder("pat1", { kind: "MEDICATION", label: "BP meds", frequency: "DAILY", nextFireAt: when });
-    expect(create).toHaveBeenCalledWith({ data: { patientId: "pat1", kind: "MEDICATION", label: "BP meds", frequency: "DAILY", nextFireAt: when } });
+    const when = new Date("2026-06-12T08:00:00Z");
+    await createReminder("pat1", { kind: "MEDICATION", label: "BP meds", frequency: "DAILY", nextFireAt: when, timeZone: "UTC" });
+    expect(create).toHaveBeenCalledWith({ data: { patientId: "pat1", kind: "MEDICATION", label: "BP meds", frequency: "DAILY", nextFireAt: when, timeZone: "UTC", localHour: 8, localMinute: 0 } });
   });
 
   it("lists active reminders with a human schedule", async () => {
-    findMany.mockResolvedValue([{ id: "1", kind: "MEDICATION", label: "BP meds", frequency: "DAILY", nextFireAt: new Date(2026, 5, 12, 8, 0) }]);
+    findMany.mockResolvedValue([{ id: "1", kind: "MEDICATION", label: "BP meds", frequency: "DAILY", nextFireAt: new Date("2026-06-12T08:00:00Z"), timeZone: "UTC" }]);
     const out = await listReminders("pat1");
-    expect(out[0].schedule).toBe("every day at 8:00 AM");
+    expect(out[0].schedule).toBe("every day at 8:00 AM (UTC)");
     expect(out[0].id).toBe("1");
   });
 
@@ -38,4 +38,10 @@ describe("reminder CRUD (patient-scoped)", () => {
     await cancelReminder("r1", "pat1");
     expect(updateMany).toHaveBeenCalledWith({ where: { id: "r1", patientId: "pat1" }, data: { active: false } });
   });
+});
+
+
+it("labels legacy timezone-free reminders as requiring recreation", async () => {
+  findMany.mockResolvedValue([{ id: "old", kind: "OTHER", label: "old", frequency: "DAILY", nextFireAt: new Date(0), timeZone: null }]);
+  expect((await listReminders("pat1"))[0].schedule).toMatch(/Timezone required/);
 });

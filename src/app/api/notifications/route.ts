@@ -2,7 +2,6 @@ import { requireApiUser } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { fireDueReminders } from "@/lib/amelia/reminders";
 
 // ─── GET: Return notifications for the current user ──────
 
@@ -11,15 +10,6 @@ export async function GET(req: NextRequest) {
     const auth = await requireApiUser({ roles: ["PATIENT", "DOCTOR", "ADMIN"] });
     if (!auth.ok) return auth.response;
     const user = auth.user;
-
-    // Lazily fire any due reminders for patients before listing notifications.
-    if (user.patient) {
-      try {
-        await fireDueReminders(user.patient!.id, user.id);
-      } catch (remErr) {
-        console.error("fireDueReminders failed:", remErr);
-      }
-    }
 
     const { searchParams } = new URL(req.url);
     const unreadOnly = searchParams.get("unreadOnly") === "true";

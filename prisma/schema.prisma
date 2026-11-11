@@ -48,6 +48,7 @@ model User {
   lastName      String   @map("last_name")
   phone         String?
   verifiedPhone String? @map("verified_phone")
+  timeZone      String? @map("time_zone")
   avatarUrl     String?  @map("avatar_url")
   role          Role     @default(PATIENT)
   isActive      Boolean  @default(true) @map("is_active")
@@ -709,6 +710,9 @@ model Reminder {
   label      String
   frequency  String // ONCE | DAILY
   nextFireAt DateTime @map("next_fire_at")
+  timeZone   String? @map("time_zone")
+  localHour  Int? @map("local_hour")
+  localMinute Int? @map("local_minute")
   active     Boolean  @default(true)
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")

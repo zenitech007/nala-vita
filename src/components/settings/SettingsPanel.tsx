@@ -74,6 +74,7 @@ interface UserProfileData {
   firstName?: string;
   lastName?: string;
   phone?: string;
+  timeZone?: string;
   role?: string;
   avatarUrl?: string | null;
   patient?: {
@@ -303,6 +304,7 @@ export default function SettingsPanel({
         firstName: profile.firstName,
         lastName: profile.lastName,
         phone: profile.phone,
+        timeZone: profile.timeZone || undefined,
         emergencyName: profile.patient?.emergencyName,
         emergencyPhone: profile.patient?.emergencyPhone,
         address: profile.patient?.address,
@@ -735,6 +737,19 @@ export default function SettingsPanel({
                         placeholder="Last Name"
                         className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
                       />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label htmlFor="profile-timezone" className="block text-xs font-medium text-gray-700 mb-1.5">Reminder timezone</label>
+                      <input
+                        id="profile-timezone"
+                        type="text"
+                        value={profile.timeZone ?? ""}
+                        onChange={(e) => setProfile({ ...profile, timeZone: e.target.value })}
+                        placeholder="Africa/Lagos"
+                        aria-describedby="profile-timezone-help"
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+                      />
+                      <p id="profile-timezone-help" className="mt-1 text-sm text-gray-600">Save your IANA timezone before setting reminders. Existing reminders keep their saved timezone.</p>
                     </div>
                     <div className="sm:col-span-2">
                       <label className="block text-xs font-medium text-gray-700 mb-1.5">Phone Number</label>

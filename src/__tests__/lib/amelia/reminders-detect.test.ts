@@ -31,32 +31,32 @@ describe("detectReminder", () => {
 
 describe("computeNextFireAt", () => {
   it("DAILY picks today if the time is still ahead", () => {
-    const now = new Date(2026, 5, 12, 6, 0, 0);
+    const now = new Date("2026-06-12T06:00:00Z");
     const c: ReminderCandidate = { kind: "MEDICATION", label: "m", frequency: "DAILY", hour: 8, minute: 0 };
-    const next = computeNextFireAt(c, now);
-    expect(next.getDate()).toBe(12);
-    expect(next.getHours()).toBe(8);
+    const next = computeNextFireAt(c, now, "UTC");
+    expect(next.getUTCDate()).toBe(12);
+    expect(next.getUTCHours()).toBe(8);
   });
 
   it("DAILY rolls to tomorrow if the time already passed", () => {
-    const now = new Date(2026, 5, 12, 9, 0, 0);
+    const now = new Date("2026-06-12T09:00:00Z");
     const c: ReminderCandidate = { kind: "MEDICATION", label: "m", frequency: "DAILY", hour: 8, minute: 0 };
-    expect(computeNextFireAt(c, now).getDate()).toBe(13);
+    expect(computeNextFireAt(c, now, "UTC").getUTCDate()).toBe(13);
   });
 
   it("ONCE uses the given datetime", () => {
-    const now = new Date(2026, 5, 12, 9, 0, 0);
+    const now = new Date("2026-06-12T09:00:00Z");
     const iso = new Date(2026, 5, 14, 14, 0, 0).toISOString();
     const c: ReminderCandidate = { kind: "APPOINTMENT", label: "appt", frequency: "ONCE", isoDateTime: iso };
-    expect(computeNextFireAt(c, now).toISOString()).toBe(iso);
+    expect(computeNextFireAt(c, now, "UTC").toISOString()).toBe(iso);
   });
 });
 
 describe("describeSchedule", () => {
   it("formats DAILY", () => {
-    expect(describeSchedule("DAILY", new Date(2026, 5, 12, 8, 0))).toBe("every day at 8:00 AM");
+    expect(describeSchedule("DAILY", new Date("2026-06-12T08:00:00Z"), "UTC")).toBe("every day at 8:00 AM (UTC)");
   });
   it("formats ONCE", () => {
-    expect(describeSchedule("ONCE", new Date(2026, 5, 12, 14, 30))).toMatch(/on Jun 12 at 2:30 PM/);
+    expect(describeSchedule("ONCE", new Date("2026-06-12T14:30:00Z"), "UTC")).toMatch(/on Jun 12 at 2:30 PM/);
   });
 });

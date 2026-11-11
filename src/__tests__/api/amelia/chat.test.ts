@@ -87,7 +87,7 @@ describe("POST /api/amelia/chat", () => {
 
   it("returns Amelia's reply on the happy path", async () => {
     getUser.mockResolvedValue({ data: { user: { id: "sub-1" } } });
-    userFindUnique.mockResolvedValue({ id: "u1", role: "PATIENT", isActive: true, patient: { id: "pat1" } });
+    userFindUnique.mockResolvedValue({ id: "u1", role: "PATIENT", timeZone: "UTC", isActive: true, patient: { id: "pat1" } });
     convoCreate.mockResolvedValue({ id: "c1" });
     msgCreate.mockResolvedValue({ id: "um1" });
     msgFindMany.mockResolvedValue([{ role: "user", content: "I have a sore throat" }]);
@@ -104,7 +104,7 @@ describe("POST /api/amelia/chat", () => {
 
   it("includes a reminderSuggestion when a reminder is detected", async () => {
     getUser.mockResolvedValue({ data: { user: { id: "sub-1" } } });
-    userFindUnique.mockResolvedValue({ id: "u1", role: "PATIENT", isActive: true, patient: { id: "pat1" } });
+    userFindUnique.mockResolvedValue({ id: "u1", role: "PATIENT", timeZone: "UTC", isActive: true, patient: { id: "pat1" } });
     convoCreate.mockResolvedValue({ id: "c1" });
     msgCreate.mockResolvedValue({ id: "um1" });
     msgFindMany.mockResolvedValue([{ role: "user", content: "remind me to take meds at 8" }]);
@@ -123,7 +123,7 @@ describe("POST /api/amelia/chat", () => {
 describe("POST /api/amelia/chat (streaming)", () => {
   beforeEach(() => {
     getUser.mockResolvedValue({ data: { user: { id: "sub-1" } } });
-    userFindUnique.mockResolvedValue({ id: "u1", role: "PATIENT", isActive: true, patient: { id: "pat1" } });
+    userFindUnique.mockResolvedValue({ id: "u1", role: "PATIENT", timeZone: "UTC", isActive: true, patient: { id: "pat1" } });
     convoCreate.mockResolvedValue({ id: "c1" });
     msgCreate.mockResolvedValue({ id: "um1" });
     msgFindMany.mockResolvedValue([{ role: "user", content: "I feel dizzy" }]);
