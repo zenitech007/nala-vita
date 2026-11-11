@@ -123,7 +123,7 @@ export default function PatientPaymentsPage() {
         throw new Error("The payment provider did not return a checkout link");
       }
 
-      window.location.href = data.authorizationUrl;
+      window.location.assign(data.authorizationUrl);
     } catch (error) {
       setPayError(error instanceof Error ? error.message : "Unable to start payment");
     } finally {

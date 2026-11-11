@@ -44,7 +44,7 @@ export default function DoctorRecordRequests({ patientId }: { patientId?: string
       <form onSubmit={submit} className="mt-4 space-y-4">{patientId ? <p className="text-sm text-gray-700">Requesting access for the selected patient. Their records remain private until approval.</p> : <div><label htmlFor="request-patient-email" className="mb-2 block text-sm text-gray-800">Patient email on file</label>
         <input id="request-patient-email" type="email" required value={email} onChange={event => setEmail(event.target.value)} className="w-full rounded-lg border border-gray-300 bg-white px-3 py-3 text-gray-900" /></div>}
         <div><label htmlFor="request-source" className="mb-2 block text-sm text-gray-800">Record source</label><select id="request-source" value={source} onChange={event => setSource(event.target.value)} className="w-full rounded-lg border border-gray-300 bg-white p-3 text-sm text-gray-900">
-          <option value="auto">Original clinic, or the patient's entered records</option>{doctors.map(doctor => <option key={doctor.id} value={`doctor:${doctor.id}`}>Dr. {doctor.user.firstName} {doctor.user.lastName}</option>)}
+          <option value="auto">Original clinic, or the patient&apos;s entered records</option>{doctors.map(doctor => <option key={doctor.id} value={`doctor:${doctor.id}`}>Dr. {doctor.user.firstName} {doctor.user.lastName}</option>)}
           {facilities.map(facility => <option key={facility.id} value={`facility:${facility.id}`}>{facility.name}</option>)}</select></div>
         {!!memberships.length && <div><label htmlFor="request-as" className="mb-2 block text-sm text-gray-800">Requesting provider</label><select id="request-as" value={requesterFacilityId} onChange={event => setRequesterFacilityId(event.target.value)} className="w-full rounded-lg border border-gray-300 bg-white p-3 text-sm text-gray-900"><option value="">You, as an individual clinician</option>{memberships.map(facility => <option key={facility.id} value={facility.id}>{facility.name} — active verified clinicians</option>)}</select></div>}
         <button disabled={busy || (!patientId && !email.trim())} className="rounded-lg bg-slate-900 px-4 py-3 text-sm font-semibold text-white disabled:opacity-50">{busy ? "Please wait…" : "Request patient approval"}</button>
@@ -56,7 +56,7 @@ export default function DoctorRecordRequests({ patientId }: { patientId?: string
           {request.reason && <p className="text-sm text-gray-700">Reason: {request.reason}</p>}
           <p className="text-sm text-gray-700">{request.effectiveStatus.toLowerCase()} · Expires {consentDate(request.expiresAt)}</p>
           {request.effectiveStatus === "APPROVED" && request.patient && <Link href={`/doctor/patients/${request.patient.id}`} className="inline-block text-sm text-gray-900 underline">Open scoped patient record</Link>}
-          {request.effectiveStatus === "PENDING" && <p className="text-sm text-gray-600">Awaiting the patient's verified approval. No access granted.</p>}</article>)}</div>
+          {request.effectiveStatus === "PENDING" && <p className="text-sm text-gray-600">Awaiting the patient&apos;s verified approval. No access granted.</p>}</article>)}</div>
         {cursor && <button disabled={busy} onClick={more} className="mt-4 text-sm text-gray-900 underline">Load more requests</button>}</section></>}
   </main>;
 }

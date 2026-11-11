@@ -115,7 +115,7 @@ export default function PatientRecordAccess() {
           <p className="text-sm text-gray-700">{grant.effectiveStatus.toLowerCase()} · Expires {consentDate(grant.expiresAt)}</p>
           {grant.effectiveStatus === "APPROVED" && <button disabled={busy === grant.id} onClick={() => revoke(grant.id)} className="rounded-lg border border-red-300 px-3 py-2 text-sm text-red-800 disabled:opacity-50">Revoke access</button>}</article>)}</section>
       <section aria-labelledby="retained-sources"><h2 id="retained-sources" className="text-lg font-semibold text-gray-900">Providers retain their authored records</h2>
-        <p className="mt-2 text-sm text-gray-700">Revoking a sharing grant does not remove the originating provider's own records.</p>
+        <p className="mt-2 text-sm text-gray-700">Revoking a sharing grant does not remove the originating provider&apos;s own records.</p>
         <ul className="mt-3 space-y-2 text-sm text-gray-800">{sources.filter(source => !source.sourceUserId).map(source => <li key={source.key}>{source.label} — own authored records</li>)}</ul>
         {unclassified && <p className="mt-3 text-sm text-gray-700">Some older records need clinic review before they can be shared with another provider.</p>}</section>
       <section aria-labelledby="prepare-access" className="rounded-2xl border border-gray-200 bg-white p-5"><h2 id="prepare-access" className="text-lg font-semibold text-gray-900">Prepare a sharing request</h2>

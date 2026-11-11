@@ -167,7 +167,7 @@ export default function NotificationBell({
       markAsRead(notification.id);
     }
     if (notification.link) {
-      window.location.href = notification.link;
+      window.location.assign(notification.link);
     }
     setIsOpen(false);
   };

@@ -137,6 +137,19 @@ export default function VideoCallPanel({
     }
   }, [sendSignal]);
 
+  const endCall = (sendEndSignal = true) => {
+    if (sendEndSignal) {
+      void sendSignal({ type: "end-call" });
+    }
+    localStreamRef.current?.getTracks().forEach((t) => t.stop());
+    pcRef.current?.close();
+    pcRef.current = null;
+    membership.current = null;
+    setIsConnected(false);
+    setIsConnecting(false);
+    onCallEnd?.();
+  };
+
   const handleSignal = useCallback(async (raw: unknown) => {
     const member = membership.current;
     const pc = pcRef.current;
@@ -315,18 +328,7 @@ export default function VideoCallPanel({
     }
   };
 
-  const endCall = (sendEndSignal = true) => {
-    if (sendEndSignal) {
-      void sendSignal({ type: "end-call" });
-    }
-    localStreamRef.current?.getTracks().forEach((t) => t.stop());
-    pcRef.current?.close();
-    pcRef.current = null;
-    membership.current = null;
-    setIsConnected(false);
-    setIsConnecting(false);
-    onCallEnd?.();
-  };
+
 
   // ─── Render ──────────────────────────────────────────────
 
