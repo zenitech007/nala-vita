@@ -53,7 +53,7 @@ export default function PatientPharmacyPage() {
       const res = await fetch("/api/medications");
       if (res.ok) {
         const meds = await res.json();
-        const list: MedicationRecord[] = Array.isArray(meds) ? meds : [];
+        const list: MedicationRecord[] = Array.isArray(meds.medications) ? meds.medications : [];
         setItems(
           list
             .filter((m) => m.isActive)
