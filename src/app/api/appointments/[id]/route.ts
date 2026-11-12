@@ -35,6 +35,13 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
 
 // ─── PATCH: Update appointment status and notes ──────────
 
+const clinicalTransitions: Record<string, readonly string[]> = {
+  SCHEDULED: ["IN_PROGRESS", "NO_SHOW"],
+  CONFIRMED: ["IN_PROGRESS", "NO_SHOW"],
+  IN_PROGRESS: ["COMPLETED"],
+};
+const cancellableStatuses = ["SCHEDULED", "CONFIRMED"];
+
 const updateSchema = z.object({
   status: z
     .enum(["SCHEDULED", "CONFIRMED", "IN_PROGRESS", "COMPLETED", "CANCELLED", "NO_SHOW"])
@@ -51,7 +58,7 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
     const user = auth.user;
 
     const appointment = await prisma.appointment.findUnique({
-      where: { id }, select: { id: true, patientId: true, doctorId: true, status: true },
+      where: { id }, select: { id: true, patientId: true, doctorId: true, status: true, updatedAt: true },
     });
 
     if (!appointment) {
@@ -59,8 +66,8 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
     }
 
     // Authorization
-    const isPatient = user.patient?.id === appointment.patientId;
-    const isDoctor = user.doctor?.id === appointment.doctorId;
+    const isPatient = user.role === "PATIENT" && user.patient?.id === appointment.patientId;
+    const isDoctor = user.role === "DOCTOR" && user.doctor?.id === appointment.doctorId;
 
 
     if (!isPatient && !isDoctor) {
@@ -71,6 +78,21 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
 
     const body = await req.json();
     const validated = updateSchema.parse(body);
+    if (isPatient && (validated.notes !== undefined || validated.status !== "CANCELLED")) {
+      return NextResponse.json({ error: "Patients may only cancel appointments." }, { status: 403 });
+    }
+    if (isDoctor && (validated.cancellationReason !== undefined || (validated.status && !["IN_PROGRESS", "COMPLETED", "NO_SHOW"].includes(validated.status)))) {
+      return NextResponse.json({ error: "This clinical operation is not allowed." }, { status: 403 });
+    }
+    if (validated.status && !(isPatient
+      ? cancellableStatuses.includes(appointment.status)
+      : clinicalTransitions[appointment.status]?.includes(validated.status))) {
+      return NextResponse.json({ error: "The appointment no longer permits this transition." }, { status: 409 });
+    }
+    if (!validated.status && validated.notes === undefined) {
+      return NextResponse.json({ error: "Provide a clinical status or notes." }, { status: 422 });
+    }
+
 
     // Build update data
     const updateData: Record<string, unknown> = {};
@@ -88,9 +110,13 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
       updateData.notes = validated.notes;
     }
 
-    const updated = await prisma.appointment.update({
-      where: { id },
+    const changed = await prisma.appointment.updateMany({
+      where: { id, status: appointment.status, updatedAt: appointment.updatedAt, patientId: appointment.patientId, doctorId: appointment.doctorId },
       data: updateData,
+    });
+    if (changed.count !== 1) return NextResponse.json({ error: "The appointment changed. Refresh and retry." }, { status: 409 });
+    const updated = await prisma.appointment.findUnique({
+      where: { id },
       include: {
         doctor: {
           include: {
@@ -132,12 +158,12 @@ const deleteSchema = z.object({
 export async function DELETE(req: NextRequest, { params }: RouteParams) {
   try {
     const { id } = await params;
-    const auth = await requireApiUser({ roles: ["PATIENT", "DOCTOR"] });
+    const auth = await requireApiUser({ roles: ["PATIENT"], profile: "patient" });
     if (!auth.ok) return auth.response;
     const user = auth.user;
 
     const appointment = await prisma.appointment.findUnique({
-      where: { id }, select: { id: true, patientId: true, doctorId: true, status: true },
+      where: { id }, select: { id: true, patientId: true, doctorId: true, status: true, updatedAt: true },
     });
 
     if (!appointment) {
@@ -145,8 +171,8 @@ export async function DELETE(req: NextRequest, { params }: RouteParams) {
     }
 
     // Authorization
-    const isPatient = user.patient?.id === appointment.patientId;
-    const isDoctor = user.doctor?.id === appointment.doctorId;
+    const isPatient = user.role === "PATIENT" && user.patient?.id === appointment.patientId;
+    const isDoctor = user.role === "DOCTOR" && user.doctor?.id === appointment.doctorId;
 
 
     if (!isPatient && !isDoctor) {
@@ -154,10 +180,10 @@ export async function DELETE(req: NextRequest, { params }: RouteParams) {
     }
 
     // Cannot cancel an already completed or cancelled appointment
-    if (["COMPLETED", "CANCELLED"].includes(appointment.status)) {
+    if (!cancellableStatuses.includes(appointment.status)) {
       return NextResponse.json(
         { error: `Cannot cancel an appointment that is already ${appointment.status.toLowerCase()}` },
-        { status: 400 }
+        { status: 409 }
       );
     }
 
@@ -166,14 +192,16 @@ export async function DELETE(req: NextRequest, { params }: RouteParams) {
     const body = await req.json();
     const validated = deleteSchema.parse(body);
 
-    const cancelled = await prisma.appointment.update({
-      where: { id },
+    const changed = await prisma.appointment.updateMany({
+      where: { id, status: appointment.status, updatedAt: appointment.updatedAt, patientId: user.patient!.id },
       data: {
         status: "CANCELLED",
         cancellationReason: validated.cancellationReason,
       },
     });
 
+    if (changed.count !== 1) return NextResponse.json({ error: "The appointment changed. Refresh and retry." }, { status: 409 });
+    const cancelled = await prisma.appointment.findUnique({ where: { id } });
     return NextResponse.json({
       message: "Appointment cancelled successfully",
       appointment: cancelled,

@@ -83,8 +83,8 @@ it('F15 duplicate and concurrent delivery produces exactly one settlement and tw
   expect(results.map(r => r.status)).toEqual([200, 200]); expect(updatePayment).toHaveBeenCalledTimes(1);
   expect(updateAppointment).toHaveBeenCalledTimes(1); expect(notification).toHaveBeenCalledTimes(2); expect(receipts.size).toBe(1);
 });
-it('F15 cannot reconfirm a cancelled appointment', async () => {
-  state.appointmentStatus = 'CANCELLED'; expect((await webhook()).status).toBe(200);
+it.each(['CANCELLED', 'COMPLETED'])('F12/F15 cannot reconfirm a terminal %s appointment', async status => {
+  state.appointmentStatus = status; expect((await webhook()).status).toBe(200);
   expect(updatePayment).not.toHaveBeenCalled(); expect(updateAppointment).not.toHaveBeenCalled(); expect(notification).not.toHaveBeenCalled();
   expect([...receipts.values()]).toEqual([expect.objectContaining({ outcome: 'REQUIRES_RECONCILIATION' })]);
 });
