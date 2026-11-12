@@ -36,6 +36,7 @@ export function SidebarShell({ role, roleLabel, brand = "Nala Vita", user, nav }
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isCommandOpen, setIsCommandOpen] = useState(false);
+  const [signOutError, setSignOutError] = useState("");
 
   // Global Cmd+K / Ctrl+K listener
   useEffect(() => {
@@ -98,6 +99,7 @@ export function SidebarShell({ role, roleLabel, brand = "Nala Vita", user, nav }
 
   return (
     <>
+      {signOutError && <p role="alert" className="fixed bottom-4 left-4 z-50 rounded-lg bg-white p-3 text-sm text-red-700">{signOutError}</p>}
       <button
         onClick={() => setIsMobileOpen(true)}
         className="lg:hidden fixed top-3 left-3 z-30 p-2.5 bg-white dark:bg-[#1E1F22] border border-gray-200 dark:border-gray-800 rounded-full shadow-sm text-gray-600 dark:text-gray-300"

@@ -1,5 +1,7 @@
 "use client";
 
+import { fetchJson } from "@/lib/api-fetch";
+
 import { useEffect, useState, useRef, useCallback } from "react";
 import { Bell, X, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -43,6 +45,7 @@ export default function NotificationBell({
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
+  const [readError, setReadError] = useState("");
   const [loading, setLoading] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -130,7 +133,8 @@ export default function NotificationBell({
 
   const markAsRead = async (notificationId: string) => {
     try {
-      await fetch("/api/notifications", {
+      setReadError("");
+      await fetchJson("/api/notifications", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ notificationIds: [notificationId] }),
@@ -140,14 +144,15 @@ export default function NotificationBell({
         prev.map((n) => (n.id === notificationId ? { ...n, isRead: true } : n))
       );
       setUnreadCount((prev) => Math.max(0, prev - 1));
-    } catch {
-      //
+    } catch (error) {
+      setReadError(error instanceof Error ? error.message : "Could not mark notifications as read.");
     }
   };
 
   const markAllAsRead = async () => {
     try {
-      await fetch("/api/notifications", {
+      setReadError("");
+      await fetchJson("/api/notifications", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ markAllRead: true }),
@@ -155,8 +160,8 @@ export default function NotificationBell({
 
       setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
       setUnreadCount(0);
-    } catch {
-      //
+    } catch (error) {
+      setReadError(error instanceof Error ? error.message : "Could not mark notifications as read.");
     }
   };
 
@@ -176,6 +181,7 @@ export default function NotificationBell({
 
   return (
     <div ref={dropdownRef} className={cn("relative", className)}>
+      {readError && <p role="alert" className="text-sm text-red-700">{readError}</p>}
       {/* Bell button */}
       <button
         onClick={() => {
