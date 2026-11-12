@@ -3,6 +3,7 @@ import localFont from "next/font/local";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages } from "next-intl/server";
 import "./globals.css";
+import "./appearance.css";
 import Providers from "@/providers";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
 
@@ -83,7 +84,7 @@ export default async function RootLayout({
   const messages = await getMessages();
 
   return (
-    <html lang={locale} className="theme-rose" suppressHydrationWarning>
+    <html lang={locale} data-brand="rose" suppressHydrationWarning>
       <head>
         {/*
           ✅ FIX: silence Chrome's "preloaded but not used" warning.

@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import postcss from "postcss";
-const css = postcss.parse(fs.readFileSync(new URL("../src/app/globals.css", import.meta.url), "utf8"));
+const css = postcss.parse(["globals.css", "appearance.css"].map(file => fs.readFileSync(new URL("../src/app/" + file, import.meta.url), "utf8")).join("\n"));
 const rules = new Map();
 css.walkRules(rule => {
   const tokens = {};
@@ -25,12 +25,18 @@ for (const brand of ["rose", "fuchsia", "ocean", "emerald"]) {
       ...rules.get(":root"), ...rules.get(".theme-" + brand),
       ...rules.get('html[data-brand="' + brand + '"]'),
       ...rules.get("html." + mode),
+      ...rules.get('html.' + mode + '[data-brand="' + brand + '"]'),
+      ...rules.get("html." + mode + "[data-brand]"),
     };
     const background = tokens["--action-bg"] ?? tokens["--primary"];
     const foreground = tokens["--action-fg"] ?? "#ffffff";
     const pairs = ["", "-hover", "-disabled", "-focus"].map(state => [
       state || "-normal", tokens["--action" + state + "-bg"] ?? background, tokens["--action" + state + "-fg"] ?? foreground,
     ]);
+    pairs.push(["-canvas", tokens["--background"], tokens["--foreground"]]);
+    pairs.push(["-surface", tokens["--surface"], tokens["--foreground"]]);
+    pairs.push(["-muted", tokens["--surface-muted"], tokens["--text-muted"]]);
+    pairs.push(["-tint", tokens["--bg-tint"], tokens["--text-on-tint"]]);
     pairs.push(["-focus-outline", tokens["--focus-outline"] ?? background, tokens["--background"]]);
     for (const [state, bg, fg] of pairs) {
       const ratio = contrast(bg, fg);
