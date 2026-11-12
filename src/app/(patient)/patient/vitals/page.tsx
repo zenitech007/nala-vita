@@ -1,4 +1,5 @@
 "use client";
+import { fetchJson } from "@/lib/api-fetch";
 import { temperatureFromCelsius, TEMPERATURE, TEMPERATURE_RANGE_F } from "@/lib/temperature";
 
 import { useState, useEffect, useCallback } from "react";
@@ -105,6 +106,7 @@ export default function PatientVitalsPage() {
   const [inputSource, setInputSource] = useState<"manual" | "wearable">("manual");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [submitError, setSubmitError] = useState("");
   const [loadingVitals, setLoadingVitals] = useState(true);
   const [chartData, setChartData] = useState<Record<VitalType, VitalReading[]>>({
     bloodPressure: [],
@@ -218,6 +220,8 @@ export default function PatientVitalsPage() {
   const handleSubmit = async () => {
     if (!inputValue) return;
     setIsSubmitting(true);
+    setSubmitError("");
+    setSubmitSuccess(false);
 
     try {
       const body: Record<string, unknown> = { source: inputSource };
@@ -237,7 +241,7 @@ export default function PatientVitalsPage() {
         body.temperatureUnit = "F";
       }
 
-      await fetch("/api/vitals", {
+      await fetchJson("/api/vitals", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -250,8 +254,8 @@ export default function PatientVitalsPage() {
         setSubmitSuccess(false);
         setShowForm(false);
       }, 2000);
-    } catch {
-      // handle
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : "Could not save the reading. Please retry.");
     } finally {
       setIsSubmitting(false);
     }
@@ -422,6 +426,7 @@ export default function PatientVitalsPage() {
               <button onClick={() => setShowForm(false)} className="p-1.5 hover:bg-gray-100 rounded-lg"><X className="w-5 h-5 text-gray-500" /></button>
             </div>
 
+            {submitError && <p role="alert" className="mb-3 text-sm text-red-700">{submitError}</p>}
             {submitSuccess ? (
               <div className="text-center py-8">
                 <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-3" />

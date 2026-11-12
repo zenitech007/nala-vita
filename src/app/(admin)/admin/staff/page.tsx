@@ -1,5 +1,7 @@
 "use client";
 
+import { fetchJson } from "@/lib/api-fetch";
+
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
@@ -66,6 +68,7 @@ export default function AdminStaffPage() {
   const [roleFilter, setRoleFilter] = useState<"ALL" | "DOCTOR" | "NURSE">("ALL");
   const [showAddForm, setShowAddForm] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [mutationError, setMutationError] = useState("");
 
   // Add form state
   const [formName, setFormName] = useState("");
@@ -118,36 +121,41 @@ export default function AdminStaffPage() {
 
   async function toggleActive(id: string) {
     const target = staffList.find((s) => s.id === id);
-    if (!target) return;
+    if (!target || saving) return;
     const nextState = !target.isActive;
-    setStaffList((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, isActive: nextState } : s))
-    );
+    setMutationError("");
+    setSaving(true);
     try {
-      await fetch("/api/admin/staff", {
+      await fetchJson("/api/admin/staff", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ doctorId: id, isActive: nextState }),
       });
-    } catch (err) {
-      console.error("Failed to toggle staff active state:", err);
+      setStaffList(prev => prev.map(staff => staff.id === id ? { ...staff, isActive: nextState } : staff));
+    } catch (error) {
+      setMutationError(error instanceof Error ? error.message : "Could not update staff status.");
+    } finally {
+      setSaving(false);
     }
   }
 
   async function assignDepartment(id: string, dept: string) {
-    setStaffList((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, department: dept, speciality: dept } : s))
-    );
-    setDeptModalId(null);
-    setDeptModalValue("");
+    if (saving) return;
+    setMutationError("");
+    setSaving(true);
     try {
-      await fetch("/api/admin/staff", {
+      await fetchJson("/api/admin/staff", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ doctorId: id, department: dept }),
       });
-    } catch (err) {
-      console.error("Failed to update staff department:", err);
+      setStaffList(prev => prev.map(staff => staff.id === id ? { ...staff, department: dept, speciality: dept } : staff));
+      setDeptModalId(null);
+      setDeptModalValue("");
+    } catch (error) {
+      setMutationError(error instanceof Error ? error.message : "Could not update the department.");
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -217,6 +225,7 @@ export default function AdminStaffPage() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {mutationError && !deptModalId && <p role="alert" className="mb-4 text-sm text-red-700">{mutationError}</p>}
         {/* Filters */}
         <div className="flex flex-col sm:flex-row gap-3 mb-6">
           <div className="relative flex-1">
@@ -330,6 +339,7 @@ export default function AdminStaffPage() {
                       <td className="px-6 py-4">
                         <button
                           onClick={() => {
+                            setMutationError("");
                             setDeptModalId(staff.id);
                             setDeptModalValue(staff.department);
                           }}
@@ -343,6 +353,8 @@ export default function AdminStaffPage() {
                         {/* Toggle Switch */}
                         <button
                           onClick={() => toggleActive(staff.id)}
+                          disabled={saving}
+                          aria-label={`${staff.isActive ? "Deactivate" : "Activate"} ${staff.name}`}
                           className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:ring-offset-2"
                           style={{
                             backgroundColor: staff.isActive
@@ -547,6 +559,7 @@ export default function AdminStaffPage() {
                 <X className="w-5 h-5 text-gray-400" />
               </button>
             </div>
+            {mutationError && <p role="alert" className="mb-3 text-sm text-red-700">{mutationError}</p>}
             <select
               value={deptModalValue}
               onChange={(e) => setDeptModalValue(e.target.value)}
@@ -567,6 +580,7 @@ export default function AdminStaffPage() {
               </button>
               <button
                 onClick={() => assignDepartment(deptModalId, deptModalValue)}
+                disabled={saving}
                 className="px-4 py-2 rounded-xl text-sm font-medium text-white bg-[var(--primary)] hover:opacity-90 transition"
               >
                 Save
