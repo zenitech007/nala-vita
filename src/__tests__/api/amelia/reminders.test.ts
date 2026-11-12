@@ -47,7 +47,7 @@ describe("reminders API", () => {
     getUser.mockResolvedValue({ data: { user: { id: "sub1" } } });
     userFindUnique.mockResolvedValue({ id: "u1", role: "PATIENT", timeZone: "UTC", isActive: true, patient: { id: "pat1" } });
     listReminders.mockResolvedValue([{ id: "1", kind: "MEDICATION", label: "BP meds", frequency: "DAILY", nextFireAt: "x", schedule: "every day at 8:00 AM" }]);
-    const res = await GET(req());
+    const res = await GET();
     const json = await res.json();
     expect(res.status).toBe(200);
     expect(json.reminders[0].label).toBe("BP meds");

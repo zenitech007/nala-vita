@@ -304,7 +304,6 @@ describe("Patient Records Lifecycle & Privacy Suite", () => {
       userFindUnique.mockResolvedValueOnce({
         id: "u-patient",
         role: "PATIENT", isActive: true,
-        isActive: true,
         patient: { id: "p-1" },
         firstName: "Alex",
         lastName: "Morgan",
