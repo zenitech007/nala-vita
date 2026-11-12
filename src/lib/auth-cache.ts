@@ -28,11 +28,11 @@ export const getAuthenticatedUserWithProfile = cache(async () => {
         select: { id: true, dateOfBirth: true, gender: true, bloodType: true },
       },
       doctor: {
-        select: { id: true, specialization: true, licenseNumber: true, isVerified: true },
+        select: { id: true, specialization: true, licenseNumber: true, isVerified: true, verification: { select: { status: true, reason: true } } },
       },
     },
   });
 
-  if (!user?.isActive || (user.role === "DOCTOR" && !user.doctor?.isVerified)) return null;
+  if (!user?.isActive) return null;
   return { session, user };
 });

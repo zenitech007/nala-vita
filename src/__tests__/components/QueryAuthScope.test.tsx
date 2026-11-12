@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { render, waitFor, act } from "@testing-library/react";
 import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import Providers from "@/providers";
@@ -10,7 +11,8 @@ const subscribe = jest.fn(callback => {
 jest.mock("@/lib/supabase", () => ({ supabase: { auth: { onAuthStateChange: (callback: typeof authChanged) => subscribe(callback) } } }));
 let client: QueryClient;
 function CaptureClient() {
-  client = useQueryClient();
+  const queryClient = useQueryClient();
+  useEffect(() => { client = queryClient; }, [queryClient]);
   return null;
 }
 

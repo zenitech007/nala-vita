@@ -65,6 +65,7 @@ model User {
   notifications    Notification[]
   fileUploads      FileUpload[]
   otpChallenges    OtpChallenge[]
+  doctorVerificationReviews DoctorVerification[] @relation("DoctorVerificationReviewer")
 
   accessRequestSourceUser RecordAccessRequest[] @relation("RequestSourceUser")
 
@@ -205,6 +206,7 @@ model Doctor {
   referralsFrom       Referral[]           @relation("ReferringDoctor")
   referralsTo         Referral[]           @relation("ReferredDoctor")
   ameliaConversations AmeliaConversation[]
+  verification DoctorVerification?
 
   facilityMemberships FacilityMembership[] @relation("FacilityMemberDoctor")
 
@@ -894,4 +896,21 @@ model RecordAccessLog {
   @@index([patientId, viewedAt])
   @@index([viewerUserId, viewedAt])
   @@map("record_access_logs")
+}
+
+
+model DoctorVerification {
+  doctorId String @id @map("doctor_id")
+  status String @default("PENDING")
+  reason String?
+  reviewerId String? @map("reviewer_id")
+  reviewedAt DateTime? @map("reviewed_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  doctor Doctor @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  reviewer User? @relation("DoctorVerificationReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
+
+  @@index([status, updatedAt])
+  @@map("doctor_verifications")
 }

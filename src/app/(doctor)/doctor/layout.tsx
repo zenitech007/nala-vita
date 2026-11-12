@@ -11,6 +11,17 @@ export default async function DoctorLayout({ children }: { children: React.React
   if (authData.user.role !== "DOCTOR" || !authData.user.doctor) redirect("/unauthorized");
 
     const { user } = authData;
+    if (!user.doctor!.isVerified) {
+      const rejected = user.doctor!.verification?.status === "REJECTED";
+      return <main className="mx-auto max-w-xl px-4 py-12">
+        <h1 className="text-2xl font-semibold">{rejected ? "Verification rejected" : "Verification pending"}</h1>
+        <p className="mt-3 text-gray-700">Your clinician account requires an administrator review before clinical tools become available.</p>
+        {user.doctor!.verification?.reason && <p className="mt-3 text-gray-700">{user.doctor!.verification.reason}</p>}
+        <p className="mt-3 text-gray-600">Contact your clinic administrator about the review.</p>
+        <a href="/login" className="mt-5 inline-block underline">Return to sign in</a>
+      </main>;
+    }
+
 
     return (
         <div className="flex min-h-screen bg-gray-50">

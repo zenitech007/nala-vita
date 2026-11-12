@@ -7,9 +7,10 @@ import DoctorDashboardClient from "./_components/DoctorDashboardClient";
 import { getAuthenticatedUserWithProfile } from "@/lib/auth-cache";
 
 export default async function DoctorDashboardPage() {
-  const auth = await requireApiUser({ roles: ["DOCTOR"], profile: "doctor" });
+  const auth = await requireApiUser({ roles: ["DOCTOR"], profile: "doctor", allowUnverifiedDoctor: true });
   if (!auth.ok) redirect("/login");
   const user = auth.user;
+  if (!user.doctor!.isVerified) return null;
   const doctorId = user.doctor!.id;
   const vitalAccess = await getCollectionVisibility(user, "VITALS");
   const now = new Date();

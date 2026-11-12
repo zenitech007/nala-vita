@@ -24,3 +24,10 @@ it('keeps the patient assistant out of the clinician layout', async () => {
   const children = layout.props.children as Array<{ type: unknown }>;
   expect(children.map(child => child.type)).not.toContain(AmeliaLauncher);
 });
+
+it('shows a pending doctor status without clinical children', async () => {
+  identity.mockResolvedValue({ session: { user: {} }, user: { role: 'DOCTOR', isActive: true, doctor: { id: 'd', isVerified: false, verification: { status: 'PENDING' } } } });
+  const layout = await DoctorLayout({ children: 'SENSITIVE_CHILD' });
+  expect(JSON.stringify(layout)).not.toContain('SENSITIVE_CHILD');
+  expect(JSON.stringify(layout)).toMatch(/pending/i);
+});

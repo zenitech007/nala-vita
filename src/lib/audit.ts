@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 
@@ -23,12 +24,12 @@ interface AuditInput {
 }
 
 /** Persist only approved metadata fields. Monitoring receives a structured event on failure. */
-export async function logAudit(input: AuditInput): Promise<void> {
+export async function logAudit(input: AuditInput, options?: { client?: Pick<Prisma.TransactionClient, "auditLog">; required?: boolean }): Promise<void> {
   const action = input.action.toUpperCase();
   const resourceType = input.resourceType.toUpperCase();
   const metadata = auditMetadata.safeParse(input.metadata ?? {});
   try {
-    await prisma.auditLog.create({ data: {
+    await (options?.client ?? prisma).auditLog.create({ data: {
       userId: input.userId,
       action,
       resourceType,
@@ -37,5 +38,6 @@ export async function logAudit(input: AuditInput): Promise<void> {
     } });
   } catch {
     console.error(JSON.stringify({ event: "audit.write_failed", action, resourceType }));
+    if (options?.required) throw new Error("Required audit persistence failed");
   }
 }

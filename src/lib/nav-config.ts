@@ -56,6 +56,7 @@ export const DOCTOR_NAV: readonly NavItem[] = [
 export const ADMIN_NAV: readonly NavItem[] = [
   { icon: LayoutDashboard, label: "Dashboard",        href: "/admin/dashboard" },
   { icon: Users,           label: "Staff",            href: "/admin/staff" },
+  { icon: Users,           label: "Doctor verification", href: "/admin/doctors" },
   { icon: Bed,             label: "Beds & Resources", href: "/admin/beds" },
   { icon: FileText,        label: "Reports",          href: "/admin/reports" },
   { icon: Settings,        label: "Settings",         href: "/admin/settings" },

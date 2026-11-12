@@ -6,7 +6,7 @@ WITH expected(table_name) AS (VALUES
   ('bed_resources'), ('file_uploads'), ('audit_logs'), ('amelia_conversations'),
   ('amelia_messages'), ('amelia_memories'), ('reminders'), ('otp_challenges'),
   ('claim_invitations'), ('otp_verification_budgets'), ('facilities'),
-  ('facility_memberships'), ('record_access_requests'), ('record_access_grants'), ('record_access_logs')
+  ('facility_memberships'), ('record_access_requests'), ('record_access_grants'), ('record_access_logs'), ('doctor_verifications')
 )
 SELECT e.table_name, CASE WHEN c.oid IS NULL THEN 'MISSING'
   WHEN NOT c.relrowsecurity THEN 'FAIL_RLS'

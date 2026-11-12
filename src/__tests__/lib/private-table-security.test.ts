@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 const migration = 'prisma/migrations/20261106020000_private_clinical_and_amelia_rls/migration.sql';
-const sql = existsSync(migration) ? readFileSync(migration, 'utf8') : '';
+const verificationMigration = 'prisma/migrations/20261111010000_doctor_verification/migration.sql';
+const sql = [migration, verificationMigration].map(file => existsSync(file) ? readFileSync(file, 'utf8') : '').join('\n');
 it('F18 protects every application data table outside the self-profile exception', () => {
   const schema = readFileSync('prisma/schema.prisma', 'utf8');
   const tables = [...schema.matchAll(/@@map\("([^"]+)"\)/g)].map(match => match[1]).filter(name => !['users', 'doctors'].includes(name));
