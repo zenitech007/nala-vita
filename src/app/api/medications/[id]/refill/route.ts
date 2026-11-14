@@ -1,8 +1,6 @@
 import { requireApiUser } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { createServerSupabaseClient } from "@/lib/supabase-server";
-import { createNotification } from "@/lib/notifications";
 
 export async function PATCH(
   req: NextRequest,
@@ -37,16 +35,18 @@ export async function PATCH(
       return NextResponse.json({ error: "No refills remaining" }, { status: 400 });
     }
 
-    await createNotification(
-      prescription.doctor.user.id,
-      "Refill Request",
-      `Patient ${user.firstName} ${user.lastName} has requested a refill for ${prescription.medication}.`,
-      "PRESCRIPTION",
-      { link: `/doctor/prescriptions` }
-    );
-
-    return NextResponse.json({ message: "Refill request sent" });
+    const request = await prisma.$transaction(async tx => {
+      const request = await tx.refillRequest.create({ data: { prescriptionId, requesterId: user.id } });
+      await tx.notification.create({ data: {
+        userId: prescription.doctor!.user.id, title: "Refill Request",
+        message: `Patient ${user.firstName} ${user.lastName} requested a refill review.`,
+        type: "PRESCRIPTION", link: "/doctor/prescriptions",
+      } });
+      return request;
+    });
+    return NextResponse.json({ message: "Refill review requested", request });
   } catch (error) {
+    if (error && typeof error === "object" && "code" in error && error.code === "P2002") return NextResponse.json({ error: "A refill request is already pending" }, { status: 409 });
     console.error("[PATCH /api/medications/[id]/refill]", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }

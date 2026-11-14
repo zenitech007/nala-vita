@@ -1,4 +1,5 @@
 "use client";
+import RefillRequests from "@/components/medications/RefillRequests";
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
@@ -425,6 +426,7 @@ export default function DoctorPrescriptionsPage() {
       </header>
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8 space-y-6">
+        <RefillRequests review />
         {/* Patient Selection Bar */}
         <div className="bg-white rounded-3xl border border-gray-100 p-6 shadow-sm">
           <div className="flex items-center justify-between mb-4">

@@ -66,6 +66,8 @@ model User {
   fileUploads      FileUpload[]
   otpChallenges    OtpChallenge[]
   doctorVerificationReviews DoctorVerification[] @relation("DoctorVerificationReviewer")
+  requestedRefills RefillRequest[] @relation("RefillRequester")
+  reviewedRefills RefillRequest[] @relation("RefillReviewer")
 
   accessRequestSourceUser RecordAccessRequest[] @relation("RequestSourceUser")
 
@@ -293,7 +295,26 @@ model Appointment {
   @@map("appointments")
 }
 
+model RefillRequest {
+  id String @id @default(cuid())
+  prescriptionId String @map("prescription_id")
+  requesterId String @map("requester_id")
+  status String @default("PENDING")
+  reason String?
+  reviewerId String? @map("reviewer_id")
+  reviewedAt DateTime? @map("reviewed_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  prescription Prescription @relation(fields: [prescriptionId], references: [id], onDelete: Cascade)
+  requester User @relation("RefillRequester", fields: [requesterId], references: [id], onDelete: Restrict)
+  reviewer User? @relation("RefillReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
+  @@index([prescriptionId, status, createdAt])
+  @@index([requesterId, createdAt])
+  @@map("refill_requests")
+}
+
 model Prescription {
+  refillRequests RefillRequest[]
   id                 String    @id @default(cuid())
   patientId          String    @map("patient_id")
   doctorId           String?   @map("doctor_id")

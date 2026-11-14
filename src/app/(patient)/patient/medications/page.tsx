@@ -1,4 +1,5 @@
 "use client";
+import RefillRequests from "@/components/medications/RefillRequests";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import Link from "next/link";
@@ -188,6 +189,7 @@ export default function PatientMedicationsPage() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
   // Loading indicators for micro-actions
+  const [refillRevision, setRefillRevision] = useState(0);
   const [refillLoadingId, setRefillLoadingId] = useState<string | null>(null);
   const [loggingActionKey, setLoggingActionKey] = useState<string | null>(null);
   const [togglingPrivacyId, setTogglingPrivacyId] = useState<string | null>(null);
@@ -348,7 +350,8 @@ export default function PatientMedicationsPage() {
         method: "PATCH",
       });
       if (res.ok) {
-        setToast({ message: "Refill request sent successfully", type: "success" });
+        setToast({ message: "Refill review requested", type: "success" });
+        setRefillRevision(value => value + 1);
         await fetchMedications();
       } else {
         const data = await res.json();
@@ -510,6 +513,7 @@ export default function PatientMedicationsPage() {
       </header>
 
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8 space-y-8">
+        <RefillRequests revision={refillRevision} />
         <MedSafetyPanel />
 
         {/* ────────────────────────────────────────────────── */}
