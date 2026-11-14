@@ -396,7 +396,7 @@ export default function VideoCallPanel({
       </div>
 
       {/* Controls bar */}
-      <div className="flex items-center justify-center gap-3 px-6 py-4 bg-gray-900/95 backdrop-blur-sm">
+      <div className="flex flex-wrap items-center justify-center gap-3 px-3 sm:px-6 py-4 bg-gray-900/95 backdrop-blur-sm">
         <button
           onClick={toggleMute}
           className={cn(

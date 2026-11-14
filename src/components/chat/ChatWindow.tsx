@@ -16,6 +16,7 @@ import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 import { chatEventSchema, chatTopic, privateChannel } from "@/lib/realtime-events";
+import { preferredScrollBehavior } from "@/lib/motion-preferences";
 import { format } from "date-fns";
 
 // ─── Types ───────────────────────────────────────────────
@@ -128,7 +129,7 @@ export default function ChatWindow({
   // ─── Auto-scroll ───────────────────────────────────────
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    messagesEndRef.current?.scrollIntoView({ behavior: preferredScrollBehavior() });
   }, [messages]);
 
   const handleScroll = () => {
@@ -139,7 +140,7 @@ export default function ChatWindow({
   };
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    messagesEndRef.current?.scrollIntoView({ behavior: preferredScrollBehavior() });
   };
 
   // ─── Mark as read ──────────────────────────────────────

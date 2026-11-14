@@ -53,7 +53,7 @@ export default function DoctorChatPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-dvh bg-gray-50 flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-[var(--primary)]" />
       </div>
     );
@@ -61,7 +61,7 @@ export default function DoctorChatPage() {
 
   if (!session) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+      <div className="min-h-dvh bg-gray-50 flex items-center justify-center px-4">
         <div className="max-w-md rounded-2xl border border-red-100 bg-white p-8 text-center">
           <AlertCircle className="mx-auto mb-4 h-10 w-10 text-red-500" />
           <h1 className="text-lg font-semibold text-gray-900">
@@ -80,7 +80,7 @@ export default function DoctorChatPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="min-h-dvh bg-gray-50 flex flex-col">
       <header className="bg-white border-b border-gray-200">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 py-4">
           <div className="flex items-center gap-3">
@@ -105,7 +105,7 @@ export default function DoctorChatPage() {
           otherUserId={session.participant.id}
           otherUserName={session.participant.displayName}
           otherUserRole={session.participant.roleLabel}
-          className="h-[calc(100vh-10rem)]"
+          className="h-[calc(100dvh-10rem)]"
         />
       </main>
     </div>

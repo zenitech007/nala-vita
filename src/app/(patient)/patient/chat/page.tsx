@@ -32,14 +32,14 @@ export default function ChatIndexPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
+      <div className="flex items-center justify-center min-h-[60dvh]">
         <Loader2 className="w-6 h-6 animate-spin text-[var(--primary)]" />
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
+    <div className="flex flex-col items-center justify-center min-h-[60dvh] text-center px-4">
       <div className="w-16 h-16 bg-[var(--primary)]/10 rounded-2xl flex items-center justify-center mb-4">
         <MessageSquare className="w-8 h-8 text-[var(--primary)]" />
       </div>

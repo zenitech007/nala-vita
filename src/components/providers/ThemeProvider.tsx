@@ -1,5 +1,6 @@
 "use client";
 
+import { MotionConfig } from "framer-motion";
 import { useEffect } from "react";
 import { ThemeProvider as NextThemesProvider, type ThemeProviderProps, useTheme } from "next-themes";
 import { useBrandTheme } from "@/hooks/useBrandTheme";
@@ -21,7 +22,7 @@ export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
   return (
     <NextThemesProvider attribute="class" themes={["light", "dark"]} storageKey="theme" defaultTheme="system" enableSystem {...props}>
       <BrandSelection />
-      {children}
+      <MotionConfig reducedMotion="user">{children}</MotionConfig>
     </NextThemesProvider>
   );
 }

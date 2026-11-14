@@ -66,7 +66,7 @@ export default function PatientTelemedicinePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+      <div className="min-h-dvh bg-gray-950 flex items-center justify-center">
         <Loader2 className="w-10 h-10 animate-spin text-[var(--primary)]" />
       </div>
     );
@@ -74,7 +74,7 @@ export default function PatientTelemedicinePage() {
 
   if (!appointment) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="min-h-dvh bg-gray-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl border border-gray-100 p-8 text-center max-w-md">
           <div className="w-14 h-14 bg-red-50 text-red-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
             <AlertCircle className="w-7 h-7" />
@@ -96,7 +96,7 @@ export default function PatientTelemedicinePage() {
 
   if (callEnded) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="min-h-dvh bg-gray-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl border border-gray-100 p-10 text-center max-w-md">
           <div className="w-16 h-16 bg-green-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
             <Stethoscope className="w-8 h-8 text-green-600" />
@@ -132,7 +132,7 @@ export default function PatientTelemedicinePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-950 flex flex-col">
+    <div className="min-h-dvh bg-gray-950 flex flex-col">
       {/* Header */}
       <header className="bg-gray-900 border-b border-gray-800 px-6 py-3">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
@@ -189,7 +189,7 @@ export default function PatientTelemedicinePage() {
             userId={userId}
             isInitiator={false}
             onCallEnd={handleCallEnd}
-            className="h-[calc(100vh-10rem)]"
+            className="h-[calc(100dvh-10rem)]"
           />
         )}
       </main>

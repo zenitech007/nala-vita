@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import {
   Sparkles,
   X,
@@ -21,6 +21,7 @@ export interface AmeliaLauncherProps {
 }
 
 export default function AmeliaLauncher({ role = "patient" }: AmeliaLauncherProps) {
+  const reducedMotion = useReducedMotion();
   const [open, setOpen] = useState(false);
   const [isDocked, setIsDocked] = useState(false);
   const [chatKey, setChatKey] = useState(0);
@@ -60,11 +61,11 @@ export default function AmeliaLauncher({ role = "patient" }: AmeliaLauncherProps
             {isDocked ? (
               // ─── DOCKED DRAWER MODE (Sticky Right Drawer) ───────────────────
               <motion.aside
-                initial={{ x: "100%" }}
+                initial={reducedMotion ? false : { x: "100%" }}
                 animate={{ x: 0 }}
-                exit={{ x: "100%" }}
-                transition={{ type: "spring", damping: 28, stiffness: 220 }}
-                className="fixed inset-y-0 right-0 z-50 w-[440px] max-w-full bg-white dark:bg-[#1E1F22] shadow-2xl border-l border-gray-200 dark:border-gray-800 flex flex-col"
+                exit={reducedMotion ? undefined : { x: "100%" }}
+                transition={reducedMotion ? { duration: 0 } : { type: "spring", damping: 28, stiffness: 220 }}
+                className="fixed inset-y-0 right-0 z-50 w-[440px] max-w-full h-dvh bg-white dark:bg-[#1E1F22] shadow-2xl border-l border-gray-200 dark:border-gray-800 flex flex-col"
               >
                 {/* Header */}
                 <div className="flex items-center justify-between bg-[var(--primary)] text-white px-4 py-3 shrink-0">
@@ -118,11 +119,11 @@ export default function AmeliaLauncher({ role = "patient" }: AmeliaLauncherProps
             ) : (
               // ─── FLOATING CARD MODE (Default Light Widget) ─────────────────
               <motion.div
-                initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                initial={reducedMotion ? false : { opacity: 0, scale: 0.9, y: 20 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                transition={{ duration: 0.2 }}
-                className="fixed bottom-24 right-6 z-50 w-[92vw] sm:w-[400px] h-[72vh] max-h-[640px] rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-800 overflow-hidden flex flex-col bg-white dark:bg-[#1E1F22]"
+                exit={reducedMotion ? undefined : { opacity: 0, scale: 0.9, y: 20 }}
+                transition={{ duration: reducedMotion ? 0 : 0.2 }}
+                className="fixed bottom-24 right-4 sm:right-6 z-50 w-[calc(100vw-2rem)] sm:w-[400px] h-[72dvh] max-h-[min(640px,calc(100dvh-7rem))] rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-800 overflow-hidden flex flex-col bg-white dark:bg-[#1E1F22]"
               >
                 {/* Header */}
                 <div className="flex items-center justify-between bg-[var(--primary)] text-white px-4 py-3 shrink-0">
@@ -177,15 +178,15 @@ export default function AmeliaLauncher({ role = "patient" }: AmeliaLauncherProps
       {/* Launcher Floating Action Button (Only show when closed or floating) */}
       {(!open || !isDocked) && (
         <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
+          whileHover={reducedMotion ? undefined : { scale: 1.05 }}
+          whileTap={reducedMotion ? undefined : { scale: 0.95 }}
           aria-label={open ? "Close Amelia" : "Ask Amelia AI"}
           onClick={() => setOpen((v) => !v)}
           className={`fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full bg-[var(--primary)] text-white shadow-xl hover:shadow-2xl transition-all flex items-center justify-center ${
             open ? "ring-4 ring-[var(--primary)]/30" : ""
           }`}
         >
-          {open ? <X className="w-6 h-6" /> : <Sparkles className="w-6 h-6 animate-pulse" />}
+          {open ? <X className="w-6 h-6" /> : <Sparkles className="w-6 h-6 motion-safe:animate-pulse" />}
         </motion.button>
       )}
     </>
