@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useCallback, ReactNode } from "react";
+import { useId, ReactNode } from "react";
+import AccessibleDialog from "@/components/ui/AccessibleDialog";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -19,41 +20,19 @@ interface ModalProps {
 }
 
 export default function Modal({ isOpen, onClose, title, children, size = "md" }: ModalProps) {
-  const handleEscape = useCallback(
-    (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    },
-    [onClose]
-  );
-
-  useEffect(() => {
-    if (isOpen) {
-      document.addEventListener("keydown", handleEscape);
-      document.body.style.overflow = "hidden";
-    }
-    return () => {
-      document.removeEventListener("keydown", handleEscape);
-      document.body.style.overflow = "";
-    };
-  }, [isOpen, handleEscape]);
-
-  if (!isOpen) return null;
-
+  const titleId = useId();
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ minHeight: "400px" }}
-    >
-      <div className="fixed inset-0 bg-black/50" onClick={onClose} />
-      <div
+    <AccessibleDialog isOpen={isOpen} onClose={onClose} labelledBy={titleId}
         className={cn(
-          "relative z-10 w-full rounded-xl bg-white p-6 shadow-xl",
+          "relative z-10 max-h-[calc(100dvh-2rem)] overflow-y-auto w-full rounded-xl bg-white p-6 shadow-xl",
           sizeClasses[size]
         )}
       >
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
+          <h2 id={titleId} className="text-lg font-semibold text-gray-900">{title}</h2>
           <button
+            type="button"
+            aria-label="Close dialog"
             onClick={onClose}
             className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
           >
@@ -61,7 +40,6 @@ export default function Modal({ isOpen, onClose, title, children, size = "md" }:
           </button>
         </div>
         {children}
-      </div>
-    </div>
+    </AccessibleDialog>
   );
 }

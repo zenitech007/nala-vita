@@ -65,3 +65,11 @@ describe("SidebarShell", () => {
     expect(signOutBtn.className).toMatch(/text-red-/);
   });
 });
+
+it("mobile menu uses a modal focus boundary and restores its opener",()=>{
+ render(<SidebarShell role="patient" roleLabel="Patient" user={null} nav={NAV}/>);
+ const opener=screen.getByRole("button",{name:"Open menu"});opener.focus();fireEvent.click(opener);
+ const dialog=screen.getByRole("dialog",{name:"Navigation menu"});expect(dialog).toHaveAttribute("aria-modal","true");
+ expect(screen.getByRole("button",{name:"Close menu"})).toHaveFocus();fireEvent.keyDown(document.activeElement!,{key:"Escape"});
+ expect(screen.queryByRole("dialog",{name:"Navigation menu"})).not.toBeInTheDocument();expect(opener).toHaveFocus();
+});

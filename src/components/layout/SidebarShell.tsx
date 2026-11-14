@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
+import AccessibleDialog from "@/components/ui/AccessibleDialog";
 import { Menu, LogOut, X, Heart, Settings as SettingsIcon, Search as SearchIcon } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
@@ -37,6 +37,12 @@ export function SidebarShell({ role, roleLabel, brand = "Nala Vita", user, nav }
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isCommandOpen, setIsCommandOpen] = useState(false);
   const [signOutError, setSignOutError] = useState("");
+  useEffect(() => {
+    const closeOnDesktop = () => { if (window.innerWidth >= 1024) setIsMobileOpen(false); };
+    window.addEventListener("resize", closeOnDesktop);
+    return () => window.removeEventListener("resize", closeOnDesktop);
+  }, []);
+
 
   // Global Cmd+K / Ctrl+K listener
   useEffect(() => {
@@ -206,23 +212,8 @@ export function SidebarShell({ role, roleLabel, brand = "Nala Vita", user, nav }
         </div>
       </aside>
 
-      <AnimatePresence>
-        {isMobileOpen && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setIsMobileOpen(false)}
-              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden"
-            />
-            <motion.aside
-              initial={{ x: "-100%" }}
-              animate={{ x: 0 }}
-              exit={{ x: "-100%" }}
-              transition={{ type: "spring", damping: 25, stiffness: 200 }}
-              className="fixed inset-y-0 left-0 w-72 bg-[#f9f9f9] dark:bg-[#1E1F22] shadow-2xl z-50 flex flex-col lg:hidden border-r border-gray-200 dark:border-gray-800"
-            >
+      <AccessibleDialog isOpen={isMobileOpen} onClose={() => setIsMobileOpen(false)} label="Navigation menu"
+        className="fixed inset-y-0 left-0 w-72 max-w-[calc(100vw-2rem)] h-dvh bg-[#f9f9f9] dark:bg-[#1E1F22] shadow-2xl flex flex-col border-r border-gray-200 dark:border-gray-800">
               <div className="h-16 flex items-center justify-between px-4 border-b border-gray-200 dark:border-gray-800">
                 <div className="flex items-center gap-2">
                   <Heart className="w-5 h-5 text-[var(--primary)]" />
@@ -308,10 +299,7 @@ export function SidebarShell({ role, roleLabel, brand = "Nala Vita", user, nav }
                   <span>Sign Out</span>
                 </button>
               </div>
-            </motion.aside>
-          </>
-        )}
-      </AnimatePresence>
+      </AccessibleDialog>
 
       {/* Global Command Palette */}
       <CommandPalette
