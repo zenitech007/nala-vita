@@ -83,7 +83,7 @@ export default function LoginPage() {
         {/* Form Card */}
         <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-8">
           {serverError && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm">
+            <div role="alert" className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm">
               {serverError}
             </div>
           )}
@@ -91,17 +91,17 @@ export default function LoginPage() {
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
             {/* Email */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="login-email" className="block text-sm font-medium text-gray-700 mb-1">
                 Email
               </label>
               <input
                 type="email"
-                {...register("email")}
+                id="login-email" aria-invalid={!!errors.email} aria-describedby={errors.email ? "login-email-error" : undefined} {...register("email")}
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent outline-none transition"
                 placeholder="john@example.com"
               />
               {errors.email && (
-                <p className="mt-1 text-xs text-red-500">
+                <p id="login-email-error" role="alert" className="mt-1 text-xs text-red-500">
                   {errors.email.message}
                 </p>
               )}
@@ -110,7 +110,7 @@ export default function LoginPage() {
             {/* Password */}
             <div>
               <div className="flex items-center justify-between mb-1">
-                <label className="block text-sm font-medium text-gray-700">
+                <label htmlFor="login-password" className="block text-sm font-medium text-gray-700">
                   Password
                 </label>
                 <Link
@@ -123,12 +123,13 @@ export default function LoginPage() {
               <div className="relative">
                 <input
                   type={showPassword ? "text" : "password"}
-                  {...register("password")}
+                  id="login-password" aria-invalid={!!errors.password} aria-describedby={errors.password ? "login-password-error" : undefined} {...register("password")}
                   className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent outline-none transition pr-10"
                   placeholder="Enter your password"
                 />
                 <button
                   type="button"
+                  aria-label={showPassword ? "Hide password" : "Show password"} aria-pressed={showPassword} aria-controls="login-password"
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                 >
@@ -140,7 +141,7 @@ export default function LoginPage() {
                 </button>
               </div>
               {errors.password && (
-                <p className="mt-1 text-xs text-red-500">
+                <p id="login-password-error" role="alert" className="mt-1 text-xs text-red-500">
                   {errors.password.message}
                 </p>
               )}

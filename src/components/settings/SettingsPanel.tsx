@@ -175,6 +175,8 @@ export default function SettingsPanel({
   });
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [savingProfile, setSavingProfile] = useState(false);
+  const [profileError, setProfileError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<Record<string,string>>({});
 
   // ─── Notification Preferences State ─────────────────────
   const [notifyEmail, setNotifyEmail] = useState(true);
@@ -299,6 +301,7 @@ export default function SettingsPanel({
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setSavingProfile(true);
+    setProfileError("");setFieldErrors({});
     try {
       const payload = {
         firstName: profile.firstName,
@@ -322,10 +325,17 @@ export default function SettingsPanel({
       if (res.ok) {
         showToast("Profile & health information saved successfully!");
       } else {
-        showToast("Failed to save profile. Please try again.");
+        const body: unknown = await res.json().catch(() => null);
+        const result = body && typeof body === "object" ? body as {error?:unknown;details?:unknown} : {};
+        const fields: Record<string,string> = {};
+        if(Array.isArray(result.details)) for(const item of result.details) {
+          if(item && typeof item === "object" && "path" in item && Array.isArray(item.path) && typeof item.path[0] === "string" && "message" in item && typeof item.message === "string") fields[item.path[0]]=item.message;
+        }
+        setFieldErrors(fields);
+        setProfileError(typeof result.error === "string" ? result.error : "Failed to save profile. Please try again.");
       }
     } catch {
-      showToast("Network error saving profile");
+      setProfileError("Could not reach the service. Your draft is kept; please retry.");
     } finally {
       setSavingProfile(false);
     }
@@ -448,6 +458,7 @@ export default function SettingsPanel({
               initial={{ opacity: 0, y: -20, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -20, scale: 0.95 }}
+              role="status"
               className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-2xl bg-gray-900 text-white shadow-xl border border-gray-700"
             >
               <div className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500 text-white">
@@ -692,6 +703,7 @@ export default function SettingsPanel({
               transition={{ duration: 0.2 }}
             >
               <form onSubmit={handleSaveProfile} className="space-y-6">
+                {profileError&&<p role="alert">{profileError}</p>}
                 {/* Account Card */}
                 <section className="bg-white rounded-2xl border border-gray-200/80 p-6 shadow-xs">
                   <div className="flex items-center gap-4 mb-6 pb-6 border-b border-gray-100">
@@ -719,24 +731,26 @@ export default function SettingsPanel({
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1.5">First Name</label>
-                      <input
+                      <label htmlFor="profile-firstName" className="block text-xs font-medium text-gray-700 mb-1.5">First Name</label>
+                      <input id="profile-firstName" aria-invalid={!!fieldErrors.firstName} aria-describedby={fieldErrors.firstName ? "profile-firstName-error" : undefined}
                         type="text"
                         value={profile.firstName ?? ""}
                         onChange={(e) => setProfile({ ...profile, firstName: e.target.value })}
                         placeholder="First Name"
                         className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
                       />
+                      {fieldErrors.firstName&&<p id="profile-firstName-error" role="alert">{fieldErrors.firstName}</p>}
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1.5">Last Name</label>
-                      <input
+                      <label htmlFor="profile-lastName" className="block text-xs font-medium text-gray-700 mb-1.5">Last Name</label>
+                      <input id="profile-lastName" aria-invalid={!!fieldErrors.lastName} aria-describedby={fieldErrors.lastName ? "profile-lastName-error" : undefined}
                         type="text"
                         value={profile.lastName ?? ""}
                         onChange={(e) => setProfile({ ...profile, lastName: e.target.value })}
                         placeholder="Last Name"
                         className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
                       />
+                      {fieldErrors.lastName&&<p id="profile-lastName-error" role="alert">{fieldErrors.lastName}</p>}
                     </div>
                     <div className="sm:col-span-2">
                       <label htmlFor="profile-timezone" className="block text-xs font-medium text-gray-700 mb-1.5">Reminder timezone</label>
@@ -746,22 +760,24 @@ export default function SettingsPanel({
                         value={profile.timeZone ?? ""}
                         onChange={(e) => setProfile({ ...profile, timeZone: e.target.value })}
                         placeholder="Africa/Lagos"
-                        aria-describedby="profile-timezone-help"
+                        aria-invalid={!!fieldErrors.timeZone} aria-describedby={fieldErrors.timeZone ? "profile-timezone-help profile-timeZone-error" : "profile-timezone-help"}
                         className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
                       />
                       <p id="profile-timezone-help" className="mt-1 text-sm text-gray-600">Save your IANA timezone before setting reminders. Existing reminders keep their saved timezone.</p>
+                      {fieldErrors.timeZone&&<p id="profile-timeZone-error" role="alert">{fieldErrors.timeZone}</p>}
                     </div>
                     <div className="sm:col-span-2">
-                      <label className="block text-xs font-medium text-gray-700 mb-1.5">Phone Number</label>
+                      <label htmlFor="profile-phone" className="block text-xs font-medium text-gray-700 mb-1.5">Phone Number</label>
                       <div className="relative">
                         <Phone className="w-4 h-4 absolute left-3.5 top-3 text-gray-400" />
-                        <input
+                        <input id="profile-phone" aria-invalid={!!fieldErrors.phone} aria-describedby={fieldErrors.phone ? "profile-phone-error" : undefined}
                           type="tel"
                           value={profile.phone ?? ""}
                           onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
                           placeholder="+234 800 000 0000"
                           className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
                         />
+                      {fieldErrors.phone&&<p id="profile-phone-error" role="alert">{fieldErrors.phone}</p>}
                       </div>
                     </div>
                   </div>
@@ -781,8 +797,8 @@ export default function SettingsPanel({
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1.5">Blood Type</label>
-                      <select
+                      <label htmlFor="profile-bloodType" className="block text-xs font-medium text-gray-700 mb-1.5">Blood Type</label>
+                      <select id="profile-bloodType" aria-invalid={!!fieldErrors.bloodType} aria-describedby={fieldErrors.bloodType ? "profile-bloodType-error" : undefined}
                         value={profile.patient?.bloodType ?? ""}
                         onChange={(e) =>
                           setProfile({
@@ -802,11 +818,12 @@ export default function SettingsPanel({
                         <option value="O+">O+</option>
                         <option value="O-">O-</option>
                       </select>
+                      {fieldErrors.bloodType&&<p id="profile-bloodType-error" role="alert">{fieldErrors.bloodType}</p>}
                     </div>
 
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1.5">Residential Address</label>
-                      <input
+                      <label htmlFor="profile-address" className="block text-xs font-medium text-gray-700 mb-1.5">Residential Address</label>
+                      <input id="profile-address" aria-invalid={!!fieldErrors.address} aria-describedby={fieldErrors.address ? "profile-address-error" : undefined}
                         type="text"
                         value={profile.patient?.address ?? ""}
                         onChange={(e) =>
@@ -818,11 +835,12 @@ export default function SettingsPanel({
                         placeholder="Street, City, State"
                         className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
                       />
+                      {fieldErrors.address&&<p id="profile-address-error" role="alert">{fieldErrors.address}</p>}
                     </div>
 
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1.5">Emergency Contact Name</label>
-                      <input
+                      <label htmlFor="profile-emergencyName" className="block text-xs font-medium text-gray-700 mb-1.5">Emergency Contact Name</label>
+                      <input id="profile-emergencyName" aria-invalid={!!fieldErrors.emergencyName} aria-describedby={fieldErrors.emergencyName ? "profile-emergencyName-error" : undefined}
                         type="text"
                         value={profile.patient?.emergencyName ?? ""}
                         onChange={(e) =>
@@ -834,11 +852,12 @@ export default function SettingsPanel({
                         placeholder="Spouse / Parent / Next of Kin"
                         className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
                       />
+                      {fieldErrors.emergencyName&&<p id="profile-emergencyName-error" role="alert">{fieldErrors.emergencyName}</p>}
                     </div>
 
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1.5">Emergency Contact Phone</label>
-                      <input
+                      <label htmlFor="profile-emergencyPhone" className="block text-xs font-medium text-gray-700 mb-1.5">Emergency Contact Phone</label>
+                      <input id="profile-emergencyPhone" aria-invalid={!!fieldErrors.emergencyPhone} aria-describedby={fieldErrors.emergencyPhone ? "profile-emergencyPhone-error" : undefined}
                         type="tel"
                         value={profile.patient?.emergencyPhone ?? ""}
                         onChange={(e) =>
@@ -850,6 +869,7 @@ export default function SettingsPanel({
                         placeholder="+234 800 123 4567"
                         className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
                       />
+                      {fieldErrors.emergencyPhone&&<p id="profile-emergencyPhone-error" role="alert">{fieldErrors.emergencyPhone}</p>}
                     </div>
                   </div>
                 </section>
@@ -868,8 +888,8 @@ export default function SettingsPanel({
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1.5">Insurance Provider</label>
-                      <input
+                      <label htmlFor="profile-insuranceProvider" className="block text-xs font-medium text-gray-700 mb-1.5">Insurance Provider</label>
+                      <input id="profile-insuranceProvider" aria-invalid={!!fieldErrors.insuranceProvider} aria-describedby={fieldErrors.insuranceProvider ? "profile-insuranceProvider-error" : undefined}
                         type="text"
                         value={profile.patient?.insuranceProvider ?? ""}
                         onChange={(e) =>
@@ -881,10 +901,11 @@ export default function SettingsPanel({
                         placeholder="e.g. AXA Mansard, Hygeia HMO"
                         className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
                       />
+                      {fieldErrors.insuranceProvider&&<p id="profile-insuranceProvider-error" role="alert">{fieldErrors.insuranceProvider}</p>}
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1.5">Policy / Member ID</label>
-                      <input
+                      <label htmlFor="profile-insuranceNumber" className="block text-xs font-medium text-gray-700 mb-1.5">Policy / Member ID</label>
+                      <input id="profile-insuranceNumber" aria-invalid={!!fieldErrors.insuranceNumber} aria-describedby={fieldErrors.insuranceNumber ? "profile-insuranceNumber-error" : undefined}
                         type="text"
                         value={profile.patient?.insuranceNumber ?? ""}
                         onChange={(e) =>
@@ -896,6 +917,7 @@ export default function SettingsPanel({
                         placeholder="POL-12345678"
                         className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
                       />
+                      {fieldErrors.insuranceNumber&&<p id="profile-insuranceNumber-error" role="alert">{fieldErrors.insuranceNumber}</p>}
                     </div>
                   </div>
                 </section>
