@@ -1,5 +1,8 @@
+import en from "../../../messages/en.json";
+import fr from "../../../messages/fr.json";
+import {PATIENT_NAV} from "@/lib/nav-config";
 import { describe, it, expect, jest, beforeEach } from "@jest/globals";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render as rtlRender, screen, fireEvent } from "@testing-library/react";
 import { SidebarShell } from "@/components/layout/SidebarShell";
 import { LayoutDashboard, Settings as SettingsIcon } from "lucide-react";
 
@@ -15,12 +18,17 @@ jest.mock("@/lib/supabase", () => ({
 import { supabase } from "@/lib/supabase";
 const signOut = supabase.auth.signOut as jest.Mock;
 
+const render=rtlRender;
+const translations=jest.fn<()=>Record<string,string>>(()=>en.nav);
+jest.mock("next-intl",()=>({useTranslations:()=> (key:string)=>translations()[key]}));
+
 const NAV = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/patient/dashboard" },
   { icon: SettingsIcon, label: "Other", href: "/patient/other" },
 ];
 
 beforeEach(() => {
+  translations.mockReturnValue(en.nav);
   signOut.mockClear();
   localStorage.clear();
 });
@@ -72,4 +80,10 @@ it("mobile menu uses a modal focus boundary and restores its opener",()=>{
  const dialog=screen.getByRole("dialog",{name:"Navigation menu"});expect(dialog).toHaveAttribute("aria-modal","true");
  expect(screen.getByRole("button",{name:"Close menu"})).toHaveFocus();fireEvent.keyDown(document.activeElement!,{key:"Escape"});
  expect(screen.queryByRole("dialog",{name:"Navigation menu"})).not.toBeInTheDocument();expect(opener).toHaveFocus();
+});
+
+it("uses the selected locale for built-in navigation",()=>{
+ translations.mockReturnValue(fr.nav);
+ rtlRender(<SidebarShell role="patient" roleLabel="Patient" user={null} nav={PATIENT_NAV}/>);
+ expect(screen.getByRole("link",{name:"Rendez-vous"})).toBeInTheDocument();
 });

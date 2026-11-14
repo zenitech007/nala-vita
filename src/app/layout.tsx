@@ -1,3 +1,4 @@
+import {selectMessages} from "@/i18n/messages";
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import { NextIntlClientProvider } from "next-intl";
@@ -77,10 +78,7 @@ export default async function RootLayout({
 }>) {
   const locale = await getLocale();
 
-  // ✅ FIX: only load the 'common' and 'nav' namespaces at root level.
-  // Each page/layout should load its own namespace via getMessages({ namespace })
-  // so clients only download translations they actually use.
-  const messages = await getMessages();
+  const messages = selectMessages(await getMessages(), ["common", "nav"]);
 
   return (
     <html lang={locale} data-brand="rose" suppressHydrationWarning>

@@ -1,5 +1,6 @@
 "use client";
 
+import {useTranslations} from "next-intl";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -9,14 +10,11 @@ import Link from "next/link";
 import { Heart, Loader2, Eye, EyeOff } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
-const loginSchema = z.object({
-  email: z.string().email("Invalid email address"),
-  password: z.string().min(1, "Password is required"),
-});
-
-type LoginForm = z.infer<typeof loginSchema>;
+interface LoginForm {email:string;password:string}
 
 export default function LoginPage() {
+  const t = useTranslations("auth");
+  const loginSchema = z.object({email:z.string().email(t("invalidEmail")),password:z.string().min(1,t("passwordRequired"))});
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [serverError, setServerError] = useState("");
@@ -63,7 +61,7 @@ export default function LoginPage() {
           "Unable to connect to the authentication server. Please check your network connection or verify that your Supabase project is active."
         );
       } else {
-        setServerError("Something went wrong. Please try again.");
+        setServerError(t("unexpectedError"));
       }
     }
   };
@@ -77,7 +75,7 @@ export default function LoginPage() {
             <Heart className="w-8 h-8 text-white" />
           </div>
           <h1 className="text-3xl font-bold text-gray-900">Nala Vita</h1>
-          <p className="text-gray-500 mt-1">Sign in to your account</p>
+          <p className="text-gray-500 mt-1">{t("signInSubtitle")}</p>
         </div>
 
         {/* Form Card */}
@@ -92,7 +90,7 @@ export default function LoginPage() {
             {/* Email */}
             <div>
               <label htmlFor="login-email" className="block text-sm font-medium text-gray-700 mb-1">
-                Email
+                {t("email")}
               </label>
               <input
                 type="email"
@@ -111,13 +109,13 @@ export default function LoginPage() {
             <div>
               <div className="flex items-center justify-between mb-1">
                 <label htmlFor="login-password" className="block text-sm font-medium text-gray-700">
-                  Password
+                  {t("password")}
                 </label>
                 <Link
                   href="/forgot-password"
                   className="text-sm text-[var(--primary)] hover:opacity-80"
                 >
-                  Forgot password?
+                  {t("forgotPassword")}
                 </Link>
               </div>
               <div className="relative">
@@ -125,11 +123,11 @@ export default function LoginPage() {
                   type={showPassword ? "text" : "password"}
                   id="login-password" aria-invalid={!!errors.password} aria-describedby={errors.password ? "login-password-error" : undefined} {...register("password")}
                   className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent outline-none transition pr-10"
-                  placeholder="Enter your password"
+                  placeholder={t("passwordPlaceholder")}
                 />
                 <button
                   type="button"
-                  aria-label={showPassword ? "Hide password" : "Show password"} aria-pressed={showPassword} aria-controls="login-password"
+                  aria-label={showPassword ? t("hidePassword") : t("showPassword")} aria-pressed={showPassword} aria-controls="login-password"
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                 >
@@ -156,17 +154,17 @@ export default function LoginPage() {
               {isSubmitting ? (
                 <>
                   <Loader2 className="w-5 h-5 animate-spin" />
-                  Signing in...
+                  {t("signingIn")}
                 </>
               ) : (
-                "Sign In"
+                t("login")
               )}
             </button>
           </form>
 
           {/* Footer */}
           <p className="text-center text-sm text-gray-500 mt-6">
-            Don&apos;t have an account?{" "}
+            {t("noAccount")}{" "}
             <Link
               href="/register"
               className="text-[var(--primary)] hover:opacity-80 font-medium"
