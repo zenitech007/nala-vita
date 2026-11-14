@@ -26,6 +26,7 @@ export async function GET(req: NextRequest) {
           specialization: true,
           consultationFee: true,
           availableDays: true,
+          timeZone:true,
           availableFrom: true,
           availableTo: true,
           isVerified: true,

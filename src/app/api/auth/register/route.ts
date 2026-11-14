@@ -1,3 +1,4 @@
+import { isIanaTimeZone } from "@/lib/appointment-availability";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
@@ -43,6 +44,7 @@ const doctorSchema = baseSchema.extend({
     .min(0, "Consultation fee must be 0 or more")
     .max(10_000, "Consultation fee seems too high"),
   bio: z.string().optional(),
+  timeZone:z.string().max(100).refine(isIanaTimeZone,"Choose a valid IANA timezone").optional(),
 });
 
 const registerSchema = z.discriminatedUnion("role", [patientSchema, doctorSchema]);
@@ -128,6 +130,7 @@ export async function POST(req: NextRequest) {
                   yearsOfExperience: validated.yearsOfExperience,
                   consultationFee: validated.consultationFee,
                   bio: validated.bio || null,
+                  timeZone:validated.timeZone??null,
                   // Doctors are unverified until an admin manually verifies them
                   isVerified: false,
                 },

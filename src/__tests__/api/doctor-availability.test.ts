@@ -1,7 +1,7 @@
-const guard = jest.fn(), update = jest.fn();
+const guard = jest.fn(), update = jest.fn(), find = jest.fn();
 jest.mock('@/lib/auth', () => ({ requireApiUser: (...args: unknown[]) => guard(...args) }));
-jest.mock('@/lib/prisma', () => ({ prisma: { doctor: { update: (...args: unknown[]) => update(...args) } } }));
-import { PATCH } from '@/app/api/doctors/availability/route';
+jest.mock('@/lib/prisma', () => ({ prisma: { doctor: { findUnique:(...args:unknown[])=>find(...args), update: (...args: unknown[]) => update(...args) } } }));
+import { PATCH, GET } from '@/app/api/doctors/availability/route';
 beforeEach(() => { jest.resetAllMocks(); guard.mockResolvedValue({ ok: true, user: { doctor: { id: 'own' } } }); });
 const data = { timeZone: 'America/Phoenix', availableDays: ['Monday'], availableFrom: '09:00', availableTo: '17:00' };
 const req = (body: unknown) => new Request('http://localhost/api/doctors/availability', { method: 'PATCH', body: JSON.stringify(body) }) as never;
@@ -16,4 +16,8 @@ it.each([{ timeZone: 'invalid' }, { availableDays: [] }, { availableTo: '08:00' 
 it('F13 denies rejected identities before writing', async () => {
   guard.mockResolvedValue({ ok: false, response: new Response(null, { status: 403 }) });
   expect((await PATCH(req(data))).status).toBe(403); expect(update).not.toHaveBeenCalled();
+});
+
+it("availability read is scoped to authenticated doctor",async()=>{
+ find.mockResolvedValue(data);expect((await GET()).status).toBe(200);expect(find).toHaveBeenCalledWith(expect.objectContaining({where:{id:"own"}}));
 });

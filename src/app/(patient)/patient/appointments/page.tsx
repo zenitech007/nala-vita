@@ -1,5 +1,9 @@
 "use client";
 
+import {useLocale} from "next-intl";
+import BookingTimeSummary from "@/components/appointments/BookingTimeSummary";
+import {isIanaTimeZone} from "@/lib/appointment-availability";
+import {bookingInstant} from "@/lib/booking-time";
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import {
@@ -58,6 +62,7 @@ interface DoctorOption {
   availableFrom: string | null;
   availableTo: string | null;
   user: { firstName: string; lastName: string; avatarUrl: string | null };
+  timeZone:string|null;
 }
 
 // ─── Booking Modal Steps ─────────────────────────────────
@@ -327,6 +332,7 @@ export default function PatientAppointmentsPage() {
 // ═══════════════════════════════════════════════════════════
 
 function BookingModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
+  const locale=useLocale();
   const [step, setStep] = useState<BookingStep>(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -345,6 +351,8 @@ function BookingModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
   // Step 3 — Date & time
   const [selectedDate, setSelectedDate] = useState("");
   const [selectedTime, setSelectedTime] = useState("");
+  let selectedBookingInstant:Date|null=null;
+  try { if(selectedDate&&selectedTime)selectedBookingInstant=bookingInstant(selectedDate,selectedTime); } catch { /* Invalid local times keep progression disabled. */ }
 
   // Step 4 — Reason
   const [reason, setReason] = useState("");
@@ -399,7 +407,7 @@ function BookingModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
   });
 
   const handleBook = async () => {
-    if (!selectedDoctor || !selectedDate || !selectedTime) {
+    if (!selectedDoctor || !selectedDoctor.timeZone || !selectedDate || !selectedTime) {
       setSubmitError("Select a doctor, date, and time before booking.");
       return;
     }
@@ -408,15 +416,7 @@ function BookingModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
     setSubmitError(null);
 
     try {
-      // Parse selected time to build the full scheduledAt
-      const [time, meridiem] = selectedTime.split(" ");
-      const [hourStr, minuteStr] = time.split(":");
-      let hour = parseInt(hourStr);
-      if (meridiem === "PM" && hour !== 12) hour += 12;
-      if (meridiem === "AM" && hour === 12) hour = 0;
-
-      const scheduledAt = new Date(selectedDate);
-      scheduledAt.setHours(hour, parseInt(minuteStr), 0, 0);
+      const scheduledAt = bookingInstant(selectedDate,selectedTime);
 
       const res = await fetch("/api/appointments", {
         method: "POST",
@@ -446,9 +446,9 @@ function BookingModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
 
   const canProceed = () => {
     switch (step) {
-      case 1: return !!selectedDoctor;
+      case 1: return !!selectedDoctor?.timeZone&&isIanaTimeZone(selectedDoctor.timeZone);
       case 2: return !!consultationType;
-      case 3: return !!selectedDate && !!selectedTime;
+      case 3: return !!selectedBookingInstant;
       case 4: return true;
       case 5: return true;
       default: return false;
@@ -544,6 +544,7 @@ function BookingModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
                     {filteredDoctors.map((doc) => (
                       <button
                         key={doc.id}
+                        disabled={!doc.timeZone||!isIanaTimeZone(doc.timeZone)}
                         onClick={() => setSelectedDoctor(doc)}
                         className={cn(
                           "w-full flex items-center gap-4 p-4 rounded-xl border-2 transition text-left",
@@ -560,6 +561,7 @@ function BookingModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
                             Dr. {doc.user.firstName} {doc.user.lastName}
                           </p>
                           <p className="text-sm text-gray-500">{doc.specialization}</p>
+                          {(!doc.timeZone||!isIanaTimeZone(doc.timeZone))&&<p className="text-sm">Booking unavailable until this doctor configures a timezone.</p>}
                           <div className="flex items-center gap-3 mt-1 text-xs text-gray-400">
                             <span>★ {doc.rating}</span>
                             <span>${doc.consultationFee}/visit</span>
@@ -633,7 +635,7 @@ function BookingModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
           {/* ── Step 3: Date & Time ── */}
           {step === 3 && (
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Select Date & Time</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Select Date & Time (your local timezone)</h3>
               <p className="text-sm text-gray-500 mb-6">Pick a convenient date and time slot</p>
 
               {/* Date selection */}
@@ -704,6 +706,7 @@ function BookingModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
           {step === 5 && selectedDoctor && (
             <div>
               <h3 className="text-lg font-semibold text-gray-900 mb-6">Confirm Appointment</h3>
+              {selectedBookingInstant&&<BookingTimeSummary instant={selectedBookingInstant} doctorTimeZone={selectedDoctor.timeZone} locale={locale}/>}
 
               <div className="bg-gray-50 rounded-xl p-5 space-y-4 mb-6">
                 <div className="flex items-center gap-3">

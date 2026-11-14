@@ -1,5 +1,6 @@
 "use client";
 
+import TimezoneSelect,{useBrowserTimeZone} from "@/components/settings/TimezoneSelect";
 import {useTranslations} from "next-intl";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
@@ -29,6 +30,7 @@ const baseSchema = z.object({
   specialization: z.string().optional(),
   yearsOfExperience: z.coerce.number<number>().optional(),
   consultationFee: z.coerce.number<number>().optional(),
+  timeZone:z.string().optional(),
 });
 
 const registerSchema = baseSchema
@@ -72,6 +74,7 @@ interface RegisterForm {
   specialization?: string;
   yearsOfExperience?: number;
   consultationFee?: number;
+  timeZone?: string;
 }
 
 // ─── Field wrapper ────────────────────────────────────────
@@ -108,6 +111,7 @@ const inputCls =
 // ─── Page ─────────────────────────────────────────────────
 
 export default function RegisterPage() {
+  const browserZone=useBrowserTimeZone();
   const t = useTranslations("auth");
   const registerSchema=createRegisterSchema(t);
   const router = useRouter();
@@ -117,6 +121,7 @@ export default function RegisterPage() {
 
   const {
     register,
+    setValue,
     handleSubmit,
     watch,
     formState: { errors, isSubmitting },
@@ -154,6 +159,7 @@ export default function RegisterPage() {
             specialization: data.specialization,
             yearsOfExperience: Number(data.yearsOfExperience),
             consultationFee: Number(data.consultationFee),
+            timeZone:data.timeZone||browserZone,
           };
 
     try {
@@ -288,6 +294,7 @@ export default function RegisterPage() {
                 <div className="p-4 bg-amber-50 border border-amber-200 text-amber-700 rounded-xl text-sm">
                   {t("doctorNotice")}
                 </div>
+                <Field id="register-timezone" label="Doctor availability timezone" error={errors.timeZone?.message}><TimezoneSelect id="register-timezone" value={watch("timeZone")||browserZone} onChange={value=>setValue("timeZone",value,{shouldValidate:true,shouldDirty:true})}/></Field>
                 <Field id="register-licenseNumber" label={t("licenseNumber")} error={errors.licenseNumber?.message}>
                   <input
                     id="register-licenseNumber" aria-invalid={!!errors.licenseNumber} aria-describedby={errors.licenseNumber ? "register-licenseNumber-error" : undefined} {...register("licenseNumber")}

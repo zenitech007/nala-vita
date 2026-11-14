@@ -23,3 +23,12 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "Could not save availability" }, { status: 500 });
   }
 }
+
+export async function GET(){
+ const auth=await requireApiUser({roles:["DOCTOR"],profile:"doctor"});if(!auth.ok)return auth.response;
+ try{
+  const availability=await prisma.doctor.findUnique({where:{id:auth.user.doctor!.id},select:{timeZone:true,availableDays:true,availableFrom:true,availableTo:true}});
+  if(!availability)return NextResponse.json({error:"Doctor profile not found"},{status:404});
+  return NextResponse.json({availability});
+ }catch{return NextResponse.json({error:"Could not load availability"},{status:500});}
+}
