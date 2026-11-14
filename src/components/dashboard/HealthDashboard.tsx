@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import {
   Droplets,
   Pill,
@@ -33,9 +33,17 @@ const WATER_GOAL = 2.5;
 export default function HealthDashboard({ initialVitals, onUpdate }: Props) {
   const [vitals, setVitals] = useState<DailyVitals>(initialVitals ?? DEFAULT_VITALS);
 
+  const [saveState,setSaveState]=useState<"idle"|"saving"|"saved">("idle");
+  const [saveError,setSaveError]=useState("");
+  const version=useRef(0);
   const persist = async (next: DailyVitals) => {
-    setVitals(next);
-    if (onUpdate) await onUpdate(next);
+    const current=++version.current;
+    setVitals(next);setSaveError("");setSaveState("saving");
+    try {
+      if(!onUpdate)throw new Error("Daily vitals saving is unavailable.");
+      await onUpdate(next);
+      if(current===version.current)setSaveState("saved");
+    } catch(error){if(current===version.current){setSaveState("idle");setSaveError(error instanceof Error?error.message:"Unable to save daily vitals");}}
   };
 
   const handleWater = (amount: number) => {
@@ -73,6 +81,10 @@ export default function HealthDashboard({ initialVitals, onUpdate }: Props) {
       </div>
 
       <div className="p-6 space-y-4">
+        <p className="text-sm">Self-reported daily tracker. The medication checkbox is not an individual dose record.</p>
+        {saveState==="saving"&&<p role="status">Saving daily vitals…</p>}
+        {saveState==="saved"&&<p role="status">Daily vitals saved</p>}
+        {saveError&&<div><p role="alert">{saveError}</p><button type="button" onClick={()=>void persist(vitals)}>Retry daily vitals save</button></div>}
         <div className="grid grid-cols-2 gap-4">
           {/* HYDRATION WIDGET (Spans full width) */}
           <div className="col-span-2 bg-gray-50 dark:bg-[#14151A] rounded-3xl p-5 border border-gray-100 dark:border-gray-800">

@@ -113,6 +113,7 @@ model Patient {
   user                User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   appointments        Appointment[]
   prescriptions       Prescription[]
+  dailyVitalSnapshots DailyVitalSnapshot[]
   vitals              Vital[]
   labOrders           LabOrder[]
   medicalNotes        MedicalNote[]
@@ -357,6 +358,21 @@ model Prescription {
   @@index([doctorId, prescribedAt])
   @@index([patientId, isSharedWithDoctor])
   @@map("prescriptions")
+}
+
+model DailyVitalSnapshot {
+  id String @id @default(cuid())
+  patientId String @map("patient_id")
+  day String
+  timeZone String @map("time_zone")
+  waterLiters Float @map("water_liters")
+  steps Int
+  medsTaken Boolean @map("meds_taken")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  @@unique([patientId, day, timeZone])
+  @@map("daily_vital_snapshots")
 }
 
 model Vital {

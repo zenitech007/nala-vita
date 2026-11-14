@@ -21,7 +21,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { EmptyState } from "@/components/ui/EmptyState";
-import HealthDashboard from "@/components/dashboard/HealthDashboard";
+import PersistedDailyVitals from "@/components/dashboard/PersistedDailyVitals";
 import MedicationSchedule from "@/components/medications/MedicationSchedule";
 
 interface Props {
@@ -161,8 +161,7 @@ export default function PatientDashboardClient({ data }: Props) {
         </div>
 
         {/* Daily Vitals widget (Phase 3 component) */}
-        {/* TODO: wire initialVitals + onUpdate to a daily-log API once the endpoint exists */}
-        <HealthDashboard />
+        <PersistedDailyVitals />
 
         {/* Medications + Appointments side-by-side */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">

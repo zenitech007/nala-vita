@@ -1,3 +1,4 @@
+import { dailyVitalDaySchema, dailyVitalsSchema } from "@/lib/daily-vitals";
 import { parsePagination, cursorWhere, pageResult, PaginationError } from "@/lib/pagination";
 import { requireApiUser } from "@/lib/auth";
 import { getRecordVisibility, workspacePatientWhere } from "@/lib/record-visibility";
@@ -64,6 +65,12 @@ export async function GET(req: NextRequest) {
     if (!auth.ok) return auth.response;
     const user = auth.user;
     const query = new URL(req.url).searchParams;
+    if(query.get("dailyVitals")==="1"){
+      if(user.role!=="PATIENT"||!user.patient) return NextResponse.json({error:"Patient profile required"},{status:403});
+      const day=dailyVitalDaySchema.parse({day:query.get("day"),timeZone:query.get("timeZone")});
+      const dailyVitals=await prisma.dailyVitalSnapshot.findUnique({where:{patientId_day_timeZone:{patientId:user.patient.id,...day}}});
+      return NextResponse.json({dailyVitals});
+    }
     const patientId = user.role === "PATIENT" ? user.patient!.id : query.get("patientId");
     const { limit, cursor } = parsePagination(query);
     if (!patientId) {
@@ -83,6 +90,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ vitals: page.items, nextCursor: page.nextCursor });
   } catch (error) {
     if (error instanceof PaginationError) return NextResponse.json({ error: error.message }, { status: 400 });
+    if(error instanceof z.ZodError) return NextResponse.json({error:"Invalid day or timezone"},{status:422});
     console.error("GET /api/vitals error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
@@ -113,6 +121,12 @@ export async function POST(req: NextRequest) {
     if (!auth.ok) return auth.response;
     const user = auth.user;
     const body = await req.json();
+    if(body && typeof body === "object" && "dailyVitals" in body){
+      if(user.role!=="PATIENT"||!user.patient) return NextResponse.json({error:"Patient profile required"},{status:403});
+      const snapshot=z.object({dailyVitals:dailyVitalsSchema}).strict().parse(body).dailyVitals;
+      const dailyVitals=await prisma.dailyVitalSnapshot.upsert({where:{patientId_day_timeZone:{patientId:user.patient.id,day:snapshot.day,timeZone:snapshot.timeZone}},create:{patientId:user.patient.id,...snapshot},update:snapshot});
+      return NextResponse.json({dailyVitals});
+    }
     const validated = createVitalSchema.parse(body);
     const patientId = user.role === "PATIENT" ? user.patient?.id : validated.patientId;
     if (!patientId) return NextResponse.json({ error: "Patient profile or target required" }, { status: 403 });

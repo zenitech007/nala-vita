@@ -624,10 +624,11 @@ export default function SettingsPanel({
                   </div>
                   <div>
                     <h2 className="text-base font-semibold text-gray-900">Clinical Units</h2>
-                    <p className="text-sm text-gray-500">Choose standard measurement units for vitals and lab data.</p>
+                    <p className="text-sm text-gray-500">Unit conversion settings are not connected to clinical displays.</p>
                   </div>
                 </div>
 
+                <fieldset disabled className="min-w-0"><legend className="sr-only">Clinical unit preferences</legend><p className="mb-4 text-sm" role="status">Unit conversion preferences are unavailable. Vitals keep their explicitly recorded units.</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">
@@ -689,6 +690,7 @@ export default function SettingsPanel({
                     </div>
                   </div>
                 </div>
+              </fieldset>
               </motion.section>
             </motion.div>
           )}
@@ -960,10 +962,11 @@ export default function SettingsPanel({
                   </div>
                   <div>
                     <h2 className="text-base font-semibold text-gray-900">Delivery Channels</h2>
-                    <p className="text-sm text-gray-500">Configure how and where Nala Vita contacts you.</p>
+                    <p className="text-sm text-gray-500">Delivery preference controls are not connected to notification services.</p>
                   </div>
                 </div>
 
+                <fieldset disabled className="min-w-0"><legend className="sr-only">Notification delivery preferences</legend><p className="mb-4 text-sm" role="status">Notification delivery preferences are unavailable. These controls do not change delivery.</p>
                 <div className="divide-y divide-gray-100">
                   {/* Email Notifications */}
                   <div className="flex items-center justify-between py-4">
@@ -1045,6 +1048,7 @@ export default function SettingsPanel({
                     />
                   </div>
                 </div>
+              </fieldset>
               </section>
             </motion.div>
           )}
