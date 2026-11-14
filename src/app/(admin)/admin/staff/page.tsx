@@ -23,7 +23,7 @@ interface StaffMember {
   id: string;
   name: string;
   email: string;
-  role: "DOCTOR" | "NURSE";
+  role: "DOCTOR";
   speciality: string;
   licenceNumber: string;
   department: string;
@@ -55,17 +55,13 @@ const SPECIALITIES = [
   "Radiologist",
   "Dermatologist",
   "Psychiatrist",
-  "Nurse Practitioner",
-  "Registered Nurse",
-  "ICU Nurse",
-  "OR Nurse",
 ];
 
 // ─── Component ──────────────────────────────────────────
 
 export default function AdminStaffPage() {
   const [search, setSearch] = useState("");
-  const [roleFilter, setRoleFilter] = useState<"ALL" | "DOCTOR" | "NURSE">("ALL");
+  const [roleFilter, setRoleFilter] = useState<"ALL" | "DOCTOR">("ALL");
   const [showAddForm, setShowAddForm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [mutationError, setMutationError] = useState("");
@@ -73,7 +69,7 @@ export default function AdminStaffPage() {
   // Add form state
   const [formName, setFormName] = useState("");
   const [formEmail, setFormEmail] = useState("");
-  const [formRole, setFormRole] = useState<"DOCTOR" | "NURSE">("DOCTOR");
+  const [formRole, setFormRole] = useState<"DOCTOR">("DOCTOR");
   const [formSpeciality, setFormSpeciality] = useState("");
   const [formLicence, setFormLicence] = useState("");
   const [formDepartment, setFormDepartment] = useState("");
@@ -164,7 +160,7 @@ export default function AdminStaffPage() {
     setSaving(true);
     const newStaff: StaffMember = {
       id: `s${Date.now()}`,
-      name: formRole === "DOCTOR" ? `Dr. ${formName}` : `Nurse ${formName}`,
+      name: `Dr. ${formName}`,
       email: formEmail,
       role: formRole,
       speciality: formSpeciality,
@@ -187,7 +183,6 @@ export default function AdminStaffPage() {
   // ─── Stats ─────────────────────────────────────────────
 
   const totalDoctors = staffList.filter((s) => s.role === "DOCTOR").length;
-  const totalNurses = staffList.filter((s) => s.role === "NURSE").length;
   const activeCount = staffList.filter((s) => s.isActive).length;
 
   return (
@@ -208,17 +203,17 @@ export default function AdminStaffPage() {
                   Staff Management
                 </h1>
                 <p className="text-gray-500 text-sm">
-                  {totalDoctors} doctors &middot; {totalNurses} nurses &middot;{" "}
+                  {totalDoctors} doctors &middot;{" "}
                   {activeCount} active
                 </p>
               </div>
             </div>
             <button
-              onClick={() => setShowAddForm(true)}
+              disabled title="Staff creation is not available yet" onClick={() => setShowAddForm(true)}
               className="flex items-center gap-2 px-4 py-2 bg-[var(--primary)] hover:opacity-90 text-white font-medium rounded-xl transition text-sm"
             >
               <UserPlus className="w-4 h-4" />
-              Add Staff
+              Add Staff — not available yet
             </button>
           </div>
         </div>
@@ -239,7 +234,7 @@ export default function AdminStaffPage() {
             />
           </div>
           <div className="flex gap-1 bg-gray-100 p-0.5 rounded-lg self-start">
-            {(["ALL", "DOCTOR", "NURSE"] as const).map((r) => (
+            {(["ALL", "DOCTOR"] as const).map((r) => (
               <button
                 key={r}
                 onClick={() => setRoleFilter(r)}
@@ -250,7 +245,7 @@ export default function AdminStaffPage() {
                     : "text-gray-500"
                 )}
               >
-                {r === "ALL" ? "All" : r === "DOCTOR" ? "Doctors" : "Nurses"}
+                {r === "ALL" ? "All" : "Doctors"}
               </button>
             ))}
           </div>
@@ -447,7 +442,7 @@ export default function AdminStaffPage() {
                   Role
                 </label>
                 <div className="flex gap-2">
-                  {(["DOCTOR", "NURSE"] as const).map((r) => (
+                  {(["DOCTOR"] as const).map((r) => (
                     <button
                       key={r}
                       onClick={() => setFormRole(r)}
@@ -458,7 +453,7 @@ export default function AdminStaffPage() {
                           : "border-gray-200 text-gray-600 hover:bg-gray-50"
                       )}
                     >
-                      {r === "DOCTOR" ? "Doctor" : "Nurse"}
+                      Doctor
                     </button>
                   ))}
                 </div>
@@ -526,18 +521,11 @@ export default function AdminStaffPage() {
               </button>
               <button
                 onClick={handleAddStaff}
-                disabled={
-                  saving ||
-                  !formName ||
-                  !formEmail ||
-                  !formSpeciality ||
-                  !formLicence ||
-                  !formDepartment
-                }
+                disabled
                 className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium text-white bg-[var(--primary)] hover:opacity-90 transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-                {saving ? "Adding..." : "Add Staff"}
+                {saving ? "Adding..." : "Add Staff — not available yet"}
               </button>
             </div>
           </div>

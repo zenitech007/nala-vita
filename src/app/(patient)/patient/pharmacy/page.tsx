@@ -95,7 +95,7 @@ export default function PatientPharmacyPage() {
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 space-y-6">
         <PageHeader
           title="Pharmacy"
-          subtitle="Order your prescriptions for collection or delivery"
+          subtitle="Review prescriptions. Ordering is not available yet."
           icon={<Pill className="w-5 h-5" />}
           action={
             <Link
@@ -162,13 +162,13 @@ export default function PatientPharmacyPage() {
                         {it.orderStatus === "available" && (
                           <button
                             onClick={() => requestOrder(it.id)}
-                            disabled={orderingId === it.id || it.refillsRemaining === 0}
+                            disabled title="Ordering is not available yet"
                             className="px-4 py-2 rounded-xl bg-[var(--primary)] text-white text-sm font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
                           >
                             {orderingId === it.id ? (
                               <Loader2 className="w-4 h-4 animate-spin" />
                             ) : (
-                              "Order"
+                              "Order — not available yet"
                             )}
                           </button>
                         )}
