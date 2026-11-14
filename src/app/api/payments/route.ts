@@ -1,3 +1,4 @@
+import { parsePagination, cursorWhere, pageResult, PaginationError } from "@/lib/pagination";
 import { requireApiUser } from '@/lib/auth';
 import { CheckoutError, initializeCheckout } from '@/lib/payment-checkout';
 import { moneyForJson } from '@/lib/money';
@@ -7,17 +8,18 @@ import { prisma } from "@/lib/prisma";
 
 // ─── GET: Return payment history for the current user ────
 
-export async function GET(_req: NextRequest) {
+export async function GET(req: NextRequest) {
   try {
     const auth = await requireApiUser({ roles: ["PATIENT", "DOCTOR"] });
     if (!auth.ok) return auth.response;
     const user = auth.user;
 
+    const { limit, cursor } = parsePagination(new URL(req.url).searchParams);
     let payments;
 
     if (user.role === "PATIENT" && user.patient) {
       payments = await prisma.payment.findMany({
-        where: { patientId: user.patient!.id },
+        where: { AND: [{ patientId: user.patient!.id }, cursorWhere(cursor, "createdAt")] },
         include: {
           appointment: {
             include: {
@@ -31,12 +33,13 @@ export async function GET(_req: NextRequest) {
             },
           },
         },
-        orderBy: { createdAt: "desc" },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        take: limit + 1,
       });
     } else if (user.role === "DOCTOR" && user.doctor) {
       payments = await prisma.payment.findMany({
         where: {
-          appointment: { doctorId: user.doctor!.id },
+          AND: [{ appointment: { doctorId: user.doctor!.id } }, cursorWhere(cursor, "createdAt")],
         },
         include: {
           patient: {
@@ -60,7 +63,8 @@ export async function GET(_req: NextRequest) {
             },
           },
         },
-        orderBy: { createdAt: "desc" },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        take: limit + 1,
       });
     } else {
       return NextResponse.json(
@@ -69,8 +73,10 @@ export async function GET(_req: NextRequest) {
       );
     }
 
-    return NextResponse.json(moneyForJson({ payments }));
+    const page = pageResult<(typeof payments)[number]>(payments, limit, "createdAt");
+    return NextResponse.json(moneyForJson({ payments: page.items, nextCursor: page.nextCursor }));
   } catch (error) {
+    if (error instanceof PaginationError) return NextResponse.json({ error: error.message }, { status: 400 });
     console.error("GET /api/payments error:", error);
     return NextResponse.json(
       { error: "Internal server error" },

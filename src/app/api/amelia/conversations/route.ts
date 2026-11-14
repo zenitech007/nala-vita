@@ -1,6 +1,7 @@
+import { parsePagination, PaginationError } from "@/lib/pagination";
 import { requireApiUser } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
-import { listConversations, getLatestConversation } from "@/lib/amelia/conversations";
+import { listConversationPage, getLatestConversation } from "@/lib/amelia/conversations";
 
 /**
  * GET /api/amelia/conversations          → sidebar list
@@ -12,15 +13,17 @@ export async function GET(req: NextRequest) {
     if (!auth.ok) return auth.response;
     const user = auth.user;
 
-    const conversations = await listConversations(user.patient!.id);
+    const { limit, cursor } = parsePagination(req.nextUrl.searchParams, 50);
+    const { conversations, nextCursor } = await listConversationPage(user.patient!.id, limit, cursor);
 
     if (req.nextUrl.searchParams.get("latest") === "1") {
       const latest = await getLatestConversation(user.patient!.id);
-      return NextResponse.json({ conversations, latest });
+      return NextResponse.json({ conversations, latest, nextCursor });
     }
 
-    return NextResponse.json({ conversations });
+    return NextResponse.json({ conversations, nextCursor });
   } catch (error) {
+    if (error instanceof PaginationError) return NextResponse.json({ error: error.message }, { status: 400 });
     console.error("Amelia conversations GET error:", error);
     return NextResponse.json({ error: "Failed to load conversations." }, { status: 500 });
   }

@@ -1,3 +1,4 @@
+import { parsePagination, cursorWhere, pageResult, PaginationError } from "@/lib/pagination";
 import { requireApiUser } from "@/lib/auth";
 import { getRecordVisibility, workspacePatientWhere } from "@/lib/record-visibility";
 import { loadVisiblePatientRecord } from "@/lib/visible-patient-record";
@@ -64,21 +65,24 @@ export async function GET(req: NextRequest) {
     const user = auth.user;
     const query = new URL(req.url).searchParams;
     const patientId = user.role === "PATIENT" ? user.patient!.id : query.get("patientId");
-    const limit = Math.min(100, Math.max(1, Number(query.get("limit")) || 30));
+    const { limit, cursor } = parsePagination(query);
     if (!patientId) {
-      const targets = await prisma.patient.findMany({ where: workspacePatientWhere(user.doctor!.id), select: { id: true } });
-      const patients = await Promise.all(targets.map(async target => {
+      const targets = await prisma.patient.findMany({ where: { AND: [workspacePatientWhere(user.doctor!.id), cursorWhere(cursor, "createdAt")] }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: limit + 1, select: { id: true, createdAt: true } });
+      const page = pageResult(targets, limit, "createdAt");
+      const patients = await Promise.all(page.items.map(async target => {
         const record = await loadVisiblePatientRecord(user, target.id);
         return { id: target.id, user: record.patient.user, vitals: record.vitals.slice(0, 1), accessLimited: true };
       }));
-      return NextResponse.json({ patients });
+      return NextResponse.json({ patients, nextCursor: page.nextCursor });
     }
     if (user.role === "DOCTOR" && !await doctorHasPatientAccess(user.doctor!.id, patientId)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     const access = await getRecordVisibility(user, patientId);
-    const vitals = await prisma.vital.findMany({ where: access.where("VITALS"), orderBy: { recordedAt: "desc" }, take: limit });
-    await access.log("VITALS", vitals);
-    return NextResponse.json({ vitals });
+    const vitals = await prisma.vital.findMany({ where: { AND: [access.where("VITALS"), cursorWhere(cursor, "recordedAt")] }, orderBy: [{ recordedAt: "desc" }, { id: "desc" }], take: limit + 1 });
+    const page = pageResult(vitals, limit, "recordedAt");
+    await access.log("VITALS", page.items);
+    return NextResponse.json({ vitals: page.items, nextCursor: page.nextCursor });
   } catch (error) {
+    if (error instanceof PaginationError) return NextResponse.json({ error: error.message }, { status: 400 });
     console.error("GET /api/vitals error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }

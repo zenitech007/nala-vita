@@ -1,3 +1,4 @@
+import { parsePagination, cursorWhere, pageResult, type PageCursor } from "@/lib/pagination";
 // src/lib/amelia/conversations.ts
 import { prisma } from "@/lib/prisma";
 
@@ -33,10 +34,15 @@ export function deriveTitle(firstUserMessage: string | undefined): string {
 }
 
 export async function listConversations(patientId: string, limit = 50): Promise<ConversationSummary[]> {
+  return (await listConversationPage(patientId, limit)).conversations;
+}
+
+export async function listConversationPage(patientId: string, requestedLimit = 50, cursor: PageCursor | null = null) {
+  const { limit } = parsePagination(new URLSearchParams({ limit: String(requestedLimit) }), 50);
   const convos = await prisma.ameliaConversation.findMany({
-    where: { patientId },
-    orderBy: { updatedAt: "desc" },
-    take: limit,
+    where: { AND: [{ patientId }, cursorWhere(cursor, "updatedAt")] },
+    orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+    take: limit + 1,
     include: {
       messages: {
         where: { role: "user" },
@@ -47,11 +53,12 @@ export async function listConversations(patientId: string, limit = 50): Promise<
     },
   });
 
-  return convos.map((c) => ({
+  const page = pageResult(convos, limit, "updatedAt");
+  return { nextCursor: page.nextCursor, conversations: page.items.map((c) => ({
     id: c.id,
     title: deriveTitle(c.messages[0]?.content),
     updatedAt: c.updatedAt.toISOString(),
-  }));
+  })) };
 }
 
 /** Loads one conversation's messages, scoped to the owning patient. */

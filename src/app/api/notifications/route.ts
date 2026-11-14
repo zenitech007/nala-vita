@@ -1,3 +1,4 @@
+import { parsePagination, cursorWhere, pageResult, PaginationError } from "@/lib/pagination";
 import { requireApiUser } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
@@ -13,8 +14,7 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url);
     const unreadOnly = searchParams.get("unreadOnly") === "true";
-    const limit = parseInt(searchParams.get("limit") || "20");
-    const offset = parseInt(searchParams.get("offset") || "0");
+    const { limit, cursor } = parsePagination(searchParams, 20);
 
     const whereClause: Record<string, unknown> = { userId: user.id };
     if (unreadOnly) {
@@ -23,18 +23,19 @@ export async function GET(req: NextRequest) {
 
     const [notifications, unreadCount] = await Promise.all([
       prisma.notification.findMany({
-        where: whereClause,
-        orderBy: { createdAt: "desc" },
-        take: limit,
-        skip: offset,
+        where: { AND: [whereClause, cursorWhere(cursor, "createdAt")] },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        take: limit + 1,
       }),
       prisma.notification.count({
         where: { userId: user.id, isRead: false },
       }),
     ]);
 
-    return NextResponse.json({ notifications, unreadCount });
+    const page = pageResult(notifications, limit, "createdAt");
+    return NextResponse.json({ notifications: page.items, unreadCount, nextCursor: page.nextCursor });
   } catch (error) {
+    if (error instanceof PaginationError) return NextResponse.json({ error: error.message }, { status: 400 });
     console.error("GET /api/notifications error:", error);
     return NextResponse.json(
       { error: "Internal server error" },

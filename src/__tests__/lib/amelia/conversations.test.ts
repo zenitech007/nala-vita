@@ -65,8 +65,8 @@ describe("listConversations", () => {
     ]);
     // Ordering and patient scoping must be enforced in the query.
     const arg = convoFindMany.mock.calls[0][0] as { where: { patientId: string }; orderBy: unknown };
-    expect(arg.where.patientId).toBe("pat1");
-    expect(arg.orderBy).toEqual({ updatedAt: "desc" });
+    expect(arg.where).toEqual({ AND: [{ patientId: "pat1" }, {}] });
+    expect(arg.orderBy).toEqual([{ updatedAt: "desc" }, { id: "desc" }]);
   });
 });
 
