@@ -1,4 +1,5 @@
 "use client";
+import ClinicInvitation from "@/components/patients/ClinicInvitation";
 import { temperatureFromCelsius } from "@/lib/temperature";
 
 import { useEffect, useState, useCallback } from "react";
@@ -339,6 +340,7 @@ export default function PatientDetailPage() {
           </div>
         </div>
       </header>
+      <div className="mx-auto max-w-7xl px-4 pt-4"><ClinicInvitation key={patient.id} patientId={patient.id}/></div>
 
       {/* ─── Tabs ─── */}
       <div className="bg-white border-b border-gray-200">
