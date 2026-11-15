@@ -3,25 +3,7 @@ import RefillRequests from "@/components/medications/RefillRequests";
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import {
-  ChevronLeft,
-  Plus,
-  Trash2,
-  Search,
-  User,
-  Pill,
-  AlertTriangle,
-  Loader2,
-  CheckCircle,
-  ShieldAlert,
-  Clock,
-  Activity,
-  ShieldCheck,
-  CalendarDays,
-  Calendar,
-  Sparkles,
-  TrendingUp,
-} from "lucide-react";
+import { ChevronLeft, Plus, Trash2, Search, User, Pill, AlertTriangle, Loader2, CheckCircle, ShieldAlert, Clock, Activity, ShieldCheck, CalendarDays, Calendar } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format, addDays, parseISO } from "date-fns";
 
@@ -142,9 +124,10 @@ export default function DoctorPrescriptionsPage() {
   const [loadingPatients, setLoadingPatients] = useState(true);
 
   // ─── Tab 1: Adherence Tracking (6 Months) State ──────────
-  const [patientMedications, setPatientMedications] = useState<DoctorMedicationView[]>([]);
-  const [adherenceStats, setAdherenceStats] = useState<AdherenceStats | null>(null);
-  const [loadingAdherence, setLoadingAdherence] = useState(false);
+  const [adherence, setAdherence] = useState<{ patientId: string; medications: DoctorMedicationView[]; stats: AdherenceStats | null } | null>(null);
+  const patientMedications = adherence?.patientId === selectedPatient?.id ? adherence?.medications ?? [] : [];
+  const adherenceStats = adherence?.patientId === selectedPatient?.id ? adherence?.stats ?? null : null;
+  const loadingAdherence = selectedPatient !== null && adherence?.patientId !== selectedPatient.id;
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
 
   // ─── Tab 2: Write Prescription State ────────────────────
@@ -193,8 +176,8 @@ export default function DoctorPrescriptionsPage() {
             );
             setPatients(mapped);
             // Default select the first patient if available
-            if (mapped.length > 0 && !selectedPatient) {
-              setSelectedPatient(mapped[0]);
+            if (mapped.length > 0) {
+              setSelectedPatient(current => current ?? mapped[0]);
             }
           }
         }
@@ -212,34 +195,23 @@ export default function DoctorPrescriptionsPage() {
   );
 
   // ─── Fetch 6-Month Adherence Data for Selected Patient ──
-  const fetchAdherenceData = useCallback(async (patientId: string) => {
-    setLoadingAdherence(true);
-    try {
-      const res = await fetch(`/api/medications?patientId=${encodeURIComponent(patientId)}`);
-      if (res.ok) {
-        const data = await res.json();
-        setPatientMedications(data.medications || []);
-        setAdherenceStats(data.adherenceStats || null);
-      } else {
-        setPatientMedications([]);
-        setAdherenceStats(null);
+  const fetchAdherenceData = useCallback((patientId: string, signal?: AbortSignal) => {
+    return fetch(`/api/medications?patientId=${encodeURIComponent(patientId)}`, { signal: signal }).then(async res => {
+      if (!res.ok) throw new Error("Medication adherence could not be loaded");
+      const data = await res.json();
+      if (!signal?.aborted) setAdherence({ patientId, medications: data.medications || [], stats: data.adherenceStats || null });
+    }).catch((err: unknown) => {
+      if (!signal?.aborted) {
+        console.error("Failed to fetch adherence progression:", err);
+        setAdherence({ patientId, medications: [], stats: null });
       }
-    } catch (err) {
-      console.error("Failed to fetch adherence progression:", err);
-      setPatientMedications([]);
-      setAdherenceStats(null);
-    } finally {
-      setLoadingAdherence(false);
-    }
+    });
   }, []);
-
   useEffect(() => {
-    if (selectedPatient) {
-      fetchAdherenceData(selectedPatient.id);
-    } else {
-      setPatientMedications([]);
-      setAdherenceStats(null);
-    }
+    if (!selectedPatient) return;
+    const controller = new AbortController();
+    void fetchAdherenceData(selectedPatient.id, controller.signal);
+    return () => controller.abort();
   }, [selectedPatient, fetchAdherenceData]);
 
   // ─── Drug Interaction Check (Gemini AI) ─────────────────
@@ -437,8 +409,7 @@ export default function DoctorPrescriptionsPage() {
               <button
                 onClick={() => {
                   setSelectedPatient(null);
-                  setPatientMedications([]);
-                  setAdherenceStats(null);
+                  setAdherence(null);
                 }}
                 className="text-xs font-bold text-[var(--primary)] hover:underline"
               >

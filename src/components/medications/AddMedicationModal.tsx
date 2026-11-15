@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Pill, Clock, Plus, Activity, Info, Lock, ShieldCheck } from "lucide-react";
 
@@ -35,13 +35,12 @@ export default function AddMedicationModal({ isOpen, onClose, onAdd }: AddMedica
   const [instructions, setInstructions] = useState("");
   const [isSharedWithDoctor, setIsSharedWithDoctor] = useState(true);
 
-  // Dynamically adjust the number of time inputs based on frequency
-  useEffect(() => {
-    if (frequency === "Once daily") setTimes((t) => [t[0] || "08:00"]);
-    if (frequency === "Twice daily") setTimes((t) => [t[0] || "08:00", t[1] || "20:00"]);
-    if (frequency === "Three times daily")
-      setTimes((t) => [t[0] || "08:00", t[1] || "14:00", t[2] || "20:00"]);
-  }, [frequency]);
+  const changeFrequency=(value:string)=>{
+    setFrequency(value);
+    if(value==="Once daily")setTimes(current=>[current[0]||"08:00"]);
+    if(value==="Twice daily")setTimes(current=>[current[0]||"08:00",current[1]||"20:00"]);
+    if(value==="Three times daily")setTimes(current=>[current[0]||"08:00",current[1]||"14:00",current[2]||"20:00"]);
+  };
 
   const handleTimeChange = (index: number, newTime: string) => {
     setTimes((prev) => {
@@ -70,7 +69,7 @@ export default function AddMedicationModal({ isOpen, onClose, onAdd }: AddMedica
     setIsSubmitting(false);
     setName("");
     setDosage("");
-    setFrequency("Once daily");
+    changeFrequency("Once daily");
     setInstructions("");
     setIsSharedWithDoctor(true);
     onClose();
@@ -156,7 +155,7 @@ export default function AddMedicationModal({ isOpen, onClose, onAdd }: AddMedica
                   <label className={labelClass}>Frequency</label>
                   <select
                     value={frequency}
-                    onChange={(e) => setFrequency(e.target.value)}
+                    onChange={(e) => changeFrequency(e.target.value)}
                     className={inputClass}
                   >
                     <option value="Once daily">Once daily</option>

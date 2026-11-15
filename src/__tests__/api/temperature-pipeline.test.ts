@@ -1,4 +1,6 @@
-let stored: Record<string, any>[] = [];
+import type {Vital} from "@prisma/client";
+type StoredVital=Pick<Vital,"id"|"recordedAt">&Partial<Vital>;
+let stored:StoredVital[]=[];
 const createVital = jest.fn();
 jest.mock('@/lib/supabase-server', () => ({ createServerSupabaseClient: () => ({ auth: { getUser: async () => ({ data: { user: { id: 'auth' } } }) } }) }));
 jest.mock('@/lib/prisma', () => ({ prisma: {
@@ -12,7 +14,7 @@ jest.mock('@/lib/prisma', () => ({ prisma: {
 import { POST, GET } from '@/app/api/vitals/route';
 import { getPatientContext } from '@/lib/amelia/context';
 import { renderContext } from '@/lib/amelia/prompts';
-beforeEach(() => { stored = []; createVital.mockReset().mockImplementation(async ({ data }) => {
+beforeEach(() => { stored = []; createVital.mockReset().mockImplementation(async ({ data }: {data:Omit<Partial<Vital>,"id"|"recordedAt">}) => {
   const row = { id: 'v', recordedAt: new Date('2030-01-01'), ...data }; stored.push(row); return row;
 }); });
 const req = (body: unknown) => new Request('http://localhost/api/vitals', { method: 'POST', body: JSON.stringify(body) }) as never;

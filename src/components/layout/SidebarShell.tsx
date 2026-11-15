@@ -1,5 +1,6 @@
 "use client";
 
+import {useLocalPreference,readBoolean} from "@/hooks/useLocalPreference";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import {useTranslations} from "next-intl";
@@ -36,7 +37,7 @@ export function SidebarShell({ role, roleLabel, brand = "Nala Vita", user, nav }
   const localizedNav = nav.map(item => ({...item,label:item.messageKey ? t(item.messageKey) : item.label}));
   const pathname = usePathname();
   const router = useRouter();
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useLocalPreference(STORAGE_KEY(role),false,readBoolean);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isCommandOpen, setIsCommandOpen] = useState(false);
   const [signOutError, setSignOutError] = useState("");
@@ -59,18 +60,7 @@ export function SidebarShell({ role, roleLabel, brand = "Nala Vita", user, nav }
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY(role));
-    if (stored !== null) setIsCollapsed(stored === "true");
-  }, [role]);
-
-  const toggleCollapse = () => {
-    setIsCollapsed((v) => {
-      const next = !v;
-      localStorage.setItem(STORAGE_KEY(role), String(next));
-      return next;
-    });
-  };
+  const toggleCollapse = () => setIsCollapsed(value => !value);
 
   const handleSignOut = async () => {
     try {

@@ -1,6 +1,6 @@
 import { requireApiUser } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+
 import { getConversation, deleteConversation } from "@/lib/amelia/conversations";
 
 async function getPatientId(): Promise<string | null> {

@@ -1,10 +1,10 @@
 import { requireApiUser } from "@/lib/auth";
 import { getRecordVisibility } from "@/lib/record-visibility";
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { createServerSupabaseClient } from "@/lib/supabase-server";
 
-export async function GET(_req: NextRequest) {
+
+export async function GET() {
   try {
     const auth = await requireApiUser({ roles: ["PATIENT"], profile: "patient" });
     if (!auth.ok) return auth.response;

@@ -1,5 +1,6 @@
 "use client";
 
+import {useRouter} from "next/navigation";
 import { fetchJson } from "@/lib/api-fetch";
 
 import { useEffect, useState, useRef, useCallback } from "react";
@@ -42,30 +43,19 @@ export default function NotificationBell({
   userId,
   className,
 }: NotificationBellProps) {
+  const router = useRouter();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
   const [readError, setReadError] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // ─── Fetch notifications ───────────────────────────────
 
-  const fetchNotifications = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await fetch("/api/notifications?limit=15");
-      if (res.ok) {
-        const data = await res.json();
-        setNotifications(data.notifications || []);
-        setUnreadCount(data.unreadCount || 0);
-      }
-    } catch {
-      // placeholder
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const fetchNotifications=useCallback(()=>fetchJson<{notifications:Notification[];unreadCount:number}>("/api/notifications?limit=15")
+    .then(data=>{setNotifications(data.notifications||[]);setUnreadCount(data.unreadCount||0);setLoading(false);})
+    .catch(failure=>{setReadError(failure instanceof Error?failure.message:"Notifications unavailable");setLoading(false);}),[]);
 
   useEffect(() => {
     fetchNotifications();
@@ -296,7 +286,7 @@ export default function NotificationBell({
             <div className="px-5 py-2.5 border-t border-gray-100 text-center">
               <button
                 onClick={() => {
-                  window.location.href = "/notifications";
+                  router.push("/notifications");
                   setIsOpen(false);
                 }}
                 className="text-xs text-[var(--primary)] hover:opacity-80 font-medium"

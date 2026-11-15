@@ -48,7 +48,7 @@ export default function DoctorBillingPage() {
   const [loading, setLoading] = useState(true);
   const [activePeriod, setActivePeriod] = useState<PeriodKey>("month");
   const [allEarnings, setAllEarnings] = useState<EarningsEntry[]>([]);
-  const [payouts, setPayouts] = useState<PayoutEntry[]>([]);
+  const [payouts] = useState<PayoutEntry[]>([]);
 
   useEffect(() => {
     async function loadBilling() {

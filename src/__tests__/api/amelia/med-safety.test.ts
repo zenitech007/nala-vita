@@ -32,9 +32,6 @@ jest.mock("@/lib/amelia/medsafety", () => ({
 
 import { GET } from "@/app/api/amelia/med-safety/route";
 
-function req() {
-  return new Request("http://localhost/api/amelia/med-safety") as never;
-}
 
 beforeEach(() => {
   [getUser, userFindUnique, getCachedOrAnalyze].forEach((m) => m.mockReset());
@@ -43,7 +40,7 @@ beforeEach(() => {
 describe("GET /api/amelia/med-safety", () => {
   it("401s when unauthenticated", async () => {
     getUser.mockResolvedValue({ data: { user: null } });
-    expect((await GET(req())).status).toBe(401);
+    expect((await GET()).status).toBe(401);
   });
 
   it("returns the analysis for the patient's active meds", async () => {
@@ -63,7 +60,7 @@ describe("GET /api/amelia/med-safety", () => {
       overallNote: "ok",
     });
 
-    const res = await GET(req());
+    const res = await GET();
     const json = await res.json();
 
     expect(res.status).toBe(200);

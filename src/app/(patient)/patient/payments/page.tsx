@@ -1,4 +1,5 @@
 "use client";
+import {fetchJson} from "@/lib/api-fetch";
 
 import { useState, useCallback, useEffect } from "react";
 import Link from "next/link";
@@ -70,29 +71,9 @@ export default function PatientPaymentsPage() {
   const [payingId, setPayingId] = useState<string | null>(null);
   const [payError, setPayError] = useState<string | null>(null);
 
-  const fetchPayments = useCallback(async () => {
-    setLoading(true);
-    setLoadError(null);
-    try {
-      const res = await fetch("/api/payments");
-      const data = await res.json().catch(() => null);
-
-      if (!res.ok) {
-        throw new Error(data?.error || "Unable to load payments");
-      }
-
-      if (!Array.isArray(data?.payments)) {
-        throw new Error("The payments response was invalid");
-      }
-
-      setPayments(data.payments);
-    } catch (error) {
-      setPayments([]);
-      setLoadError(error instanceof Error ? error.message : "Unable to load payments");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const fetchPayments=useCallback(()=>fetchJson<{payments:Payment[]}>("/api/payments")
+    .then(data=>{if(!Array.isArray(data.payments))throw new Error("The payments response was invalid");setPayments(data.payments);setLoadError(null);setLoading(false);})
+    .catch(error=>{setPayments([]);setLoadError(error instanceof Error?error.message:"Unable to load payments");setLoading(false);}),[]);
 
   useEffect(() => {
     fetchPayments();
@@ -242,7 +223,7 @@ export default function PatientPaymentsPage() {
             <p className="text-gray-700 text-lg font-medium">Could not load payments</p>
             <p className="text-gray-500 text-sm mt-1">{loadError}</p>
             <button
-              onClick={fetchPayments}
+              onClick={()=>{setLoading(true);setLoadError(null);void fetchPayments();}}
               className="mt-4 text-[var(--primary)] hover:opacity-80 font-medium text-sm"
             >
               Try again

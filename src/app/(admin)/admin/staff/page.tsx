@@ -82,23 +82,11 @@ export default function AdminStaffPage() {
 
   const [staffList, setStaffList] = useState<StaffMember[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError,setLoadError]=useState("");
 
-  const fetchStaff = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch("/api/admin/staff");
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data.staff)) {
-          setStaffList(data.staff);
-        }
-      }
-    } catch (err) {
-      console.error("Failed to load staff list:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const fetchStaff=()=>fetchJson<{staff:StaffMember[]}>("/api/admin/staff")
+    .then(data=>{if(Array.isArray(data.staff))setStaffList(data.staff);setLoadError("");setLoading(false);})
+    .catch(error=>{setLoadError(error instanceof Error?error.message:"Staff directory unavailable");setLoading(false);});
 
   useEffect(() => {
     fetchStaff();
@@ -288,7 +276,7 @@ export default function AdminStaffPage() {
                       <p className="text-gray-500 text-sm">Loading staff directory...</p>
                     </td>
                   </tr>
-                ) : filtered.length === 0 ? (
+                ) : loadError ? <tr><td colSpan={7} role="alert">{loadError}</td></tr> : filtered.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="text-center py-12">
                       <Search className="w-10 h-10 text-gray-300 mx-auto mb-2" />

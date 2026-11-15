@@ -4,7 +4,7 @@ import { imageDataUrlSchema, MAX_IMAGE_DATA_URL } from "@/lib/image-data-url";
 import { requireApiUser } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { createServerSupabaseClient } from "@/lib/supabase-server";
+
 import { prisma } from "@/lib/prisma";
 import { checkRateLimitAsync } from "@/lib/rate-limit";
 import { runAmeliaTurn, runAmeliaTurnStream } from "@/lib/amelia/engine";

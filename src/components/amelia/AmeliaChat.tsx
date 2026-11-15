@@ -200,7 +200,6 @@ export default function AmeliaChat({
       let buffer = "";
       let opened = false;
 
-      // eslint-disable-next-line no-constant-condition
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;

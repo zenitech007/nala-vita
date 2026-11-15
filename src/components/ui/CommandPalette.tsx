@@ -1,5 +1,6 @@
 "use client";
 
+import {z} from "zod";
 import { useEffect, useState, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
@@ -10,16 +11,12 @@ import {
   Calendar,
   Pill,
   Activity,
-  FileText,
-  CreditCard,
-  Settings,
   Sparkles,
   ArrowRight,
-  Command,
   X,
   Loader2,
-  Video,
   FlaskConical,
+  type LucideIcon,
 } from "lucide-react";
 import { PATIENT_NAV, DOCTOR_NAV, ADMIN_NAV, NavItem } from "@/lib/nav-config";
 import type { SidebarRole } from "@/components/layout/SidebarShell";
@@ -36,23 +33,25 @@ interface SearchItem {
   subtitle?: string;
   category: "Pages" | "Patients" | "Doctors" | "Actions";
   href: string;
-  icon?: any;
+  icon?: LucideIcon;
 }
 
-export function CommandPalette({ role, isOpen, onClose }: Props) {
+export function CommandPalette(props:Props){return props.isOpen?<CommandPaletteContent {...props}/>:null;}
+
+function CommandPaletteContent({ role, isOpen, onClose }: Props) {
   const router = useRouter();
   const [query, setQuery] = useState("");
-  const [remoteResults, setRemoteResults] = useState<SearchItem[]>([]);
-  const [loadingRemote, setLoadingRemote] = useState(false);
-  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [remote,setRemote]=useState<{query:string;items:SearchItem[]}|null>(null);
+  const [selection,setSelection]=useState({key:"",index:0});
+  const queryKey=query.trim();
+  const remoteResults=useMemo(()=>remote?.query===queryKey?remote.items:[],[remote,queryKey]);
+  const loadingRemote=queryKey.length>=2&&remote?.query!==queryKey;
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Focus input on open
   useEffect(() => {
     if (isOpen) {
-      setQuery("");
-      setSelectedIndex(0);
-      setTimeout(() => inputRef.current?.focus(), 50);
+      inputRef.current?.focus();
     }
   }, [isOpen]);
 
@@ -145,39 +144,21 @@ export function CommandPalette({ role, isOpen, onClose }: Props) {
     return [...pageItems, ...actionItems];
   }, [role]);
 
-  // Query remote patients or doctors when query is typed
+  // The result carries its query key; stale results are never shown for a new query.
   useEffect(() => {
-    if (!query.trim() || query.trim().length < 2) {
-      setRemoteResults([]);
-      setLoadingRemote(false);
-      return;
-    }
-
-    const timer = setTimeout(async () => {
-      setLoadingRemote(true);
-      try {
-        const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
-        if (res.ok) {
-          const data = await res.json();
-          const mapped = (data.results || []).map((r: any) => ({
-            id: r.id,
-            title: r.title,
-            subtitle: r.subtitle,
-            category: r.category === "patients" ? "Patients" : "Doctors",
-            href: r.href,
-            icon: r.category === "patients" ? Users : Stethoscope,
-          }));
-          setRemoteResults(mapped);
-        }
-      } catch {
-        // quiet error
-      } finally {
-        setLoadingRemote(false);
-      }
-    }, 200);
-
-    return () => clearTimeout(timer);
-  }, [query]);
+    if(queryKey.length<2)return;
+    const controller=new AbortController();
+    const timer=setTimeout(async()=>{
+      try{
+        const response=await fetch(`/api/search?q=${encodeURIComponent(queryKey)}`,{signal:controller.signal});
+        if(!response.ok)throw new Error("Search unavailable");
+        const data=z.object({results:z.array(z.object({id:z.string(),title:z.string(),subtitle:z.string().optional(),category:z.enum(["patients","doctors","actions"]),href:z.string()}))}).parse(await response.json());
+        const items:SearchItem[]=data.results.map(result=>({...result,category:result.category==="patients"?"Patients":result.category==="doctors"?"Doctors":"Actions",icon:result.category==="patients"?Users:result.category==="doctors"?Stethoscope:Sparkles}));
+        if(!controller.signal.aborted)setRemote({query:queryKey,items});
+      }catch{if(!controller.signal.aborted)setRemote({query:queryKey,items:[]});}
+    },200);
+    return ()=>{clearTimeout(timer);controller.abort();};
+  },[queryKey]);
 
  // Filter static items by query
  const filteredItems = useMemo(() => {
@@ -193,10 +174,9 @@ export function CommandPalette({ role, isOpen, onClose }: Props) {
  return [...remoteResults, ...matchedStatic];
  }, [query, staticItems, remoteResults]);
 
- // Keep selected index within bounds
- useEffect(() => {
- setSelectedIndex(0);
- }, [filteredItems.length]);
+ const selectionKey=query+":"+filteredItems.map(item=>item.id).join("|");
+ const selectedIndex=selection.key===selectionKey?Math.min(selection.index,Math.max(0,filteredItems.length-1)):0;
+ const setSelectedIndex=(next:number|((current:number)=>number))=>setSelection({key:selectionKey,index:typeof next==="function"?next(selectedIndex):next});
 
   const handleSelect = (item: SearchItem) => {
     onClose();

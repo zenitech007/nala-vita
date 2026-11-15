@@ -1,54 +1,63 @@
+import type {Payment,PaymentAttempt,PaymentProviderEvent,Appointment} from "@prisma/client";
 import { createHmac } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 const notification = jest.fn(), updatePayment = jest.fn(), updateAppointment = jest.fn();
-let state: any, queue = Promise.resolve();
+type SettlementState={
+ payment:Partial<Payment>&Pick<Payment,"id"|"patientId"|"appointmentId"|"amount"|"currency"|"status">;
+ attempt:Partial<PaymentAttempt>&Pick<PaymentAttempt,"id"|"paymentId"|"patientId"|"appointmentId"|"reference"|"amountMinor"|"currency"|"domain"|"status"|"providerTransactionId">;
+ appointmentStatus:Appointment["status"];
+};
+let state:SettlementState,queue=Promise.resolve();
 let receipts: Map<string, unknown>;
 const appointment = () => ({ id: 'a', patientId: 'p', status: state.appointmentStatus,
   patient: { userId: 'patient-user', user: { id: 'patient-user', firstName: 'Synthetic', lastName: 'Patient' } },
   doctor: { userId: 'doctor-user', user: { id: 'doctor-user', firstName: 'Synthetic', lastName: 'Doctor' } } });
 const attempt = () => ({ ...state.attempt, payment: { ...state.payment, appointment: appointment() } });
-async function runTransaction(fn: (tx: any) => unknown) {
-  const previous = queue; let release!: () => void;
-  queue = new Promise<void>(resolve => { release = resolve; }); await previous;
-  const backup = { payment: { ...state.payment }, attempt: { ...state.attempt }, appointmentStatus: state.appointmentStatus };
-  const oldReceipts = new Map(receipts);
-  const tx = {
+function settlementTx(){
+  return {
     $queryRaw: async () => [],
     paymentAttempt: {
-      findUnique: async ({ where }: any) => (where.reference && where.reference !== 'ref-synthetic') ? null : attempt(),
-      updateMany: async ({ where, data }: any) => {
+      findUnique: async ({ where }: {where:{reference?:string}}) => (where.reference && where.reference !== 'ref-synthetic') ? null : attempt(),
+      updateMany: async ({ where, data }: {where:{status?:{in:string[]}};data:Partial<PaymentAttempt>}) => {
         if (where.status?.in && !where.status.in.includes(state.attempt.status)) return { count: 0 };
         Object.assign(state.attempt, data); return { count: 1 };
       },
     },
     paymentProviderEvent: {
-      findUnique: async ({ where }: any) => receipts.get(where.providerEventId) ?? null,
-      create: async ({ data }: any) => { if (receipts.has(data.providerEventId)) throw { code: 'P2002' }; receipts.set(data.providerEventId, data); return data; },
+      findUnique: async ({ where }: {where:{providerEventId:string}}) => receipts.get(where.providerEventId) ?? null,
+      create: async ({ data }: {data:Partial<PaymentProviderEvent>&Pick<PaymentProviderEvent,"providerEventId">}) => { if (receipts.has(data.providerEventId)) throw { code: 'P2002' }; receipts.set(data.providerEventId, data); return data; },
     },
     payment: {
-      findFirst: async ({ where }: any) => where.paystackReference === 'ref-synthetic' ? { ...state.payment, patient: { user: { id: 'patient-user' } } } : null,
+      findFirst: async ({ where }: {where:{paystackReference:string}}) => where.paystackReference === 'ref-synthetic' ? { ...state.payment, patient: { user: { id: 'patient-user' } } } : null,
       findUnique: async () => ({ ...state.payment, appointment: appointment() }),
       update: updatePayment,
-      updateMany: async ({ where, data }: any) => {
+      updateMany: async ({ where, data }: {where:{status:Payment["status"]};data:Partial<Payment>}) => {
         if (where.status !== state.payment.status) return { count: 0 };
         updatePayment({ where, data }); Object.assign(state.payment, data); return { count: 1 };
       },
     },
     appointment: {
       findUnique: async () => appointment(), update: updateAppointment,
-      updateMany: async ({ where, data }: any) => {
+      updateMany: async ({ where, data }: {where:{status:{in:Appointment["status"][]}};data:Partial<Appointment>&Pick<Appointment,"status">}) => {
         if (!where.status.in.includes(state.appointmentStatus)) return { count: 0 };
         updateAppointment({ where, data }); state.appointmentStatus = data.status; return { count: 1 };
       },
     },
     notification: { create: notification },
   };
+}
+async function runTransaction(fn: (tx:ReturnType<typeof settlementTx>) => unknown) {
+  const previous = queue; let release!: () => void;
+  queue = new Promise<void>(resolve => { release = resolve; }); await previous;
+  const backup = { payment: { ...state.payment }, attempt: { ...state.attempt }, appointmentStatus: state.appointmentStatus };
+  const oldReceipts = new Map(receipts);
+  const tx=settlementTx();
   try { return await fn(tx); }
   catch (error) { state = backup; receipts = oldReceipts; throw error; }
   finally { release(); }
 }
 jest.mock('@/lib/prisma', () => ({ prisma: {
-  $transaction: (fn: (tx: any) => unknown) => runTransaction(fn),
+  $transaction: (fn: (tx:ReturnType<typeof settlementTx>) => unknown) => runTransaction(fn),
   payment: { findFirst: async () => ({ ...state.payment, patient: { user: { id: 'patient-user' } } }), update: (...a: unknown[]) => updatePayment(...a) },
   notification: { create: (...a: unknown[]) => notification(...a) },
 } }));
@@ -83,7 +92,7 @@ it('F15 duplicate and concurrent delivery produces exactly one settlement and tw
   expect(results.map(r => r.status)).toEqual([200, 200]); expect(updatePayment).toHaveBeenCalledTimes(1);
   expect(updateAppointment).toHaveBeenCalledTimes(1); expect(notification).toHaveBeenCalledTimes(2); expect(receipts.size).toBe(1);
 });
-it.each(['CANCELLED', 'COMPLETED'])('F12/F15 cannot reconfirm a terminal %s appointment', async status => {
+it.each(['CANCELLED', 'COMPLETED'] as const)('F12/F15 cannot reconfirm a terminal %s appointment', async status => {
   state.appointmentStatus = status; expect((await webhook()).status).toBe(200);
   expect(updatePayment).not.toHaveBeenCalled(); expect(updateAppointment).not.toHaveBeenCalled(); expect(notification).not.toHaveBeenCalled();
   expect([...receipts.values()]).toEqual([expect.objectContaining({ outcome: 'REQUIRES_RECONCILIATION' })]);

@@ -40,7 +40,7 @@ export async function generateSpeech(params: {
               },
             },
           },
-        } as any,
+        },
       }), params.signal);
 
       const candidates = response.candidates;

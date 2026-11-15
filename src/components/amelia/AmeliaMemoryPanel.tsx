@@ -1,5 +1,6 @@
 "use client";
 
+import {fetchJson} from "@/lib/api-fetch";
 import { useEffect, useState, useCallback } from "react";
 import { Check, Trash2, Loader2 } from "lucide-react";
 
@@ -23,17 +24,11 @@ const KIND_LABEL: Record<string, string> = {
 export default function AmeliaMemoryPanel() {
   const [memories, setMemories] = useState<MemoryFact[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error,setError]=useState("");
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await fetch("/api/amelia/memory");
-      const data = await res.json();
-      if (res.ok) setMemories(data.memories ?? []);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const load=useCallback(()=>fetchJson<{memories:MemoryFact[]}>("/api/amelia/memory")
+    .then(data=>{setMemories(data.memories??[]);setError("");setLoading(false);})
+    .catch(failure=>{setError(failure instanceof Error?failure.message:"Collection unavailable");setLoading(false);}),[]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -50,6 +45,8 @@ export default function AmeliaMemoryPanel() {
     await fetch(`/api/amelia/memory/${id}`, { method: "DELETE" });
     await load();
   };
+
+  if(error)return <div><p role="alert">{error}</p><button type="button" onClick={()=>{setError("");setLoading(true);void load();}}>Retry memories</button></div>;
 
   if (loading) {
     return <div className="flex items-center justify-center py-12 text-gray-400"><Loader2 className="w-5 h-5 animate-spin" /></div>;

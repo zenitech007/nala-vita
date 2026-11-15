@@ -32,7 +32,7 @@ beforeEach(() => [getUser, userFindUnique, listMemories, confirmMemory, updateMe
 describe("memory API", () => {
   it("GET 401s when unauthenticated", async () => {
     getUser.mockResolvedValue({ data: { user: null } });
-    const res = await GET(req());
+    const res = await GET();
     expect(res.status).toBe(401);
   });
 
@@ -40,7 +40,7 @@ describe("memory API", () => {
     getUser.mockResolvedValue({ data: { user: { id: "sub1" } } });
     userFindUnique.mockResolvedValue({ id: "u1", role: "PATIENT", isActive: true, patient: { id: "pat1" } });
     listMemories.mockResolvedValue([{ id: "1", kind: "ALLERGY", value: "penicillin", confirmedByUser: true }]);
-    const res = await GET(req());
+    const res = await GET();
     const json = await res.json();
     expect(res.status).toBe(200);
     expect(json.memories[0].value).toBe("penicillin");

@@ -1,4 +1,5 @@
 "use client";
+import {fetchJson} from "@/lib/api-fetch";
 import RefillRequests from "@/components/medications/RefillRequests";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
@@ -173,6 +174,7 @@ const DOSE_STATUS_RING: Record<DoseStatus, string> = {
 
 export default function PatientMedicationsPage() {
   const [medications, setMedications] = useState<Medication[]>([]);
+  const [loadError,setLoadError]=useState("");
   const [last7Days, setLast7Days] = useState<string[]>(getFallback7Days());
   const [todayStr, setTodayStr] = useState<string>(
     new Date().toISOString().split("T")[0]
@@ -208,26 +210,12 @@ export default function PatientMedicationsPage() {
   }, [toast]);
 
   // Fetch medications & adherence
-  const fetchMedications = useCallback(async () => {
-    try {
-      const res = await fetch("/api/medications");
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data)) {
-          setMedications(data);
-        } else if (data && typeof data === "object") {
-          setMedications(Array.isArray(data.medications) ? data.medications : []);
-          if (Array.isArray(data.last7Days)) setLast7Days(data.last7Days);
-          if (data.today) setTodayStr(data.today);
-          if (data.adherenceStats) setAdherenceStats(data.adherenceStats);
-        }
-      }
-    } catch (err) {
-      console.error("Failed to fetch medications:", err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const fetchMedications=useCallback(()=>fetchJson<Medication[]|{medications:Medication[];last7Days?:string[];today?:string;adherenceStats?:AdherenceStats}>("/api/medications")
+    .then(data=>{
+      if(Array.isArray(data))setMedications(data);
+      else{setMedications(Array.isArray(data.medications)?data.medications:[]);if(data.last7Days)setLast7Days(data.last7Days);if(data.today)setTodayStr(data.today);if(data.adherenceStats)setAdherenceStats(data.adherenceStats);}
+      setLoadError("");setLoading(false);
+    }).catch(error=>{setLoadError(error instanceof Error?error.message:"Medications unavailable");setLoading(false);}),[]);
 
   useEffect(() => {
     fetchMedications();
@@ -766,7 +754,7 @@ export default function PatientMedicationsPage() {
             </div>
           </div>
 
-          {filteredActiveMedications.length === 0 ? (
+          {loadError ? <p role="alert" aria-label="Medication loading error">{loadError}</p> : filteredActiveMedications.length === 0 ? (
             <div className="bg-white rounded-3xl border border-gray-100 p-10 text-center shadow-sm">
               <Pill className="w-12 h-12 text-gray-300 mx-auto mb-3" />
               <p className="text-gray-700 font-semibold text-base mb-1">

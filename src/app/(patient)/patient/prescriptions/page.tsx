@@ -1,5 +1,6 @@
 "use client";
 
+import {fetchJson} from "@/lib/api-fetch";
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import {
@@ -42,31 +43,9 @@ export default function PatientPrescriptionsPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"active" | "expired">("active");
 
-  const fetchPrescriptions = useCallback(async () => {
-    setLoading(true);
-    setLoadError(null);
-    try {
-      const res = await fetch("/api/prescriptions");
-      const data = await res.json().catch(() => null);
-
-      if (!res.ok) {
-        throw new Error(data?.error || "Unable to load prescriptions");
-      }
-
-      if (!Array.isArray(data?.prescriptions)) {
-        throw new Error("The prescriptions response was invalid");
-      }
-
-      setPrescriptions(data.prescriptions);
-    } catch (error) {
-      setPrescriptions([]);
-      setLoadError(
-        error instanceof Error ? error.message : "Unable to load prescriptions"
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const fetchPrescriptions=useCallback(()=>fetchJson<{prescriptions:Prescription[]}>("/api/prescriptions")
+    .then(data=>{if(!Array.isArray(data.prescriptions))throw new Error("The prescriptions response was invalid");setPrescriptions(data.prescriptions);setLoadError(null);setLoading(false);})
+    .catch(error=>{setPrescriptions([]);setLoadError(error instanceof Error?error.message:"Unable to load prescriptions");setLoading(false);}),[]);
 
   useEffect(() => {
     fetchPrescriptions();
@@ -143,7 +122,7 @@ export default function PatientPrescriptionsPage() {
             <p className="text-gray-700 text-lg font-medium">Could not load prescriptions</p>
             <p className="text-gray-500 text-sm mt-1">{loadError}</p>
             <button
-              onClick={fetchPrescriptions}
+              onClick={()=>{setLoading(true);setLoadError(null);void fetchPrescriptions();}}
               className="mt-4 text-[var(--primary)] hover:opacity-80 font-medium text-sm"
             >
               Try again

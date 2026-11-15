@@ -3,7 +3,6 @@ import { requireApiUser } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { ai, GEMINI_MODEL } from "@/lib/gemini";
-import { prisma } from "@/lib/prisma";
 import { checkRateLimitAsync } from "@/lib/rate-limit";
 
 const symptomCheckSchema = z.object({
@@ -92,7 +91,7 @@ Provide 2-4 possible conditions, a clear recommendation, and 3-5 self-care tips.
       }
     }
 
-    let result: any = null;
+    let result: unknown = null;
     if (responseText) {
       try {
         const cleaned = responseText.replace(/^```json\s*/i, "").replace(/```\s*$/, "").trim();
@@ -119,7 +118,7 @@ Provide 2-4 possible conditions, a clear recommendation, and 3-5 self-care tips.
 
     return NextResponse.json(
       {
-        ...result,
+        ...(result && typeof result === "object" ? result : {}),
         disclaimer:
           "This assessment is for informational purposes only and does not constitute medical advice. Always consult a qualified healthcare professional for proper diagnosis and treatment.",
       },

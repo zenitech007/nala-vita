@@ -1,6 +1,6 @@
 const sendMail = jest.fn(), close = jest.fn(), createTransport = jest.fn();
 jest.mock('nodemailer', () => ({ __esModule: true, default: { createTransport: (...args: unknown[]) => createTransport(...args) } }));
-import { EmailOtpChannel, SmsOtpChannel, selectOtpChannel } from '@/lib/otp-channel';
+import { EmailOtpChannel, SmsOtpChannel, selectOtpChannel, type OtpChannel } from '@/lib/otp-channel';
 const keys = ['OTP_CHANNEL', 'OTP_SMS_ENABLED', 'OTP_SMTP_HOST', 'OTP_SMTP_PORT', 'OTP_SMTP_USER', 'OTP_SMTP_PASSWORD', 'OTP_EMAIL_FROM'] as const;
 const original = Object.fromEntries(keys.map(key => [key, process.env[key]]));
 afterAll(() => { for (const key of keys) { if (original[key] === undefined) delete process.env[key]; else process.env[key] = original[key]; } });
@@ -15,5 +15,6 @@ it('F01 selects verified email; SMS stays explicitly disabled', async () => {
   expect(selectOtpChannel({ email: 'patient@example.test', verifiedEmail: true })).toBeInstanceOf(EmailOtpChannel);
   expect(() => selectOtpChannel({ email: 'patient@example.test', verifiedEmail: false })).toThrow();
   process.env.OTP_CHANNEL = 'sms'; expect(() => selectOtpChannel({ verifiedEmail: false, verifiedPhone: '+15550000000' })).toThrow('SMS not enabled');
-  await expect(new SmsOtpChannel().send('+15550000000', '123456', 'CLAIM')).rejects.toThrow('SMS not enabled'); expect(sendMail).not.toHaveBeenCalled();
+  const sms: OtpChannel = new SmsOtpChannel();
+  await expect(sms.send('+15550000000', '123456', 'CLAIM')).rejects.toThrow('SMS not enabled'); expect(sendMail).not.toHaveBeenCalled();
 });

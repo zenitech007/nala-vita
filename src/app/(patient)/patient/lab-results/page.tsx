@@ -1,4 +1,5 @@
 "use client";
+import {fetchJson} from "@/lib/api-fetch";
 
 import { useState, useCallback, useEffect } from "react";
 import Link from "next/link";
@@ -57,31 +58,9 @@ export default function PatientLabResultsPage() {
   const [aiSummary, setAiSummary] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
 
-  const fetchOrders = useCallback(async () => {
-    setLoading(true);
-    setLoadError(null);
-    try {
-      const res = await fetch("/api/lab-tests");
-      const data = await res.json().catch(() => null);
-
-      if (!res.ok) {
-        throw new Error(data?.error || "Unable to load lab results");
-      }
-
-      if (!Array.isArray(data?.labOrders)) {
-        throw new Error("The lab results response was invalid");
-      }
-
-      setOrders(data.labOrders);
-    } catch (error) {
-      setOrders([]);
-      setLoadError(
-        error instanceof Error ? error.message : "Unable to load lab results"
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const fetchOrders=useCallback(()=>fetchJson<{labOrders:LabOrder[]}>("/api/lab-tests")
+    .then(data=>{if(!Array.isArray(data.labOrders))throw new Error("The lab results response was invalid");setOrders(data.labOrders);setLoadError(null);setLoading(false);})
+    .catch(error=>{setOrders([]);setLoadError(error instanceof Error?error.message:"Unable to load lab results");setLoading(false);}),[]);
 
   useEffect(() => {
     fetchOrders();
@@ -206,7 +185,7 @@ export default function PatientLabResultsPage() {
               </p>
             </div>
             <button
-              onClick={fetchOrders}
+              onClick={()=>{setLoading(true);setLoadError(null);void fetchOrders();}}
               className="text-xs font-medium text-red-700 underline hover:no-underline"
             >
               Retry

@@ -1,39 +1,38 @@
+import type {OtpChallenge,OtpVerificationBudget} from "@prisma/client";
+import {mockOf} from "../helpers/mock";
 const edgeBudget = jest.fn();
 jest.mock('@/lib/rate-limit', () => ({ checkRateLimitAsync: (...args: unknown[]) => edgeBudget(...args) }));
-let rows: any[] = [], queue = Promise.resolve();
-let budgets = new Map<string, any>();
-const matches = (row: any, where: any) => (!where.id || row.id === where.id)
-  && (!where.recipientHash || row.recipientHash === where.recipientHash)
-  && (!where.ipHash || row.ipHash === where.ipHash)
-  && (!where.createdAt?.gte || row.createdAt >= where.createdAt.gte);
-const tx = { $queryRaw: async () => [], otpVerificationBudget: {
-  findUnique: async ({ where }: any) => budgets.get(where.id) ?? null,
-  upsert: async ({ where, create, update }: any) => { const row = budgets.has(where.id) ? { ...budgets.get(where.id), ...update } : create; budgets.set(where.id, row); return row; },
-}, otpChallenge: {
-  findUnique: async ({ where }: any) => rows.find(row => row.id === where.id) ?? null,
-  findFirst: async ({ where }: any) => [...rows].reverse().find(row => matches(row, where)) ?? null,
-  count: async ({ where }: any) => rows.filter(row => matches(row, where)).length,
-  create: async ({ data }: any) => { const row = { attempts: 0, consumedAt: null, createdAt: new Date(), ...data }; rows.push(row); return row; },
-  update: async ({ where, data }: any) => { const row = rows.find(row => row.id === where.id); row.attempts += data.attempts?.increment ?? 0; return row; },
-  updateMany: async ({ where, data }: any) => { const row = rows.find(row => row.id === where.id);
-    if (!row || row.consumedAt || row.attempts >= 5 || row.expiresAt <= new Date()) return { count: 0 };
-    Object.assign(row, data); return { count: 1 };
-  },
-} };
-async function transaction(fn: (tx: any) => unknown) {
-  const previous = queue; let release!: () => void; queue = new Promise<void>(resolve => { release = resolve; }); await previous;
-  try { return await fn(tx); } finally { release(); }
+type ChallengeWhere={id?:string;recipientHash?:string;ipHash?:string;createdAt?:{gte:Date}};
+let rows:OtpChallenge[]=[],queue=Promise.resolve();
+let budgets=new Map<string,OtpVerificationBudget>();
+const matches=(row:OtpChallenge,where:ChallengeWhere)=>(!where.id||row.id===where.id)
+ &&(!where.recipientHash||row.recipientHash===where.recipientHash)&&(!where.ipHash||row.ipHash===where.ipHash)
+ &&(!where.createdAt?.gte||row.createdAt>=where.createdAt.gte);
+const tx={ $queryRaw:async()=>[],otpVerificationBudget:{
+ findUnique:async({where}:{where:{id:string}})=>budgets.get(where.id)??null,
+ upsert:async({where,create,update}:{where:{id:string};create:OtpVerificationBudget;update:Partial<OtpVerificationBudget>})=>{const previous=budgets.get(where.id);const row=previous?{...previous,...update}:create;budgets.set(where.id,row);return row;},
+},otpChallenge:{
+ findUnique:async({where}:{where:{id:string}})=>rows.find(row=>row.id===where.id)??null,
+ findFirst:async({where}:{where:ChallengeWhere})=>[...rows].reverse().find(row=>matches(row,where))??null,
+ count:async({where}:{where:ChallengeWhere})=>rows.filter(row=>matches(row,where)).length,
+ create:async({data}:{data:Omit<OtpChallenge,"attempts"|"consumedAt"|"createdAt">})=>{const row={attempts:0,consumedAt:null,createdAt:new Date(),...data};rows.push(row);return row;},
+ update:async({where,data}:{where:{id:string};data:{attempts?:{increment:number}}})=>{const row=rows.find(row=>row.id===where.id);if(!row)throw new Error("Synthetic OTP row missing");row.attempts+=data.attempts?.increment??0;return row;},
+ updateMany:async({where,data}:{where:{id:string};data:Partial<OtpChallenge>})=>{const row=rows.find(row=>row.id===where.id);if(!row||row.consumedAt||row.attempts>=5||row.expiresAt<=new Date())return {count:0};Object.assign(row,data);return {count:1};},
+}};
+async function transaction(fn:(client:typeof tx)=>unknown){
+ const previous=queue;let release!:()=>void;queue=new Promise<void>(resolve=>{release=resolve;});await previous;
+ try{return await fn(tx);}finally{release();}
 }
-jest.mock('@/lib/prisma', () => ({ prisma: { $transaction: (fn: (tx: any) => unknown) => transaction(fn) } }));
+jest.mock('@/lib/prisma',()=>({prisma:{$transaction:(fn:(client:typeof tx)=>unknown)=>transaction(fn)}}));
 let otp: typeof import('@/lib/email-otp');
-const send = jest.fn();
+const send=mockOf<import("@/lib/otp-channel").OtpChannel["send"]>();
 const input = { email: 'synthetic@example.test', ip: '203.0.113.1', purpose: 'CLAIM', targetUserId: 'u', binding: 'claim-u', verifiedEmail: true };
 const oldSecret = process.env.OTP_HASH_SECRET;
 beforeAll(async () => { process.env.OTP_HASH_SECRET = 'synthetic-otp-secret-at-least-32-characters'; otp = await import('@/lib/email-otp'); });
 afterAll(() => { if (oldSecret === undefined) delete process.env.OTP_HASH_SECRET; else process.env.OTP_HASH_SECRET = oldSecret; });
 beforeEach(() => { edgeBudget.mockReset().mockResolvedValue({ allowed: true }); rows = []; budgets = new Map(); queue = Promise.resolve(); send.mockReset().mockResolvedValue(undefined); jest.useFakeTimers().setSystemTime(new Date('2030-01-01')); });
 afterEach(() => jest.useRealTimers());
-async function issue(patch = {}) { return otp.issueEmailOtp({ ...input, ...patch }, { send }); }
+async function issue(patch:Partial<Parameters<typeof import("@/lib/email-otp").issueEmailOtp>[0]> = {}) { return otp.issueEmailOtp({ ...input, ...patch }, { send }); }
 const proof = (challengeId: string, code = send.mock.calls[0][1], binding = input.binding) => ({ challengeId, code, purpose: input.purpose, binding });
 it('F01 stores a hash, sends six digits, expires after ten minutes and consumes once', async () => {
   const { challengeId } = await issue(); const code = send.mock.calls[0][1]; expect(code).toMatch(/^\d{6}$/);

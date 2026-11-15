@@ -3,8 +3,6 @@ import { requireApiUser } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { ai, GEMINI_MODEL } from "@/lib/gemini";
-import { createServerSupabaseClient } from "@/lib/supabase-server";
-import { prisma } from "@/lib/prisma";
 import { checkRateLimitAsync } from "@/lib/rate-limit";
 import { temperatureToCelsius, formatTemperature } from "@/lib/temperature";
 
@@ -163,7 +161,7 @@ Guidelines:
       }
     }
 
-    let result: any = null;
+    let result: unknown = null;
     if (responseText) {
       try {
         const cleaned = responseText.replace(/^```json\s*/i, "").replace(/```\s*$/, "").trim();
@@ -198,7 +196,7 @@ Guidelines:
     }
 
     return NextResponse.json({
-      ...result,
+      ...(result && typeof result === "object" ? result : {}),
       disclaimer:
         "This AI-generated clinical decision support is intended to assist licensed physicians only. It does not replace professional clinical judgment. All treatment decisions must be made by a qualified healthcare provider.",
       generatedAt: new Date().toISOString(),

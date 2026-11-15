@@ -9,7 +9,7 @@ export default function EmailProofForm({ mode }: { mode: "claim" | "verify" }) {
   const [error, setError] = useState(""), [message, setMessage] = useState(""), [canResend, setCanResend] = useState(false);
   useEffect(() => {
     if (!challengeId) return;
-    setCanResend(false); const timer = setTimeout(() => setCanResend(true), 60000);
+    const timer = setTimeout(() => setCanResend(true), 60000);
     return () => clearTimeout(timer);
   }, [challengeId]);
   const endpoint = mode === "claim" ? "claim" : "email";
@@ -20,7 +20,7 @@ export default function EmailProofForm({ mode }: { mode: "claim" | "verify" }) {
         body: JSON.stringify({ email: email.trim(), ...(mode === "claim" && invitationCode.trim() ? { invitationCode: invitationCode.trim() } : {}) }) });
       const body = await response.json();
       if (!response.ok || typeof body.challengeId !== "string") throw new Error(body.error || "Could not request a code. Try again.");
-      setChallengeId(body.challengeId); setCode(""); setMessage(body.message || "If eligible, a code will be sent to your email.");
+      setCanResend(false);setChallengeId(body.challengeId); setCode(""); setMessage(body.message || "If eligible, a code will be sent to your email.");
     } catch (failure) { setError(failure instanceof Error ? failure.message : "Could not request a code. Try again."); }
     finally { setBusy(false); }
   }

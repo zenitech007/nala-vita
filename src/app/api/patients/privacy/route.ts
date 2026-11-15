@@ -3,7 +3,7 @@ import { requireApiUser } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { createServerSupabaseClient } from "@/lib/supabase-server";
+
 
 const privacySchema = z.object({
   noteId: z.string().min(1, "Note ID is required"),

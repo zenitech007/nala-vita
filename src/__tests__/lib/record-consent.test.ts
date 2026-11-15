@@ -1,19 +1,27 @@
-const issue = jest.fn(), createGrant = jest.fn(), notify = jest.fn();
-let request: any, grants: any[], validProof = true, providerActive = true;
-const findRequest = async ({ where }: any) => request && where.patientId === request.patientId && request.status === where.status ? { ...request } : null;
+import type {RecordAccessRequest,RecordAccessGrant,OtpChallenge} from "@prisma/client";
+import {mockOf} from "../helpers/mock";
+type RequestSnapshot=Pick<RecordAccessRequest,"id"|"patientId"|"requestedByUserId"|"requesterDoctorId"|"requesterFacilityId"|"sourceDoctorId"|"sourceFacilityId"|"sourceUserId"|"status"|"scope"|"expiresAt">;
+type GrantSnapshot=Omit<RecordAccessGrant,"createdAt"|"updatedAt">;
+type GrantCreateData=Omit<GrantSnapshot,"id"|"revokedAt">;
+type RequestWhere=Pick<RecordAccessRequest,"id"|"patientId"|"status">;
+type GrantWhere=Pick<RecordAccessGrant,"id"|"patientId"|"status">;
+const issue=jest.fn(),notify=jest.fn();
+const createGrant=mockOf<(input:{data:GrantCreateData})=>Promise<GrantSnapshot>>();
+let request:RequestSnapshot,grants:GrantSnapshot[],validProof=true,providerActive=true;
+const findRequest = async ({ where }: {where:RequestWhere}) => request && where.patientId === request.patientId && request.status === where.status ? { ...request } : null;
 const tx = {
-  recordAccessRequest: { findFirst: findRequest, updateMany: async ({ where, data }: any) => {
+  recordAccessRequest: { findFirst: findRequest, updateMany: async ({ where, data }: {where:RequestWhere;data:Partial<RecordAccessRequest>}) => {
     if (!request || request.id !== where.id || request.patientId !== where.patientId || request.status !== where.status) return { count: 0 };
     Object.assign(request, data); return { count: 1 };
   } },
   doctor: { findUnique: async () => ({ id: 'new-doctor', userId: 'doctor-user', isVerified: true, user: { role: 'DOCTOR', isActive: providerActive } }) },
   facilityMembership: { findFirst: async () => null },
-  recordAccessGrant: { create: (...args: unknown[]) => createGrant(...args), findFirst: async ({ where }: any) => grants.find(grant => grant.id === where.id && grant.patientId === where.patientId && grant.status === where.status) ?? null,
-    updateMany: async ({ where, data }: any) => { const grant = grants.find(grant => grant.id === where.id && grant.patientId === where.patientId && grant.status === where.status && !grant.revokedAt);
+  recordAccessGrant: { create: (...args:Parameters<typeof createGrant>) => createGrant(...args), findFirst: async ({ where }: {where:GrantWhere}) => grants.find(grant => grant.id === where.id && grant.patientId === where.patientId && grant.status === where.status) ?? null,
+    updateMany: async ({ where, data }: {where:GrantWhere;data:Partial<RecordAccessGrant>}) => { const grant = grants.find(grant => grant.id === where.id && grant.patientId === where.patientId && grant.status === where.status && !grant.revokedAt);
       if (!grant) return { count: 0 }; Object.assign(grant, data); return { count: 1 }; } },
   notification: { create: notify }, recordAccessLog: { create: async () => ({}) },
 };
-jest.mock('@/lib/prisma', () => ({ prisma: { recordAccessRequest: { findFirst: findRequest, updateMany: (...args: [any]) => tx.recordAccessRequest.updateMany(...args) },
+jest.mock('@/lib/prisma', () => ({ prisma: { recordAccessRequest: { findFirst: findRequest, updateMany: (...args:Parameters<typeof tx.recordAccessRequest.updateMany>) => tx.recordAccessRequest.updateMany(...args) },
   $transaction: (fn: (tx: unknown) => unknown) => fn(tx) } }));
 const consume = jest.fn();
 jest.mock('@/lib/email-otp', () => ({ issueEmailOtp: (...args: unknown[]) => issue(...args), consumeEmailOtp: (...args: unknown[]) => consume(...args) }));
@@ -27,7 +35,7 @@ beforeEach(() => {
   request = { id: 'request', patientId: 'p', requestedByUserId: 'doctor-user', requesterDoctorId: 'new-doctor', requesterFacilityId: null,
     sourceDoctorId: 'old-doctor', sourceFacilityId: null, sourceUserId: null, status: 'PENDING', scope: ['PRESCRIPTIONS', 'VITALS'], expiresAt: new Date(Date.now() + 3600000) };
   issue.mockResolvedValue({ challengeId: 'challenge' });
-  consume.mockImplementation(async (_proof, action) => validProof ? action(tx, { targetUserId: 'patient-user' }) : false);
+  consume.mockImplementation(async (_proof:unknown, action:(client:typeof tx,challenge:Pick<OtpChallenge,"targetUserId">)=>Promise<unknown>) => validProof ? action(tx, { targetUserId: 'patient-user' }) : false);
   createGrant.mockImplementation(async ({ data }) => { const grant = { ...data, id: 'grant', revokedAt: null }; grants.push(grant); return grant; });
 });
 it('F04 binds OTP purpose to request, selected scope and duration', async () => {

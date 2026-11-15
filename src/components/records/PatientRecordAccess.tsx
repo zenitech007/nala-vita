@@ -9,12 +9,12 @@ function ApprovalRequest({ request, refresh }: { request: ConsentRow; refresh: (
   const [challengeId, setChallengeId] = useState(""), [code, setCode] = useState("");
   const [busy, setBusy] = useState(false), [error, setError] = useState(""), [message, setMessage] = useState("");
   const [canResend, setCanResend] = useState(false);
-  useEffect(() => { if (!challengeId) return; setCanResend(false); const timer = setTimeout(() => setCanResend(true), 60000); return () => clearTimeout(timer); }, [challengeId]);
+  useEffect(() => { if (!challengeId) return; const timer = setTimeout(() => setCanResend(true), 60000); return () => clearTimeout(timer); }, [challengeId]);
   async function sendCode() {
     setBusy(true); setError("");
     try {
       const result = await consentJson<{ challengeId: string; message: string }>(`/api/record-access/${request.id}/otp`, consentPost({ scope, durationDays: days }));
-      setChallengeId(result.challengeId); setCode(""); setMessage(result.message);
+      setCanResend(false);setChallengeId(result.challengeId); setCode(""); setMessage(result.message);
     } catch (failure) { setError(failure instanceof Error ? failure.message : "Could not request a code."); }
     finally { setBusy(false); }
   }
@@ -58,17 +58,16 @@ export default function PatientRecordAccess() {
   const [loaded, setLoaded] = useState(false), [error, setError] = useState(""), [message, setMessage] = useState("");
   const [busy, setBusy] = useState(""), [sourceKey, setSourceKey] = useState(""), [doctorId, setDoctorId] = useState("");
   const [unclassified, setUnclassified] = useState(false);
-  const load = useCallback(async () => {
-    setError("");
-    try {
-      const [r, g, s, l, d] = await Promise.all([
+  const load = useCallback(() => {
+    return Promise.all([
         consentJson<{ requests: ConsentRow[]; nextCursor: string | null }>("/api/record-access"),
         consentJson<{ grants: ConsentRow[] }>("/api/record-access/grants"), consentJson<{ sources: RecordSource[]; hasUnclassifiedRecords: boolean }>("/api/record-access/sources"),
         consentJson<{ logs: AccessLogRow[]; nextCursor: string | null }>("/api/record-access/log"), consentJson<{ doctors: typeof doctors }>("/api/doctors?limit=50"),
-      ]);
+      ]).then(([r, g, s, l, d]) => {
+      setError("");
       setRequests(r.requests); setRequestCursor(r.nextCursor); setGrants(g.grants); setSources(s.sources); setUnclassified(s.hasUnclassifiedRecords);
       setLogs(l.logs); setLogCursor(l.nextCursor); setDoctors(d.doctors); setLoaded(true);
-    } catch (failure) { setError(failure instanceof Error ? failure.message : "Records access could not be loaded."); }
+    }).catch((failure: unknown) => { setError(failure instanceof Error ? failure.message : "Records access could not be loaded."); });
   }, []);
   useEffect(() => { void load(); }, [load]);
   async function revoke(id: string) {

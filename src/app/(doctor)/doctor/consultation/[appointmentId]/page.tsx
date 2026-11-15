@@ -4,25 +4,7 @@ import { formatTemperature } from "@/lib/temperature";
 import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import {
-  ArrowLeft,
-  Loader2,
-  Calendar,
-  Clock,
-  User,
-  Stethoscope,
-  Activity,
-  Pill,
-  AlertTriangle,
-  FileText,
-  Save,
-  Mic,
-  MicOff,
-  CheckCircle,
-  Sparkles,
-  Wand2,
-  PictureInPicture2,
-} from "lucide-react";
+import { ArrowLeft, Loader2, Calendar, Clock, User, Stethoscope, Activity, Pill, AlertTriangle, FileText, Save, Mic, MicOff, CheckCircle, Sparkles, PictureInPicture2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 import { format } from "date-fns";
@@ -180,7 +162,6 @@ export default function DoctorConsultationPage() {
   }, [appointmentId]);
 
   const patient = appointment?.patient || null;
-  const displayAppointment = appointment;
 
   const calculateAge = (dob: string) => {
     const birth = new Date(dob);

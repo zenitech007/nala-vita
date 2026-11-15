@@ -9,13 +9,12 @@ export default function DoctorRecordRequests({ patientId }: { patientId?: string
   const [facilities, setFacilities] = useState<{ id: string; name: string }[]>([]), [memberships, setMemberships] = useState<typeof facilities>([]);
   const [email, setEmail] = useState(""), [source, setSource] = useState("auto"), [requesterFacilityId, setRequesterFacilityId] = useState("");
   const [loaded, setLoaded] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState(""), [message, setMessage] = useState("");
-  const load = useCallback(async () => {
-    setError("");
-    try {
-      const [r, d, f] = await Promise.all([consentJson<{ requests: ConsentRow[]; nextCursor: string | null }>("/api/record-access"),
-        consentJson<{ doctors: typeof doctors }>("/api/doctors?limit=50"), consentJson<{ requesterFacilities: typeof facilities; sourceFacilities: typeof facilities }>("/api/record-access/facilities")]);
+  const load = useCallback(() => {
+    return Promise.all([consentJson<{ requests: ConsentRow[]; nextCursor: string | null }>("/api/record-access"),
+        consentJson<{ doctors: typeof doctors }>("/api/doctors?limit=50"), consentJson<{ requesterFacilities: typeof facilities; sourceFacilities: typeof facilities }>("/api/record-access/facilities")]).then(([r, d, f]) => {
+      setError("");
       setRequests(r.requests); setCursor(r.nextCursor); setDoctors(d.doctors); setFacilities(f.sourceFacilities); setMemberships(f.requesterFacilities); setLoaded(true);
-    } catch (failure) { setError(failure instanceof Error ? failure.message : "Could not load record requests."); }
+    }).catch((failure: unknown) => { setError(failure instanceof Error ? failure.message : "Could not load record requests."); });
   }, []);
   useEffect(() => { void load(); }, [load]);
   async function submit(event: FormEvent) {

@@ -9,9 +9,13 @@ let visibility: typeof import('@/lib/record-visibility');
 const doctor = (id: string) => ({ id: `user-${id}`, role: 'DOCTOR', isActive: true, doctor: { id, isVerified: true } });
 const approved = { id: 'g', patientId: 'p', requesterDoctorId: 'b', requesterFacilityId: null, sourceDoctorId: 'a', sourceFacilityId: null, sourceUserId: null,
   scope: ['NOTES', 'PRESCRIPTIONS'], status: 'APPROVED', expiresAt: new Date(Date.now() + 3600000), revokedAt: null };
-function matches(row: any, filter: any): boolean {
-  return Object.entries(filter).every(([key, value]: [string, any]) => key === 'patient' ? true : key === 'OR' ? value.some((child: any) => matches(row, child))
-    : value && typeof value === 'object' && 'in' in value ? value.in.includes(row[key]) : row[key] === value);
+function matches(row:Record<string,unknown>,filter:object):boolean{
+ return Object.entries(filter).every(([key,value]:[string,unknown])=>{
+  if(key==="patient")return true;
+  if(key==="OR")return Array.isArray(value)&&value.some((child:unknown)=>!!child&&typeof child==="object"&&matches(row,child));
+  if(value&&typeof value==="object"&&"in" in value)return Array.isArray(value.in)&&value.in.includes(row[key]);
+  return row[key]===value;
+ });
 }
 beforeAll(async () => { visibility = await import('@/lib/record-visibility'); });
 beforeEach(() => { jest.resetAllMocks(); memberships.mockResolvedValue([]); grants.mockResolvedValue([]); patient.mockResolvedValue({ id: 'p', userId: 'patient-user', createdByDoctorId: 'a', createdByFacilityId: null }); });

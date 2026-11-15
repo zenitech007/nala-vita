@@ -3,7 +3,7 @@ import { requireApiUser } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { ai, GEMINI_MODEL } from "@/lib/gemini";
-import { prisma } from "@/lib/prisma";
+
 
 const soapFormatSchema = z.object({
   notes: z.string().min(3, "Notes text must be at least 3 characters"),
@@ -21,7 +21,6 @@ export async function POST(req: NextRequest) {
   try {
     const auth = await requireApiUser({ roles: ["DOCTOR"], profile: "doctor" });
     if (!auth.ok) return auth.response;
-    const user = auth.user;
 
     const body = await req.json();
     const parsed = soapFormatSchema.safeParse(body);

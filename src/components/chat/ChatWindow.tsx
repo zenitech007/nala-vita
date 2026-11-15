@@ -66,7 +66,7 @@ interface ChatWindowProps {
 
 // ─── Component ───────────────────────────────────────────
 
-export default function ChatWindow({
+function ChatWindowContent({
   currentUserId,
   otherUserId,
   otherUserName,
@@ -92,20 +92,15 @@ export default function ChatWindow({
 
   // ─── Fetch messages ────────────────────────────────────
 
-  const fetchMessages = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const res = await fetch(`/api/messages?otherUserId=${otherUserId}`);
+  const fetchMessages = useCallback(() => {
+    return fetch(`/api/messages?otherUserId=${otherUserId}`).then(async res => {
       if (!res.ok) throw new Error("Messages could not be loaded");
-
       const data = await res.json();
       setMessages(Array.isArray(data.messages) ? data.messages : []);
       setError("");
-    } catch (err) {
-      setError((err as Error).message || "Messages could not be loaded");
-    } finally {
-      setIsLoading(false);
-    }
+    }).catch((err: unknown) => {
+      setError(err instanceof Error ? err.message : "Messages could not be loaded");
+    }).finally(() => setIsLoading(false));
   }, [otherUserId]);
 
   useEffect(() => {
@@ -530,4 +525,8 @@ export default function ChatWindow({
       </div>
     </div>
   );
+}
+
+export default function ChatWindow(props: ChatWindowProps) {
+  return <ChatWindowContent key={`${props.currentUserId}:${props.otherUserId}`} {...props} />;
 }

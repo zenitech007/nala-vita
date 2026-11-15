@@ -2,12 +2,12 @@ import { loadVisiblePatientRecord } from "@/lib/visible-patient-record";
 import { requireApiUser } from "@/lib/auth";
 import { doctorHasPatientAccess } from "@/lib/access-control";
 import { NextRequest, NextResponse } from "next/server";
-import { createServerSupabaseClient } from "@/lib/supabase-server";
-import { prisma } from "@/lib/prisma";
+
+
 import { checkRateLimitAsync } from "@/lib/rate-limit";
 import { getCachedOrAnalyze, analyzeMedications } from "@/lib/amelia/medsafety";
 
-export async function GET(_req: NextRequest) {
+export async function GET() {
   const auth = await requireApiUser({ roles: ["PATIENT"], profile: "patient" });
   if (!auth.ok) return auth.response;
   const user = auth.user;

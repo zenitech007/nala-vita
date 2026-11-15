@@ -89,16 +89,14 @@ export default function DoctorReferralsPage() {
   const [allPatients, setAllPatients] = useState<PatientOption[]>([]);
   const [incomingReferrals, setIncomingReferrals] = useState<IncomingReferral[]>([]);
   const [sentReferrals, setSentReferrals] = useState<SentReferral[]>([]);
-  const [loadingData, setLoadingData] = useState(true);
+  const [, setLoadingData] = useState(true);
 
-  const fetchData = async () => {
-    setLoadingData(true);
-    try {
-      const [doctorsRes, patientsRes, referralsRes] = await Promise.all([
+  const fetchData = () => {
+    return Promise.all([
         fetch("/api/doctors?limit=50"),
         fetch("/api/patients?all=true&limit=50"),
         fetch("/api/referrals"),
-      ]);
+      ]).then(async ([doctorsRes, patientsRes, referralsRes]) => {
 
       if (doctorsRes.ok) {
         const dData = await doctorsRes.json();
@@ -156,11 +154,11 @@ export default function DoctorReferralsPage() {
           );
         }
       }
-    } catch (err) {
+    }).catch((err: unknown) => {
       console.error("Failed to load referral data:", err);
-    } finally {
+    }).finally(() => {
       setLoadingData(false);
-    }
+    });
   };
 
   useEffect(() => {

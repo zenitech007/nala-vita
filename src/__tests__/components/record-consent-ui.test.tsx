@@ -1,9 +1,10 @@
+import type {ConsentRow} from "@/components/records/consent-ui";
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import PatientRecordAccess from '@/components/records/PatientRecordAccess';
 const originalFetch = global.fetch;
 const provider = { requesterDoctor: { id: 'new', user: { firstName: 'New', lastName: 'Doctor' } }, sourceDoctor: { id: 'old', user: { firstName: 'Old', lastName: 'Doctor' } } };
-let requests: any[], grants: any[], failApproval: boolean;
+let requests:(ConsentRow&{patientId?:string})[],grants:ConsentRow[],failApproval:boolean;
 beforeEach(() => {
   failApproval = true; grants = [];
   requests = [{ ...provider, id: 'request', patientId: 'p', scope: ['VITALS', 'NOTES'], effectiveStatus: 'PENDING', expiresAt: '2030-01-01T00:00:00Z' }];

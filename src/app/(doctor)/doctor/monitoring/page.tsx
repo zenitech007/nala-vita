@@ -16,7 +16,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { format, subDays } from "date-fns";
+import { format } from "date-fns";
 import {
   LineChart,
   Line,
@@ -105,8 +105,10 @@ export default function DoctorMonitoringPage() {
   const [selectedPatient, setSelectedPatient] = useState<PatientVitalSummary | null>(null);
   const [detailVitalKey, setDetailVitalKey] = useState<string>("bloodPressure");
   const [filterStatus, setFilterStatus] = useState<"all" | "abnormal">("all");
-  const [historyData, setHistoryData] = useState<VitalHistoryPoint[]>([]);
-  const [loadingHistory, setLoadingHistory] = useState(false);
+  const historyKey = selectedPatient ? `${selectedPatient.id}:${detailVitalKey}` : null;
+  const [history, setHistory] = useState<{ key: string; points: VitalHistoryPoint[] } | null>(null);
+  const historyData = history?.key === historyKey ? history.points : [];
+  const loadingHistory = historyKey !== null && history?.key !== historyKey;
 
   useEffect(() => {
     async function loadPatients() {
@@ -165,14 +167,12 @@ export default function DoctorMonitoringPage() {
   }, []);
 
   useEffect(() => {
-    if (!selectedPatient) {
-      setHistoryData([]);
-      return;
-    }
+    if (!selectedPatient || !historyKey) return;
+    const key = historyKey;
+    const controller = new AbortController();
     async function loadHistory() {
-      setLoadingHistory(true);
       try {
-        const res = await fetch(`/api/vitals?patientId=${selectedPatient!.id}&limit=30`);
+        const res = await fetch(`/api/vitals?patientId=${selectedPatient!.id}&limit=30`, { signal: controller.signal });
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data.vitals)) {
@@ -195,17 +195,18 @@ export default function DoctorMonitoringPage() {
               })
               .filter((p: VitalHistoryPoint | null): p is VitalHistoryPoint => p !== null)
               .reverse();
-            setHistoryData(pts);
+            if (!controller.signal.aborted) setHistory({ key, points: pts });
           }
-        }
+        } else if (!controller.signal.aborted) { setHistory({ key, points: [] }); }
       } catch (err) {
         console.error("Failed to load patient history:", err);
       } finally {
-        setLoadingHistory(false);
+        if (!controller.signal.aborted) setHistory(current => current?.key === key ? current : { key, points: [] });
       }
     }
-    loadHistory();
-  }, [selectedPatient, detailVitalKey]);
+    void loadHistory();
+    return () => controller.abort();
+  }, [selectedPatient, detailVitalKey, historyKey]);
 
   const filteredPatients = filterStatus === "all"
     ? patients

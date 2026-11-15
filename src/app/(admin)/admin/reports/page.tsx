@@ -207,22 +207,16 @@ export default function AdminReportsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchReport = useCallback(async (rangeKey: RangeKey) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const { from, to } = getDateRange(rangeKey);
-      const res = await fetch(
-        `/api/admin/reports?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`
-      );
+  const fetchReport = useCallback((rangeKey: RangeKey) => {
+    const { from, to } = getDateRange(rangeKey);
+    return fetch(`/api/admin/reports?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`).then(async res => {
       if (!res.ok) throw new Error("Failed to fetch reports");
       const json: ReportData = await res.json();
       setData(json);
-    } catch (err) {
+      setError(null);
+    }).catch((err: unknown) => {
       setError(err instanceof Error ? err.message : "Unknown error");
-    } finally {
-      setLoading(false);
-    }
+    }).finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
@@ -298,7 +292,7 @@ export default function AdminReportsPage() {
       <div className="flex h-[60vh] flex-col items-center justify-center gap-4">
         <p className="text-red-600 text-lg">{error ?? "No data available"}</p>
         <button
-          onClick={() => fetchReport(range)}
+          onClick={() => { setLoading(true); setError(null); void fetchReport(range); }}
           className="rounded-lg bg-[var(--primary)] px-4 py-2 text-white hover:opacity-90 transition-colors"
         >
           Retry
@@ -373,7 +367,7 @@ export default function AdminReportsPage() {
           {RANGE_OPTIONS.map((opt) => (
             <button
               key={opt.key}
-              onClick={() => setRange(opt.key)}
+              onClick={() => { if (opt.key !== range) { setLoading(true); setError(null); setRange(opt.key); } }}
               className={cn(
                 "rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
                 range === opt.key

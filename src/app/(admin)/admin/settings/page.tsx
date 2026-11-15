@@ -1,28 +1,9 @@
 "use client";
+import {fetchJson} from "@/lib/api-fetch";
 
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import {
-  Building2,
-  MapPin,
-  Mail,
-  Users,
-  Database,
-  Shield,
-  CreditCard,
-  Cpu,
-  CheckCircle,
-  Loader2,
-  Settings,
-  Phone,
-  Clock,
-  Award,
-  RefreshCw,
-  Server,
-  Lock,
-  Activity,
-  Zap,
-} from "lucide-react";
+import { Building2, MapPin, Mail, Users, Database, Shield, CreditCard, Cpu, CheckCircle, Loader2, Settings, Phone, Clock, Award, RefreshCw, Lock, Activity, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // ─── Types ───────────────────────────────────────────────
@@ -42,20 +23,9 @@ export default function AdminSettingsPage() {
   const [staffLoading, setStaffLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const fetchStaffCount = async () => {
-    try {
-      const res = await fetch("/api/admin/reports");
-      if (res.ok) {
-        const data = await res.json();
-        setStaffCount(data.overview?.totalDoctors ?? 0);
-      }
-    } catch {
-      // silently fallback
-    } finally {
-      setStaffLoading(false);
-      setRefreshing(false);
-    }
-  };
+  const fetchStaffCount=()=>fetchJson<{overview?:{totalDoctors?:number}}>("/api/admin/reports")
+    .then(data=>{const count=data.overview?.totalDoctors;setStaffCount(typeof count==="number"&&Number.isFinite(count)?count:null);setStaffLoading(false);setRefreshing(false);})
+    .catch(()=>{setStaffCount(null);setStaffLoading(false);setRefreshing(false);});
 
   useEffect(() => {
     fetchStaffCount();

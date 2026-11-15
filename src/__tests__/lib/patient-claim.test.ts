@@ -1,20 +1,22 @@
+import type {User,Patient,ClaimInvitation} from "@prisma/client";
 const createAuth = jest.fn(), deleteAuth = jest.fn(), updateUser = jest.fn(), issueOtp = jest.fn();
-let provisional: any, invitation: any, validProof = true, failDatabase = false;
-const challenge = { id: 'challenge', targetUserId: 'u', recipientHash: 'digest:email:synthetic@example.test', context: { invitationId: null } };
+type Provisional=Pick<User,"id"|"role"|"isActive"|"supabaseId"|"email"|"firstName"|"lastName">&{patient:Pick<Patient,"id"|"createdByDoctorId">};
+let provisional:Provisional,invitation:Pick<ClaimInvitation,"id"|"patientId"|"issuerDoctorId"|"expiresAt"|"usedAt">|null,validProof=true,failDatabase=false;
+const challenge: {id:string;targetUserId:string;recipientHash:string;context:{invitationId:string|null}} = { id: 'challenge', targetUserId: 'u', recipientHash: 'digest:email:synthetic@example.test', context: { invitationId: null } };
 const tx = { $queryRaw: async () => [], user: { findUnique: async () => provisional,
   updateMany: (...a: unknown[]) => updateUser(...a) }, claimInvitation: { findUnique: async () => invitation,
     updateMany: async () => { if (!invitation || invitation.usedAt) return { count: 0 }; invitation.usedAt = new Date(); return { count: 1 }; } },
   doctor: { findUnique: async () => ({ isVerified: true, user: { isActive: true } }) } };
 jest.mock('@/lib/prisma', () => ({ prisma: {
-  user: { findMany: async ({ where }: any) => provisional?.email?.toLowerCase() === where.email.equals ? [provisional] : [] }, otpChallenge: { findUnique: async () => challenge },
-  claimInvitation: { findUnique: async ({ where }: any) => where.tokenHash === 'digest:invite:clinic-code' ? invitation : null },
+  user: { findMany: async ({ where }: {where:{email:{equals:string}}}) => provisional?.email?.toLowerCase() === where.email.equals ? [provisional] : [] }, otpChallenge: { findUnique: async () => challenge },
+  claimInvitation: { findUnique: async ({ where }: {where:{tokenHash:string}}) => where.tokenHash === 'digest:invite:clinic-code' ? invitation : null },
   patient: { findUnique: async () => ({ id: 'p', userId: 'u', createdByDoctorId: 'd', user: provisional }) },
   doctor: { findUnique: async () => ({ isVerified: true, user: { isActive: true } }) },
 } }));
 jest.mock('@/lib/email-otp', () => ({
   normalizeEmail: (email: string) => email.trim().toLowerCase(), otpDigest: (value: string) => `digest:${value}`,
   issueEmailOtp: (...a: unknown[]) => issueOtp(...a),
-  consumeEmailOtp: async (_proof: unknown, fn: (tx: unknown, row: unknown) => unknown) => validProof ? fn(tx, challenge) : false,
+  consumeEmailOtp: async (_proof: unknown, fn: (client:typeof tx,row:typeof challenge) => unknown) => validProof ? fn(tx, challenge) : false,
 }));
 jest.mock('@/lib/supabase-admin', () => ({ supabaseAdmin: { auth: { admin: { createUser: (...a: unknown[]) => createAuth(...a), deleteUser: (...a: unknown[]) => deleteAuth(...a) } } } }));
 let claims: typeof import('@/lib/patient-claim');
@@ -63,7 +65,7 @@ it('F01 phone-only records require a valid clinic invitation and proof of the ch
   invitation = { id: 'invite', patientId: 'p', issuerDoctorId: 'd', expiresAt: new Date(Date.now() + 3600000), usedAt: null };
   await claims.requestPatientClaim(proof.email, '203.0.113.1', 'clinic-code');
   expect(issueOtp).toHaveBeenLastCalledWith(expect.objectContaining({ targetUserId: 'u', context: { invitationId: 'invite' } }));
-  challenge.context.invitationId = 'invite' as never;
+  challenge.context.invitationId = 'invite';
   expect(await claims.completePatientClaim(proof)).toBe(true); expect(invitation.usedAt).toEqual(expect.any(Date));
 });
 it('F01 cannot change the recipient email after challenge issuance', async () => {

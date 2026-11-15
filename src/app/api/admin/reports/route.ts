@@ -7,7 +7,6 @@ export async function GET(req: NextRequest) {
   try {
     const auth = await requireApiUser({ roles: ["ADMIN"], profile: "admin" });
     if (!auth.ok) return auth.response;
-    const user = auth.user;
 
     const { searchParams } = new URL(req.url);
     const from = searchParams.get("from");

@@ -1,8 +1,8 @@
 import { requireApiUser } from "@/lib/auth";
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { listMemories } from "@/lib/amelia/memory";
 
-export async function GET(_req: NextRequest) {
+export async function GET() {
   const auth = await requireApiUser({ roles: ["PATIENT"], profile: "patient" });
   if (!auth.ok) return auth.response;
   const user = auth.user;

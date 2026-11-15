@@ -3,36 +3,10 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import {
-  Globe,
-  Type,
-  Sun,
-  Moon,
-  Check,
-  Loader2,
-  ChevronLeft,
-  Palette,
-  User,
-  Bell,
-  Shield,
-  Cpu,
-  Save,
-  Phone,
-  Mail,
-  Heart,
-  Scale,
-  Sparkles,
-  Smartphone,
-  Volume2,
-  Lock,
-  FileText,
-  AlertCircle,
-  Activity,
-  CheckCircle2,
-  RefreshCw,
-} from "lucide-react";
+import { Globe, Type, Sun, Moon, Check, Loader2, ChevronLeft, Palette, User, Bell, Shield, Cpu, Save, Phone, Mail, Heart, Scale, Sparkles, Smartphone, Volume2, Lock, FileText, AlertCircle, Activity } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useTranslations } from "next-intl";
+import {useLocalPreference,readBoolean} from "@/hooks/useLocalPreference";
+import { useTranslations, useLocale } from "next-intl";
 import { ThemeSwitcher } from "@/components/ui/ThemeSwitcher";
 
 // ─── Types ───────────────────────────────────────────────
@@ -152,11 +126,11 @@ export default function SettingsPanel({
   const [activeTab, setActiveTab] = useState<SettingsTab>("general");
 
   // ─── General & Display State ────────────────────────────
-  const [currentLocale, setCurrentLocale] = useState("en");
-  const [fontSize, setFontSize] = useState<FontSize>("medium");
-  const [highContrast, setHighContrast] = useState(false);
-  const [unitSystem, setUnitSystem] = useState<UnitSystem>("metric");
-  const [glucoseUnit, setGlucoseUnit] = useState<GlucoseUnit>("mg/dL");
+  const currentLocale=useLocale();
+  const [fontSize,setFontSize]=useLocalPreference<FontSize>("mediconnect-font-size","medium",raw=>raw==="small"||raw==="medium"||raw==="large"?raw:undefined);
+  const [highContrast,setHighContrast]=useLocalPreference("mediconnect-high-contrast",false,readBoolean);
+  const [unitSystem,setUnitSystem]=useLocalPreference<UnitSystem>("mediconnect-unit-system","metric",raw=>raw==="imperial"||raw==="metric"?raw:undefined);
+  const [glucoseUnit,setGlucoseUnit]=useLocalPreference<GlucoseUnit>("mediconnect-glucose-unit","mg/dL",raw=>raw==="mmol/L"||raw==="mg/dL"?raw:undefined);
 
   // ─── Profile State ──────────────────────────────────────
   const [profile, setProfile] = useState<UserProfileData>({
@@ -173,16 +147,16 @@ export default function SettingsPanel({
       insuranceNumber: "",
     },
   });
-  const [loadingProfile, setLoadingProfile] = useState(true);
+  const [, setLoadingProfile] = useState(true);
   const [savingProfile, setSavingProfile] = useState(false);
   const [profileError, setProfileError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string,string>>({});
 
   // ─── Notification Preferences State ─────────────────────
-  const [notifyEmail, setNotifyEmail] = useState(true);
-  const [notifySms, setNotifySms] = useState(true);
-  const [notifyAmelia, setNotifyAmelia] = useState(true);
-  const [notifySound, setNotifySound] = useState(true);
+  const [notifyEmail,setNotifyEmail]=useLocalPreference("mediconnect-notify-email",true,readBoolean);
+  const [notifySms,setNotifySms]=useLocalPreference("mediconnect-notify-sms",true,readBoolean);
+  const [notifyAmelia,setNotifyAmelia]=useLocalPreference("mediconnect-notify-amelia",true,readBoolean);
+  const [notifySound,setNotifySound]=useLocalPreference("mediconnect-notify-sound",true,readBoolean);
 
   // ─── UI Status States ───────────────────────────────────
   const [savingLocale, setSavingLocale] = useState(false);
@@ -193,47 +167,9 @@ export default function SettingsPanel({
     setTimeout(() => setSavedBanner(null), 3500);
   };
 
-  // ─── Load Local Preferences ─────────────────────────────
-  useEffect(() => {
-    const match = document.cookie.match(/NEXT_LOCALE=([^;]+)/);
-    if (match) setCurrentLocale(match[1]);
-
-    const storedFontSize = localStorage.getItem("mediconnect-font-size");
-    if (storedFontSize === "small" || storedFontSize === "medium" || storedFontSize === "large") {
-      setFontSize(storedFontSize);
-    }
-
-    const storedContrast = localStorage.getItem("mediconnect-high-contrast");
-    if (storedContrast === "true") setHighContrast(true);
-
-    const storedUnits = localStorage.getItem("mediconnect-unit-system");
-    if (storedUnits === "imperial" || storedUnits === "metric") {
-      setUnitSystem(storedUnits);
-    }
-
-    const storedGlucose = localStorage.getItem("mediconnect-glucose-unit");
-    if (storedGlucose === "mmol/L" || storedGlucose === "mg/dL") {
-      setGlucoseUnit(storedGlucose);
-    }
-
-    // Notifications
-    const storedEmail = localStorage.getItem("mediconnect-notify-email");
-    if (storedEmail !== null) setNotifyEmail(storedEmail === "true");
-
-    const storedSms = localStorage.getItem("mediconnect-notify-sms");
-    if (storedSms !== null) setNotifySms(storedSms === "true");
-
-    const storedAmelia = localStorage.getItem("mediconnect-notify-amelia");
-    if (storedAmelia !== null) setNotifyAmelia(storedAmelia === "true");
-
-    const storedSound = localStorage.getItem("mediconnect-notify-sound");
-    if (storedSound !== null) setNotifySound(storedSound === "true");
-  }, []);
-
   // ─── Apply Font Size and High Contrast ──────────────────
   useEffect(() => {
     document.documentElement.style.fontSize = FONT_SIZE_ROOT[fontSize];
-    localStorage.setItem("mediconnect-font-size", fontSize);
   }, [fontSize]);
 
   useEffect(() => {
@@ -242,7 +178,6 @@ export default function SettingsPanel({
     } else {
       document.documentElement.classList.remove("high-contrast");
     }
-    localStorage.setItem("mediconnect-high-contrast", String(highContrast));
   }, [highContrast]);
 
   // ─── Persist Unit Preferences ───────────────────────────
@@ -353,7 +288,6 @@ export default function SettingsPanel({
         });
 
         if (res.ok) {
-          setCurrentLocale(locale);
           showToast(t("savedSuccessfully"));
           router.refresh();
         }

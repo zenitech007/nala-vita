@@ -36,55 +36,59 @@ export function useRealtimeMessages(
   otherUserId: string | null,
   options: UseRealtimeMessagesOptions = {}
 ) {
-  const [messages, setMessages] = useState<RealtimeMessage[]>([]);
+  const threadKey = `${currentUserId}:${otherUserId}`;
+  const [thread, setThread] = useState<{ key: string; messages: RealtimeMessage[] } | null>(null);
+  const messages = thread?.key === threadKey ? thread.messages : [];
+  const isLoading = !!currentUserId && !!otherUserId && thread?.key !== threadKey;
+  const { onNewMessage } = options;
   const [isConnected, setIsConnected] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
 
   const seenMessages = useRef(new Set<string>());
 
   // ── Fetch existing message thread ──────────────────────
-  const fetchMessages = useCallback(async (liveUpdate = false) => {
+  const fetchMessages = useCallback((liveUpdate = false, signal?: AbortSignal) => {
     if (!currentUserId || !otherUserId) return;
-    setIsLoading(true);
-    try {
-      const res = await fetch(`/api/messages?otherUserId=${otherUserId}`);
+    return fetch(`/api/messages?otherUserId=${encodeURIComponent(otherUserId)}`, { signal }).then(async res => {
       if (res.ok) {
         const data = await res.json();
+        if (signal?.aborted) return;
         const rows: RealtimeMessage[] = Array.isArray(data.messages) ? data.messages : [];
         if (liveUpdate) {
           const unread = rows.filter(row => row.senderId === otherUserId && row.receiverId === currentUserId && !seenMessages.current.has(row.id));
-          for (const row of unread) options.onNewMessage?.(row);
+          for (const row of unread) onNewMessage?.(row);
           if (unread.length) void fetch("/api/messages", { method: "PATCH", headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ messageIds: unread.map(row => row.id) }) }).catch(() => undefined);
         }
         seenMessages.current = new Set(rows.map(row => row.id));
-        setMessages(rows);
+        setThread({ key: threadKey, messages: rows });
       }
-    } catch (err) {
+    }).catch((err: unknown) => {
       console.error("[useRealtimeMessages] fetch error:", err);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [currentUserId, otherUserId, options.onNewMessage]);
+    }).finally(() => {
+      if (!signal?.aborted) setThread(current => current?.key === threadKey ? current : { key: threadKey, messages: [] });
+    });
+  }, [currentUserId, otherUserId, onNewMessage, threadKey]);
 
   // ── Subscribe to new messages via Supabase Realtime ───
   useEffect(() => {
     if (!currentUserId || !otherUserId) return;
 
-    fetchMessages();
+    const controller = new AbortController();
+    void fetchMessages(false, controller.signal);
 
     const channel = supabase.channel(chatTopic(currentUserId), privateChannel)
       .on("broadcast", { event: "invalidate" }, ({ payload }) => {
         const event = chatEventSchema.safeParse(payload);
         if (event.success && event.data.senderId === otherUserId && event.data.receiverId === currentUserId) {
-          void fetchMessages(true);
+          void fetchMessages(true, controller.signal);
         }
       }).subscribe(status => setIsConnected(status === "SUBSCRIBED"));
     return () => {
+      controller.abort();
       supabase.removeChannel(channel);
       setIsConnected(false);
     };
-  }, [currentUserId, otherUserId, fetchMessages, options]);
+  }, [currentUserId, otherUserId, fetchMessages]);
 
   // ── Send a message ─────────────────────────────────────
   const sendMessage = useCallback(
@@ -111,10 +115,10 @@ export function useRealtimeMessages(
 
       // Optimistic update — our own sent messages won't come back via the
       // Realtime subscription (which filters for messages FROM the other user)
-      setMessages((prev) => [...prev, sent]);
+      setThread(current => ({ key: threadKey, messages: [...(current?.key === threadKey ? current.messages : []), sent] }));
       return sent;
     },
-    [currentUserId, otherUserId]
+    [currentUserId, otherUserId, threadKey]
   );
 
   return { messages, isConnected, isLoading, sendMessage, refetch: fetchMessages };

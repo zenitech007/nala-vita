@@ -1,34 +1,10 @@
 "use client";
+import {fetchJson} from "@/lib/api-fetch";
 import { formatTemperature } from "@/lib/temperature";
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import {
-  FileText,
-  FlaskConical,
-  Pill,
-  HeartPulse,
-  UserCheck,
-  Loader2,
-  ChevronDown,
-  ChevronUp,
-  ExternalLink,
-  Activity,
-  Heart,
-  Thermometer,
-  Droplets,
-  Weight,
-  Candy,
-  Lock,
-  Unlock,
-  Share2,
-  CheckCircle2,
-  XCircle,
-  ShieldCheck,
-  AlertCircle,
-  X,
-  UserPlus,
-} from "lucide-react";
+import { FileText, FlaskConical, Pill, HeartPulse, UserCheck, Loader2, ChevronDown, ChevronUp, ExternalLink, Activity, Heart, Thermometer, Droplets, Weight, Candy, Lock, Unlock, Share2, CheckCircle2, XCircle, ShieldCheck, AlertCircle, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 
@@ -1093,19 +1069,10 @@ export default function PatientRecordsPage() {
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [showShareModal, setShowShareModal] = useState(false);
 
-  async function fetchRecords() {
-    try {
-      setLoading(true);
-      setError(null);
-      const res = await fetch("/api/records");
-      if (!res.ok) throw new Error("Failed to load records");
-      const json: RecordsData = await res.json();
-      setData(json);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
-    } finally {
-      setLoading(false);
-    }
+  function fetchRecords(){
+    return fetchJson<RecordsData>("/api/records")
+      .then(json=>{setData(json);setError(null);setLoading(false);})
+      .catch(error=>{setError(error instanceof Error?error.message:"Records unavailable");setLoading(false);});
   }
 
   useEffect(() => {

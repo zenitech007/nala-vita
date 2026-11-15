@@ -115,7 +115,7 @@ function IntakePatientModal({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pendingMessage, setPendingMessage] = useState<string | null>(null);
-  useEffect(() => { if (!isOpen) setPendingMessage(null); }, [isOpen]);
+  const close = () => { setPendingMessage(null); onClose(); };
 
   if (!isOpen) return null;
 
@@ -151,7 +151,7 @@ function IntakePatientModal({
 
       onSuccess(data.message || "Patient successfully registered in clinic directory");
       if (res.status === 202) { setPendingMessage(data.message); return; }
-      onClose();
+      close();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Registration error");
     } finally {
@@ -174,7 +174,7 @@ function IntakePatientModal({
             </div>
           </div>
           <button
-            onClick={onClose}
+            onClick={close}
             className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition"
           >
             <X className="w-5 h-5" />
@@ -329,7 +329,7 @@ function IntakePatientModal({
           <div className="pt-3 flex items-center justify-end gap-2 border-t border-gray-100">
             <button
               type="button"
-              onClick={onClose}
+              onClick={close}
               className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-xl transition"
             >
               Cancel
@@ -369,21 +369,17 @@ export default function DoctorPatientsPage() {
   const [bannerMessage, setBannerMessage] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const fetchPatients = useCallback(async (query: string) => {
-    setLoading(true);
-    try {
-      const params = query ? `?search=${encodeURIComponent(query)}` : "";
-      const res = await fetch(`/api/patients${params}`);
+  const fetchPatients = useCallback((query: string) => {
+    const params = query ? `?search=${encodeURIComponent(query)}` : "";
+    return fetch(`/api/patients${params}`).then(async res => {
       if (res.ok) {
         const data: PatientsResponse = await res.json();
         setPatients(data.patients);
         setTotal(data.total);
       }
-    } catch {
-      // network error — leave current state
-    } finally {
-      setLoading(false);
-    }
+    }).catch(() => {
+      // Keep the current directory when the network is unavailable.
+    }).finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
@@ -392,6 +388,7 @@ export default function DoctorPatientsPage() {
 
   const handleSearchChange = (value: string) => {
     setSearch(value);
+    setLoading(true);
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       fetchPatients(value);

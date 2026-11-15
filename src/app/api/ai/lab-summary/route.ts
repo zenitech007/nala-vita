@@ -2,8 +2,8 @@ import { ProviderTimeoutError, providerTimeoutResponse } from "@/lib/provider-de
 import { requireApiUser } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { createServerSupabaseClient } from "@/lib/supabase-server";
-import { prisma } from "@/lib/prisma";
+
+
 import { checkRateLimitAsync } from "@/lib/rate-limit";
 import { chat } from "@/lib/amelia/llm";
 

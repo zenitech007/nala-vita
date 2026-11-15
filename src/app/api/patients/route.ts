@@ -4,7 +4,7 @@ import { loadVisiblePatientRecord } from "@/lib/visible-patient-record";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { createServerSupabaseClient } from "@/lib/supabase-server";
+
 import { requireApiUser } from "@/lib/auth";
 import { requestRecordAccess } from "@/lib/record-access-requests";
 import { RECORD_SCOPES } from "@/lib/record-scope";

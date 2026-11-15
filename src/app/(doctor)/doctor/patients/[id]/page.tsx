@@ -5,28 +5,7 @@ import { temperatureFromCelsius } from "@/lib/temperature";
 import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import {
-  ChevronLeft,
-  Loader2,
-  Heart,
-  Thermometer,
-  Droplets,
-  Activity,
-  Weight,
-  Candy,
-  Pill,
-  FileText,
-  FlaskConical,
-  ArrowRightLeft,
-  Plus,
-  X,
-  AlertTriangle,
-  Phone,
-  User,
-  Video,
-  Clock as _Clock,
-  AlertCircle,
-} from "lucide-react";
+import { ChevronLeft, Loader2, Heart, Thermometer, Droplets, Activity, Weight, Candy, Pill, FileText, FlaskConical, ArrowRightLeft, Plus, X, AlertTriangle, Phone, User, Video, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import {
@@ -184,9 +163,7 @@ const NOTE_CATEGORIES = [
 
 // ─── Component ───────────────────────────────────────────
 
-export default function PatientDetailPage() {
-  const params = useParams();
-  const patientId = params.id as string;
+function PatientDetailContent({ patientId }: { patientId: string }) {
 
   const [data, setData] = useState<PatientResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -199,19 +176,15 @@ export default function PatientDetailPage() {
   });
   const [noteSubmitting, setNoteSubmitting] = useState(false);
 
-  const fetchPatient = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/patients/${patientId}`);
+  const fetchPatient = useCallback(() => {
+    return fetch(`/api/patients/${patientId}`).then(async res => {
       if (res.ok) {
         const json: PatientResponse = await res.json();
         setData(json);
       }
-    } catch {
-      // network error
-    } finally {
-      setLoading(false);
-    }
+    }).catch(() => {
+      // Keep existing results if the network is unavailable.
+    }).finally(() => setLoading(false));
   }, [patientId]);
 
   useEffect(() => {
@@ -1197,4 +1170,10 @@ function ReferralsTab({ referrals }: { referrals: Referral[] }) {
       ))}
     </div>
   );
+}
+
+export default function PatientDetailPage() {
+  const params = useParams();
+  const patientId = params.id as string;
+  return <PatientDetailContent key={patientId} patientId={patientId} />;
 }

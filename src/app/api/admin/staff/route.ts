@@ -2,11 +2,10 @@ import { requireApiUser } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-export async function GET(_req: NextRequest) {
+export async function GET() {
   try {
     const auth = await requireApiUser({ roles: ["ADMIN"], profile: "admin" });
     if (!auth.ok) return auth.response;
-    const user = auth.user;
 
     const doctors = await prisma.doctor.findMany({
       include: {
@@ -48,7 +47,6 @@ export async function PATCH(req: NextRequest) {
   try {
     const auth = await requireApiUser({ roles: ["ADMIN"], profile: "admin" });
     if (!auth.ok) return auth.response;
-    const user = auth.user;
 
     const body = await req.json();
     const { doctorId, isActive, department, speciality } = body;

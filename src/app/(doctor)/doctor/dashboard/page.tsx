@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { TEMPERATURE, formatTemperature } from "@/lib/temperature";
 import { redirect } from "next/navigation";
 import DoctorDashboardClient from "./_components/DoctorDashboardClient";
-import { getAuthenticatedUserWithProfile } from "@/lib/auth-cache";
+
 
 export default async function DoctorDashboardPage() {
   const auth = await requireApiUser({ roles: ["DOCTOR"], profile: "doctor", allowUnverifiedDoctor: true });

@@ -4,7 +4,7 @@ import { doctorHasPatientAccess } from "@/lib/access-control";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { createServerSupabaseClient } from "@/lib/supabase-server";
+
 import { createNotification } from "@/lib/notifications";
 
 // ─── POST: Create a referral ─────────────────────────────
@@ -122,7 +122,7 @@ export async function POST(req: NextRequest) {
 
 // ─── GET: List referrals for the authenticated doctor ────
 
-export async function GET(_req: NextRequest) {
+export async function GET() {
   try {
     const auth = await requireApiUser({ roles: ["PATIENT", "DOCTOR"] });
     if (!auth.ok) return auth.response;

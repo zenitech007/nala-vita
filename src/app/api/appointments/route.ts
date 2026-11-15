@@ -2,7 +2,7 @@ import { requireApiUser } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { createServerSupabaseClient } from "@/lib/supabase-server";
+
 import { appointmentAvailabilityError } from "@/lib/appointment-availability";
 import { AppointmentConflict, reserveAppointmentSlot } from "@/lib/appointment-lock";
 import { Prisma } from "@prisma/client";

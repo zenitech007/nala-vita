@@ -8,7 +8,7 @@ import { GET as payments } from '@/app/api/payments/route';
 beforeEach(() => { jest.resetAllMocks(); });
 it('F10 editable admin metadata cannot override the database role', async () => {
   user.mockResolvedValue({ id: 'u', role: 'PATIENT', isActive: true, patient: { id: 'p' } });
-  expect((await staff(new Request('https://example.test/api/admin/staff') as never)).status).toBe(403); expect(records).not.toHaveBeenCalled();
+  expect((await staff()).status).toBe(403); expect(records).not.toHaveBeenCalled();
 });
 it.each([staff, notifications, payments])('F10 deactivation prevents data access despite tampered active metadata', async handler => {
   user.mockResolvedValue({ id: 'u', role: 'ADMIN', isActive: false, admin: { id: 'a' } });

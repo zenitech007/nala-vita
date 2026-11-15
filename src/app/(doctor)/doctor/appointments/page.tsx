@@ -87,25 +87,21 @@ export default function DoctorAppointmentsPage() {
   const [selectedAppointment, setSelectedAppointment] = useState<DoctorAppointment | null>(null);
   const [calendarWeekStart, setCalendarWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 1 }));
 
-  const fetchAppointments = useCallback(async () => {
-    setLoading(true);
-    try {
-      const statusMap: Record<TabKey, string> = {
-        upcoming: "upcoming",
-        in_progress: "upcoming", // API groups these together
-        completed: "past",
-        cancelled: "cancelled",
-      };
-      const res = await fetch(`/api/appointments?status=${statusMap[activeTab]}`);
+  const fetchAppointments = useCallback(() => {
+    const statusMap: Record<TabKey, string> = {
+      upcoming: "upcoming",
+      in_progress: "upcoming", // API groups these together
+      completed: "past",
+      cancelled: "cancelled",
+    };
+    return fetch(`/api/appointments?status=${statusMap[activeTab]}`).then(async res => {
       if (res.ok) {
         const data = await res.json();
         setAppointments(data.appointments || []);
       }
-    } catch {
-      // placeholder data handles no-api case
-    } finally {
-      setLoading(false);
-    }
+    }).catch(() => {
+      // Keep existing results if the network is unavailable.
+    }).finally(() => setLoading(false));
   }, [activeTab]);
 
   useEffect(() => {
@@ -194,7 +190,7 @@ export default function DoctorAppointmentsPage() {
             {STATUS_TABS.map((tab) => (
               <button
                 key={tab.key}
-                onClick={() => setActiveTab(tab.key)}
+                onClick={() => { if (tab.key !== activeTab) { setLoading(true); setActiveTab(tab.key); } }}
                 className={cn(
                   "px-5 py-2.5 rounded-lg text-sm font-medium transition",
                   activeTab === tab.key ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"

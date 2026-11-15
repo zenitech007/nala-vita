@@ -2,7 +2,7 @@ import { isIanaTimeZone } from "@/lib/appointment-availability";
 import { requireApiUser } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { prisma } from "@/lib/prisma";
+
 import { createReminder, listReminders } from "@/lib/amelia/reminders";
 
 async function getPatientId(): Promise<string | null> {

@@ -1,5 +1,5 @@
 const getUser = jest.fn(), getSession = jest.fn();
-jest.mock('@supabase/auth-helpers-nextjs', () => ({ createServerClient: (_url: unknown, _key: unknown, config: any) => {
+jest.mock('@supabase/auth-helpers-nextjs', () => ({ createServerClient: (_url: unknown, _key: unknown, config:{cookies:{setAll:(cookies:{name:string;value:string;options?:{httpOnly?:boolean}}[])=>void}}) => {
   config.cookies.setAll([{ name: 'refreshed', value: 'new', options: { httpOnly: true } }]);
   return { auth: { getUser, getSession } };
 } }));

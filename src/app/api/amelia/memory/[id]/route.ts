@@ -1,7 +1,7 @@
 import { requireApiUser } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { prisma } from "@/lib/prisma";
+
 import { confirmMemory, updateMemory, deleteMemory } from "@/lib/amelia/memory";
 
 const patchSchema = z.union([

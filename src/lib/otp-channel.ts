@@ -19,7 +19,7 @@ export async function sendAppEmail(recipient: string, subject: string, text: str
     finally { transport.close(); }
 }
 export class SmsOtpChannel implements OtpChannel {
-  async send(_recipient: string, _code: string, _purpose: string): Promise<void> { throw new Error("SMS not enabled"); }
+  async send(): Promise<void> { throw new Error("SMS not enabled"); }
 }
 export function selectOtpChannel(contact: { email?: string | null; verifiedEmail: boolean; verifiedPhone?: string | null }): OtpChannel {
   const channel = process.env.OTP_CHANNEL ?? "email";

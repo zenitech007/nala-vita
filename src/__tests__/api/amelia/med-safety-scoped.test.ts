@@ -9,7 +9,7 @@ import { GET, POST } from '@/app/api/amelia/med-safety/route';
 beforeEach(() => { jest.resetAllMocks(); analyze.mockResolvedValue({}); visible.mockResolvedValue({ patient: { allergies: [] }, prescriptions: [{ medication: 'Visible', dosage: '1', isActive: true }], profileAvailable: true, accessLimited: true }); });
 it('F06 inactive patients cannot read cached safety reports', async () => {
   user.mockResolvedValue({ id: 'u', role: 'PATIENT', isActive: false, patient: { id: 'p', prescriptions: [], allergies: [] } });
-  expect((await GET(new Request('http://localhost/api/amelia/med-safety') as never)).status).toBe(403);
+  expect((await GET()).status).toBe(403);
   expect(analyze).not.toHaveBeenCalled();
 });
 it('F06 doctor safety input is restricted to visible records', async () => {

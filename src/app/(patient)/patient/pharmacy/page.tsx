@@ -1,4 +1,5 @@
 "use client";
+import {fetchJson} from "@/lib/api-fetch";
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
@@ -45,32 +46,14 @@ const STATUS_ICON: Record<OrderStatus, typeof Pill> = {
 export default function PatientPharmacyPage() {
   const [items, setItems] = useState<PharmacyItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError,setLoadError]=useState("");
   const [orderingId, setOrderingId] = useState<string | null>(null);
 
-  const fetchItems = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await fetch("/api/medications");
-      if (res.ok) {
-        const meds = await res.json();
-        const list: MedicationRecord[] = Array.isArray(meds.medications) ? meds.medications : [];
-        setItems(
-          list
-            .filter((m) => m.isActive)
-            .map((m) => ({
-              id: m.id,
-              medication: m.medication,
-              dosage: m.dosage,
-              refillsRemaining: m.refillsAllowed - m.refillsUsed,
-              prescribedAt: m.prescribedAt,
-              orderStatus: "available" as OrderStatus,
-            }))
-        );
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const fetchItems=useCallback(()=>fetchJson<{medications:MedicationRecord[]}>("/api/medications")
+    .then(data=>{const list=Array.isArray(data.medications)?data.medications:[];
+      setItems(list.filter(item=>item.isActive).map(item=>({id:item.id,medication:item.medication,dosage:item.dosage,refillsRemaining:item.refillsAllowed-item.refillsUsed,prescribedAt:item.prescribedAt,orderStatus:"available"})));
+      setLoadError("");setLoading(false);
+    }).catch(error=>{setLoadError(error instanceof Error?error.message:"Prescriptions unavailable");setLoading(false);}),[]);
 
   useEffect(() => {
     fetchItems();
@@ -111,7 +94,7 @@ export default function PatientPharmacyPage() {
           <div className="flex items-center justify-center py-20">
             <Loader2 className="w-8 h-8 animate-spin text-[var(--primary)]" />
           </div>
-        ) : (
+        ) : loadError ? <p role="alert">{loadError}</p> : (
           <>
             <SectionCard
               title="Available for order"

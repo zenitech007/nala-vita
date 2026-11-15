@@ -4,7 +4,8 @@ import {useLocale} from "next-intl";
 import BookingTimeSummary from "@/components/appointments/BookingTimeSummary";
 import {isIanaTimeZone} from "@/lib/appointment-availability";
 import {bookingInstant} from "@/lib/booking-time";
-import { useEffect, useState, useCallback } from "react";
+import { Suspense, useEffect, useState, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   Calendar,
@@ -111,24 +112,16 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: typeof
   NO_SHOW: { label: "No Show", color: "bg-amber-100 text-amber-700", icon: AlertCircle },
 };
 
-export default function PatientAppointmentsPage() {
+function PatientAppointmentsContent() {
   const [activeTab, setActiveTab] = useState<TabKey>("upcoming");
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [showBooking, setShowBooking] = useState(false);
+  const searchParams = useSearchParams();
+  const [showBooking, setShowBooking] = useState(searchParams.get("action") === "book");
 
-  // Check URL param for auto-open
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("action") === "book") setShowBooking(true);
-  }, []);
-
-  const fetchAppointments = useCallback(async () => {
-    setLoading(true);
-    setLoadError(null);
-    try {
-      const res = await fetch(`/api/appointments?status=${activeTab}`);
+  const fetchAppointments = useCallback(() => {
+    return fetch(`/api/appointments?status=${activeTab}`).then(async res => {
       const data = await res.json().catch(() => null);
 
       if (!res.ok) {
@@ -140,14 +133,15 @@ export default function PatientAppointmentsPage() {
       }
 
       setAppointments(data.appointments);
-    } catch (error) {
+      setLoadError(null);
+    }).catch((error: unknown) => {
       setAppointments([]);
       setLoadError(
         error instanceof Error ? error.message : "Unable to load appointments"
       );
-    } finally {
+    }).finally(() => {
       setLoading(false);
-    }
+    });
   }, [activeTab]);
 
   useEffect(() => {
@@ -192,7 +186,7 @@ export default function PatientAppointmentsPage() {
           {tabs.map((tab) => (
             <button
               key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
+              onClick={() => { if (tab.key !== activeTab) { setLoading(true); setLoadError(null); setActiveTab(tab.key); } }}
               className={cn(
                 "px-5 py-2.5 rounded-lg text-sm font-medium transition",
                 activeTab === tab.key
@@ -221,7 +215,7 @@ export default function PatientAppointmentsPage() {
             <p className="text-gray-700 text-lg font-medium">Could not load appointments</p>
             <p className="text-gray-500 text-sm mt-1">{loadError}</p>
             <button
-              onClick={fetchAppointments}
+              onClick={() => { setLoading(true); setLoadError(null); void fetchAppointments(); }}
               className="mt-4 text-[var(--primary)] hover:opacity-80 font-medium text-sm"
             >
               Try again
@@ -357,12 +351,9 @@ function BookingModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
   // Step 4 — Reason
   const [reason, setReason] = useState("");
 
-  const loadDoctors = useCallback(async () => {
-    setDoctorsLoading(true);
-    setDoctorsError(null);
+  const loadDoctors = useCallback(() => {
 
-    try {
-      const res = await fetch("/api/doctors?limit=50");
+    return fetch("/api/doctors?limit=50").then(async res => {
       const data = await res.json().catch(() => null);
 
       if (!res.ok) {
@@ -374,15 +365,16 @@ function BookingModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
       }
 
       setDoctors(data.doctors);
-    } catch (error) {
+      setDoctorsError(null);
+    }).catch((error: unknown) => {
       setDoctors([]);
       setSelectedDoctor(null);
       setDoctorsError(
         error instanceof Error ? error.message : "Unable to load doctors"
       );
-    } finally {
+    }).finally(() => {
       setDoctorsLoading(false);
-    }
+    });
   }, []);
 
   useEffect(() => {
@@ -533,7 +525,7 @@ function BookingModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
                     <AlertCircle className="w-8 h-8 text-red-400 mx-auto mb-2" />
                     <p className="text-sm text-gray-700">{doctorsError}</p>
                     <button
-                      onClick={loadDoctors}
+                      onClick={() => { setDoctorsLoading(true); setDoctorsError(null); void loadDoctors(); }}
                       className="mt-3 text-sm font-medium text-[var(--primary)] hover:opacity-80"
                     >
                       Try again
@@ -830,4 +822,8 @@ function BookingModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
       </div>
     </div>
   );
+}
+
+export default function PatientAppointmentsPage() {
+  return <Suspense fallback={null}><PatientAppointmentsContent /></Suspense>;
 }

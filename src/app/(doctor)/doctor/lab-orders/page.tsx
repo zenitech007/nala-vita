@@ -71,7 +71,7 @@ export default function DoctorLabOrdersPage() {
 
   // Real patient options
   const [patients, setPatients] = useState<PatientOption[]>([]);
-  const [loadingPatients, setLoadingPatients] = useState(true);
+  const [, setLoadingPatients] = useState(true);
 
   useEffect(() => {
     async function loadPatients() {
@@ -102,19 +102,15 @@ export default function DoctorLabOrdersPage() {
     `${p.firstName} ${p.lastName}`.toLowerCase().includes(patientSearch.toLowerCase())
   );
 
-  const fetchOrders = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/lab-tests?status=${activeTab}`);
+  const fetchOrders = useCallback(() => {
+    return fetch(`/api/lab-tests?status=${activeTab}`).then(async res => {
       if (res.ok) {
         const data = await res.json();
         setOrders(data.labOrders || []);
       }
-    } catch {
-      // network error
-    } finally {
-      setLoading(false);
-    }
+    }).catch(() => {
+      // Keep existing results if the network is unavailable.
+    }).finally(() => setLoading(false));
   }, [activeTab]);
 
   useEffect(() => {
@@ -199,7 +195,7 @@ export default function DoctorLabOrdersPage() {
           {([{ key: "pending" as const, label: "Pending" }, { key: "completed" as const, label: "Completed" }]).map((tab) => (
             <button
               key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
+              onClick={() => { if (tab.key !== activeTab) { setLoading(true); setActiveTab(tab.key); } }}
               className={cn("px-5 py-2.5 rounded-lg text-sm font-medium transition", activeTab === tab.key ? "bg-white text-gray-900 shadow-sm" : "text-gray-500")}
             >
               {tab.label}

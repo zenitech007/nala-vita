@@ -1,6 +1,6 @@
 import { requireApiUser } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+
 import { cancelReminder } from "@/lib/amelia/reminders";
 
 async function getPatientId(): Promise<string | null> {

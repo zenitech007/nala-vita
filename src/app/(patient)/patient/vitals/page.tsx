@@ -117,12 +117,8 @@ export default function PatientVitalsPage() {
     temperature: [],
   });
 
-  const fetchVitals = useCallback(async () => {
-    setLoadingVitals(true);
-    try {
-      const res = await fetch("/api/vitals?limit=30");
-      if (res.ok) {
-        const data = await res.json();
+  const fetchVitals=useCallback(()=>fetchJson<{vitals:{id:string;recordedAt:string;source?:string;bloodPressure?:string|null;heartRate?:number|null;bloodSugar?:number|null;oxygenSaturation?:number|null;weight?:number|null;temperature?:number|null}[]}>("/api/vitals?limit=30")
+    .then(data=>{
         const records = Array.isArray(data.vitals) ? data.vitals : [];
         const mappedData: Record<VitalType, VitalReading[]> = {
           bloodPressure: [],
@@ -200,13 +196,8 @@ export default function PatientVitalsPage() {
           }
         }
         setChartData(mappedData);
-      }
-    } catch (err) {
-      console.error("Failed to load patient vitals:", err);
-    } finally {
       setLoadingVitals(false);
-    }
-  }, []);
+    }).catch(error=>{console.error("Failed to load patient vitals:",error);setLoadingVitals(false);}),[]);
 
   useEffect(() => {
     fetchVitals();

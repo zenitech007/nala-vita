@@ -2,18 +2,7 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
-import {
-  Sparkles,
-  X,
-  PanelRightClose,
-  PanelRightOpen,
-  Maximize2,
-  Minimize2,
-  Stethoscope,
-  Activity,
-  Pill,
-  FileQuestion,
-} from "lucide-react";
+import { Sparkles, X, PanelRightOpen, Minimize2 } from "lucide-react";
 import AmeliaChat from "./AmeliaChat";
 
 export interface AmeliaLauncherProps {
@@ -24,7 +13,7 @@ export default function AmeliaLauncher({ role = "patient" }: AmeliaLauncherProps
   const reducedMotion = useReducedMotion();
   const [open, setOpen] = useState(false);
   const [isDocked, setIsDocked] = useState(false);
-  const [chatKey, setChatKey] = useState(0);
+  const [chatKey] = useState(0);
 
   const quickPrompts =
     role === "doctor"
