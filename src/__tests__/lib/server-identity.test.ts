@@ -10,5 +10,5 @@ it('F10 only uses the verified Auth ID and never reads cookie session data', asy
 
 it('returns verified identity for a pending doctor so the layout can show its status', async () => {
   findUser.mockResolvedValue({ isActive: true, role: 'DOCTOR', doctor: { id: 'd', isVerified: false } });
-  expect((await getAuthenticatedUserWithProfile())?.user.doctor.isVerified).toBe(false);
+  expect((await getAuthenticatedUserWithProfile())?.user?.doctor?.isVerified).toBe(false);
 });

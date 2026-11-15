@@ -1,16 +1,19 @@
+import {routeContext} from "../../helpers/requests";
+import {mockOf,mockQuery} from "../../helpers/mock";
+import type {AuthReply,UserProjection} from "../../helpers/projections";
 import { describe, it, expect, jest, beforeEach } from "@jest/globals";
 
-const getUser = jest.fn();
+const getUser=mockQuery<AuthReply>();
 jest.mock("@/lib/supabase-server", () => ({ createServerSupabaseClient: () => ({ auth: { getUser: () => getUser() } }) }));
-const userFindUnique = jest.fn();
+const userFindUnique=mockQuery<UserProjection|null>();
 jest.mock("@/lib/prisma", () => ({ prisma: { user: { findUnique: (...a: unknown[]) => userFindUnique(...a) } } }));
-const createReminder = jest.fn();
-const listReminders = jest.fn();
-const cancelReminder = jest.fn();
+const createReminder=mockOf<typeof import("@/lib/amelia/reminders").createReminder>();
+const listReminders=mockOf<typeof import("@/lib/amelia/reminders").listReminders>();
+const cancelReminder=mockOf<typeof import("@/lib/amelia/reminders").cancelReminder>();
 jest.mock("@/lib/amelia/reminders", () => ({
-  createReminder: (...a: unknown[]) => createReminder(...a),
-  listReminders: (...a: unknown[]) => listReminders(...a),
-  cancelReminder: (...a: unknown[]) => cancelReminder(...a),
+  createReminder: (...a: Parameters<typeof createReminder>) => createReminder(...a),
+  listReminders: (...a: Parameters<typeof listReminders>) => listReminders(...a),
+  cancelReminder: (...a: Parameters<typeof cancelReminder>) => cancelReminder(...a),
 }));
 
 import { POST, GET } from "@/app/api/amelia/reminders/route";
@@ -19,7 +22,7 @@ import { DELETE } from "@/app/api/amelia/reminders/[id]/route";
 function req(body?: unknown) {
   return new Request("http://localhost/api/amelia/reminders", { method: "POST", body: body ? JSON.stringify(body) : undefined }) as never;
 }
-const ctx = (id: string) => ({ params: { id } });
+const ctx = (id: string) => routeContext({id});
 
 beforeEach(() => [getUser, userFindUnique, createReminder, listReminders, cancelReminder].forEach((m) => m.mockReset()));
 

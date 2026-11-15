@@ -1,7 +1,11 @@
+import {notificationFixture} from "../helpers/fixtures";
+import {mockOf,mockQuery} from "../helpers/mock";
+import type {AuthReply,UserProjection,PatientProjection,PrescriptionProjection} from "../helpers/projections";
+import type {Appointment,Referral} from "@prisma/client";
 import { describe, it, expect, jest, beforeEach } from "@jest/globals";
 
 // Mock Supabase Server
-const getUser = jest.fn();
+const getUser = mockQuery<AuthReply>();
 jest.mock("@/lib/supabase-server", () => ({
   createServerSupabaseClient: () => ({
     auth: { getUser: () => getUser() },
@@ -9,21 +13,21 @@ jest.mock("@/lib/supabase-server", () => ({
 }));
 
 // Mock Notifications
-const createNotification = jest.fn();
+const createNotification=mockOf<typeof import("@/lib/notifications").createNotification>();
 jest.mock("@/lib/notifications", () => ({
-  createNotification: (...args: unknown[]) => createNotification(...args),
+  createNotification: (...args: Parameters<typeof createNotification>) => createNotification(...args),
 }));
 
 // Mock Prisma
-const userFindUnique = jest.fn();
-const patientFindUnique = jest.fn();
-const appointmentFindFirst = jest.fn();
-const referralFindFirst = jest.fn();
-const prescriptionFindUnique = jest.fn();
-const prescriptionFindMany = jest.fn();
-const prescriptionCreate = jest.fn();
-const prescriptionUpdate = jest.fn();
-const auditLogCreate = jest.fn();
+const userFindUnique = mockQuery<UserProjection|null>();
+const patientFindUnique = mockQuery<PatientProjection|null>();
+const appointmentFindFirst = mockQuery<Partial<Appointment>|null>();
+const referralFindFirst = mockQuery<Partial<Referral>|null>();
+const prescriptionFindUnique = mockQuery<PrescriptionProjection|null>();
+const prescriptionFindMany = mockQuery<PrescriptionProjection[]>();
+const prescriptionCreate = mockQuery<PrescriptionProjection>();
+const prescriptionUpdate = mockQuery<PrescriptionProjection>();
+const auditLogCreate = mockQuery<{id:string}>();
 
 jest.mock("@/lib/prisma", () => ({
   prisma: {
@@ -66,7 +70,7 @@ describe("Two-Sided Medication Pipeline & Adherence Suite", () => {
     jest.clearAllMocks();
     patientFindUnique.mockResolvedValue({ id: "pat-1", userId: "u-pat-1" });
     auditLogCreate.mockResolvedValue({ id: "audit-1" });
-    createNotification.mockResolvedValue(true);
+    createNotification.mockResolvedValue(notificationFixture());
   });
 
   describe("Patient Dashboard: 7-Day Adherence & Prescription Self-Management", () => {
@@ -97,7 +101,7 @@ describe("Two-Sided Medication Pipeline & Adherence Suite", () => {
           refillsAllowed: 2,
           refillsUsed: 0,
           isActive: true,
-          prescribedAt: new Date().toISOString(),
+          prescribedAt: new Date(),
           expiresAt: null,
           addedBy: "DOCTOR",
           isSharedWithDoctor: true,
@@ -370,7 +374,7 @@ describe("Two-Sided Medication Pipeline & Adherence Suite", () => {
           refillsAllowed: 3,
           refillsUsed: 1,
           isActive: true,
-          prescribedAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+          prescribedAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
           expiresAt: null,
           addedBy: "DOCTOR",
           isSharedWithDoctor: true,

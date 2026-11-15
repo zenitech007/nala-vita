@@ -1,10 +1,11 @@
+import {mockOf} from "../helpers/mock";
 import { describe, it, expect, jest, beforeEach } from "@jest/globals";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import HealthDashboard from "@/components/dashboard/HealthDashboard";
 
-const onUpdate = jest.fn().mockImplementation(() => Promise.resolve());
+const onUpdate=mockOf<NonNullable<React.ComponentProps<typeof HealthDashboard>["onUpdate"]>>().mockResolvedValue(undefined);
 
-beforeEach(() => onUpdate.mockClear());
+beforeEach(() => {onUpdate.mockClear();});
 
 describe("HealthDashboard", () => {
   it("renders hydration, medication, and steps sections", () => {

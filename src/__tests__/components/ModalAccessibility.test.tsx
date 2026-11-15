@@ -1,6 +1,6 @@
 import {render,screen,fireEvent} from "@testing-library/react";
 import {useState} from "react";
-import Modal from "@/components/ui/Modal";
+import Modal from "@/components/ui/modal";
 function Harness(){const[open,setOpen]=useState(false);return <><button onClick={()=>setOpen(true)}>Open editor</button><Modal isOpen={open} title="Edit record" onClose={()=>setOpen(false)}><input aria-label="Draft"/><button>Save</button></Modal></>;}
 test("dialog has a name, traps focus, makes background inert, and restores focus on Escape",()=>{
  const {container}=render(<Harness/>);const opener=screen.getByRole("button",{name:"Open editor"});opener.focus();fireEvent.click(opener);

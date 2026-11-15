@@ -1,12 +1,14 @@
+import {mockOf,mockQuery} from "../../helpers/mock";
+import type {AuthReply,UserProjection} from "../../helpers/projections";
 import { describe, it, expect, jest, beforeEach } from "@jest/globals";
 
-const getUser = jest.fn();
+const getUser=mockQuery<AuthReply>();
 jest.mock("@/lib/supabase-server", () => ({ createServerSupabaseClient: () => ({ auth: { getUser: () => getUser() } }) }));
-const userFindUnique = jest.fn();
+const userFindUnique=mockQuery<UserProjection|null>();
 jest.mock("@/lib/prisma", () => ({ prisma: { user: { findUnique: (...a: unknown[]) => userFindUnique(...a) } } }));
 jest.mock("@/lib/rate-limit", () => ({ checkRateLimitAsync: async () => ({ allowed: true, remaining: 9, resetAt: Date.now() + 60000 }) }));
-const chat = jest.fn();
-jest.mock("@/lib/amelia/llm", () => ({ chat: (...a: unknown[]) => chat(...a) }));
+const chat=mockOf<typeof import("@/lib/amelia/llm").chat>();
+jest.mock("@/lib/amelia/llm", () => ({ chat: (...a: Parameters<typeof chat>) => chat(...a) }));
 
 import { POST } from "@/app/api/ai/lab-summary/route";
 

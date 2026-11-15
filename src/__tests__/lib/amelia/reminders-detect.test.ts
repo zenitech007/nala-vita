@@ -1,15 +1,16 @@
+import {mockOf} from "../../helpers/mock";
 // src/__tests__/lib/amelia/reminders-detect.test.ts
 import { describe, it, expect, jest, beforeEach } from "@jest/globals";
 
-const chat = jest.fn();
-jest.mock("@/lib/amelia/llm", () => ({ chat: (...a: unknown[]) => chat(...a) }));
+const chat=mockOf<typeof import("@/lib/amelia/llm").chat>();
+jest.mock("@/lib/amelia/llm", () => ({ chat: (...a: Parameters<typeof chat>) => chat(...a) }));
 jest.mock("@/lib/prisma", () => ({ prisma: {} }));
 jest.mock("@/lib/notifications", () => ({ createNotification: jest.fn() }));
 
 import { detectReminder, computeNextFireAt, describeSchedule } from "@/lib/amelia/reminders";
 import type { ReminderCandidate } from "@/lib/amelia/types";
 
-beforeEach(() => chat.mockReset());
+beforeEach(() => {chat.mockReset();});
 
 describe("detectReminder", () => {
   it("returns null when the patient isn't asking for a reminder", async () => {

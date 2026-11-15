@@ -1,7 +1,9 @@
+import {mockQuery} from "../../helpers/mock";
+import type {PatientProjection} from "../../helpers/projections";
 // src/__tests__/lib/amelia/context.test.ts
 import { describe, it, expect, jest, beforeEach } from "@jest/globals";
 
-const findUnique = jest.fn<any>();
+const findUnique=mockQuery<PatientProjection|null>();
 jest.mock("@/lib/prisma", () => ({ prisma: {
  patient: { findUnique: (...a: unknown[]) => findUnique(...a), findFirst: (...a: unknown[]) => findUnique(...a) },
  vital: { findMany: async () => (await findUnique())?.vitals ?? [] },
@@ -12,7 +14,7 @@ jest.mock("@/lib/prisma", () => ({ prisma: {
 
 import { getPatientContext } from "@/lib/amelia/context";
 
-beforeEach(() => findUnique.mockReset());
+beforeEach(() => {findUnique.mockReset();});
 
 describe("getPatientContext", () => {
   it("maps the patient record into a grounded context", async () => {

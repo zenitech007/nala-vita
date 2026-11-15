@@ -1,9 +1,10 @@
+import {mockQuery} from "../../helpers/mock";
 // src/__tests__/lib/amelia/reminders-crud.test.ts
 import { describe, it, expect, jest, beforeEach } from "@jest/globals";
 
-const create = jest.fn();
-const findMany = jest.fn();
-const updateMany = jest.fn();
+const create=mockQuery<Partial<import("@prisma/client").Reminder>>();
+const findMany=mockQuery<Partial<import("@prisma/client").Reminder>[]>();
+const updateMany=mockQuery<{count:number}>();
 jest.mock("@/lib/prisma", () => ({
   prisma: { reminder: {
     create: (...a: unknown[]) => create(...a),

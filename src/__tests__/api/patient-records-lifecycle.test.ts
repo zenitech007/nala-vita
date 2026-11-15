@@ -1,7 +1,12 @@
+import {notificationFixture} from "../helpers/fixtures";
+import {mockOf,mockQuery} from "../helpers/mock";
+import {routeContext} from "../helpers/requests";
+import type {AuthReply,UserProjection,PatientProjection,DoctorProjection,ReferralProjection,NoteProjection} from "../helpers/projections";
+import type {Appointment,RecordAccessRequest} from "@prisma/client";
 import { describe, it, expect, jest, beforeEach } from "@jest/globals";
 
 // Mock Supabase Server
-const getUser = jest.fn();
+const getUser = mockQuery<AuthReply>();
 jest.mock("@/lib/supabase-server", () => ({
   createServerSupabaseClient: () => ({
     auth: { getUser: () => getUser() },
@@ -9,7 +14,7 @@ jest.mock("@/lib/supabase-server", () => ({
 }));
 
 // Mock Supabase Admin
-const createUser = jest.fn();
+const createUser = mockQuery<AuthReply>();
 jest.mock("@/lib/supabase-admin", () => ({
   supabaseAdmin: {
     auth: {
@@ -21,35 +26,35 @@ jest.mock("@/lib/supabase-admin", () => ({
 }));
 
 // Mock Notifications
-const createNotification = jest.fn();
-const patientRequest = jest.fn();
+const createNotification=mockOf<typeof import("@/lib/notifications").createNotification>();
+const patientRequest = mockQuery<Partial<RecordAccessRequest>>();
 jest.mock('@/lib/record-access-requests', () => ({ createPatientRecordRequest: (...args: unknown[]) => patientRequest(...args), ConsentError: class extends Error {} }));
 jest.mock("@/lib/notifications", () => ({
-  createNotification: (...args: unknown[]) => createNotification(...args),
+  createNotification: (...args: Parameters<typeof createNotification>) => createNotification(...args),
 }));
 
 // Mock Prisma
-const userFindUnique = jest.fn();
-const userFindFirst = jest.fn();
-const userCreate = jest.fn();
-const userUpdate = jest.fn();
-const doctorFindUnique = jest.fn();
-const doctorFindMany = jest.fn();
-const patientFindUnique = jest.fn();
-const patientFindMany = jest.fn();
-const patientCreate = jest.fn();
-const appointmentFindFirst = jest.fn();
-const appointmentFindMany = jest.fn();
-const appointmentCreate = jest.fn();
-const referralFindFirst = jest.fn();
-const referralFindMany = jest.fn();
-const referralCreate = jest.fn();
-const referralUpdate = jest.fn();
-const medicalNoteFindFirst = jest.fn();
-const medicalNoteFindMany = jest.fn();
-const medicalNoteCreate = jest.fn();
-const medicalNoteUpdate = jest.fn();
-const auditLogCreate = jest.fn();
+const userFindUnique = mockQuery<UserProjection|null>();
+const userFindFirst = mockQuery<UserProjection|null>();
+const userCreate = mockQuery<UserProjection>();
+const userUpdate = mockQuery<UserProjection>();
+const doctorFindUnique = mockQuery<DoctorProjection|null>();
+const doctorFindMany = mockQuery<DoctorProjection[]>();
+const patientFindUnique = mockQuery<PatientProjection|null>();
+const patientFindMany = mockQuery<PatientProjection[]>();
+const patientCreate = mockQuery<PatientProjection>();
+const appointmentFindFirst = mockQuery<Partial<Appointment>|null>();
+const appointmentFindMany = mockQuery<Partial<Appointment>[]>();
+const appointmentCreate = mockQuery<Pick<Appointment,"id">>();
+const referralFindFirst = mockQuery<ReferralProjection|null>();
+const referralFindMany = mockQuery<ReferralProjection[]>();
+const referralCreate = mockQuery<ReferralProjection>();
+const referralUpdate = mockQuery<ReferralProjection|{count:number}>();
+const medicalNoteFindFirst = mockQuery<NoteProjection|null>();
+const medicalNoteFindMany = mockQuery<NoteProjection[]>();
+const medicalNoteCreate = mockQuery<NoteProjection>();
+const medicalNoteUpdate = mockQuery<NoteProjection>();
+const auditLogCreate = mockQuery<{id:string}>();
 
 jest.mock("@/lib/prisma", () => ({
   prisma: {
@@ -114,7 +119,7 @@ describe("Patient Records Lifecycle & Privacy Suite", () => {
   beforeEach(() => {
     jest.resetAllMocks();
     auditLogCreate.mockResolvedValue({ id: "audit-1" });
-    createNotification.mockResolvedValue(true);
+    createNotification.mockResolvedValue(notificationFixture());
     doctorFindMany.mockResolvedValue([]);
     patientRequest.mockResolvedValue({ id: 'request', status: 'PENDING' });
   });
@@ -271,7 +276,7 @@ describe("Patient Records Lifecycle & Privacy Suite", () => {
 
       const request = new Request("http://localhost/api/patients/p-1");
       const res = await getPatientRecordHandler(request as never, {
-        params: { id: "p-1" },
+        ...routeContext({id:"p-1"}),
       });
 
       expect(res.status).toBe(403);
@@ -291,7 +296,7 @@ describe("Patient Records Lifecycle & Privacy Suite", () => {
 
       const request = new Request("http://localhost/api/patients/p-1");
       const res = await getPatientRecordHandler(request as never, {
-        params: { id: "p-1" },
+        ...routeContext({id:"p-1"}),
       });
 
       expect(res.status).toBe(403);

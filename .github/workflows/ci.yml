@@ -29,6 +29,9 @@ jobs:
       - name: Production TypeScript
         if: success() || failure()
         run: npx tsc --noEmit
+      - name: Semantic test TypeScript
+        if: success() || failure()
+        run: npx tsc --noEmit -p tsconfig.test.json
       - name: ESLint
         if: success() || failure()
         run: npm run lint

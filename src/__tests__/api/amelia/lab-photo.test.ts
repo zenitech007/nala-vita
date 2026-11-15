@@ -1,11 +1,13 @@
+import {mockOf,mockQuery} from "../../helpers/mock";
+import type {AuthReply,UserProjection} from "../../helpers/projections";
 import { describe, it, expect, jest, beforeEach } from "@jest/globals";
 
-const getUser = jest.fn();
+const getUser=mockQuery<AuthReply>();
 jest.mock("@/lib/supabase-server", () => ({
   createServerSupabaseClient: () => ({ auth: { getUser: () => getUser() } }),
 }));
 
-const userFindUnique = jest.fn();
+const userFindUnique=mockQuery<UserProjection|null>();
 jest.mock("@/lib/prisma", () => ({
   prisma: { user: { findUnique: (...a: unknown[]) => userFindUnique(...a) } },
 }));
@@ -18,9 +20,9 @@ jest.mock("@/lib/rate-limit", () => ({
   }),
 }));
 
-const extractLabsFromImage = jest.fn();
+const extractLabsFromImage=mockOf<typeof import("@/lib/amelia/labvision").extractLabsFromImage>();
 jest.mock("@/lib/amelia/labvision", () => ({
-  extractLabsFromImage: (...a: unknown[]) => extractLabsFromImage(...a),
+  extractLabsFromImage: (...a: Parameters<typeof extractLabsFromImage>) => extractLabsFromImage(...a),
 }));
 
 import { POST } from "@/app/api/ai/lab-photo/route";

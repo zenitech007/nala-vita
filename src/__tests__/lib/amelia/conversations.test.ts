@@ -1,9 +1,11 @@
+import {mockQuery} from "../../helpers/mock";
+import type {ConversationProjection} from "../../helpers/projections";
 // src/__tests__/lib/amelia/conversations.test.ts
 import { describe, it, expect, jest, beforeEach } from "@jest/globals";
 
-const convoFindMany = jest.fn();
-const convoFindFirst = jest.fn();
-const convoDeleteMany = jest.fn();
+const convoFindMany=mockQuery<ConversationProjection[]>();
+const convoFindFirst=mockQuery<ConversationProjection|null>();
+const convoDeleteMany=mockQuery<{count:number}>();
 jest.mock("@/lib/prisma", () => ({
   prisma: {
     ameliaConversation: {

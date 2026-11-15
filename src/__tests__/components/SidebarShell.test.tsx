@@ -12,7 +12,7 @@ jest.mock("next/navigation", () => ({
 }));
 
 jest.mock("@/lib/supabase", () => ({
-  supabase: { auth: { signOut: jest.fn().mockResolvedValue({ error: null }) } },
+  supabase: { auth: { signOut: jest.fn<()=>Promise<{error:null}>>().mockResolvedValue({ error: null }) } },
 }));
 
 import { supabase } from "@/lib/supabase";

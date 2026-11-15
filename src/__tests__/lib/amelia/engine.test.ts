@@ -1,12 +1,13 @@
+import {mockOf} from "../../helpers/mock";
 // src/__tests__/lib/amelia/engine.test.ts
 import { describe, it, expect, jest, beforeEach } from "@jest/globals";
 
-const getPatientContext = jest.fn();
-const chat = jest.fn();
-jest.mock("@/lib/amelia/context", () => ({ getPatientContext: (...a: unknown[]) => getPatientContext(...a) }));
-jest.mock("@/lib/amelia/llm", () => ({ chat: (...a: unknown[]) => chat(...a) }));
-const getMemoriesForGrounding = jest.fn();
-jest.mock("@/lib/amelia/memory", () => ({ getMemoriesForGrounding: (...a: unknown[]) => getMemoriesForGrounding(...a) }));
+const getPatientContext=mockOf<typeof import("@/lib/amelia/context").getPatientContext>();
+const chat=mockOf<typeof import("@/lib/amelia/llm").chat>();
+jest.mock("@/lib/amelia/context", () => ({ getPatientContext: (...a: Parameters<typeof getPatientContext>) => getPatientContext(...a) }));
+jest.mock("@/lib/amelia/llm", () => ({ chat: (...a: Parameters<typeof chat>) => chat(...a) }));
+const getMemoriesForGrounding=mockOf<typeof import("@/lib/amelia/memory").getMemoriesForGrounding>();
+jest.mock("@/lib/amelia/memory", () => ({ getMemoriesForGrounding: (...a: Parameters<typeof getMemoriesForGrounding>) => getMemoriesForGrounding(...a) }));
 
 import { runAmeliaTurn, runAmeliaTurnStream } from "@/lib/amelia/engine";
 

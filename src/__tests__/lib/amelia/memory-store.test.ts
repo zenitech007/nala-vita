@@ -1,8 +1,9 @@
+import {mockQuery} from "../../helpers/mock";
 // src/__tests__/lib/amelia/memory-store.test.ts
 import { describe, it, expect, jest, beforeEach } from "@jest/globals";
 
-const findMany = jest.fn();
-const createMany = jest.fn();
+const findMany=mockQuery<Partial<import("@prisma/client").AmeliaMemory>[]>();
+const createMany=mockQuery<{count:number}>();
 jest.mock("@/lib/prisma", () => ({
   prisma: { ameliaMemory: { findMany: (...a: unknown[]) => findMany(...a), createMany: (...a: unknown[]) => createMany(...a) } },
 }));

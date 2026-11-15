@@ -1,7 +1,7 @@
 import {render,screen,fireEvent,waitFor} from "@testing-library/react";
 import SettingsPanel from "@/components/settings/SettingsPanel";
 jest.mock("next/navigation",()=>({useRouter:()=>({refresh:jest.fn()})}));
-jest.mock("next-intl",()=>({useTranslations:()=> (key:string)=>key}));
+jest.mock("next-intl",()=>({useLocale:()=>"en",useTranslations:()=> (key:string)=>key}));
 jest.mock("@/components/ui/ThemeSwitcher",()=>({ThemeSwitcher:()=>null}));
 beforeEach(()=>{global.fetch=jest.fn().mockResolvedValue({ok:true,json:async()=>({firstName:"Test",lastName:"Patient",patient:{}})});});
 test("profile controls have names and server field errors are associated",async()=>{

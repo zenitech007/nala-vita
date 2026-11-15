@@ -17,7 +17,7 @@ function mockFetchSequence() {
   return calls;
 }
 
-beforeEach(() => mockFetchSequence());
+beforeEach(() => {mockFetchSequence();});
 
 describe("AmeliaMemoryPanel", () => {
   it("loads and lists memories with a Confirm button on the pending high-stakes item", async () => {

@@ -1,12 +1,13 @@
+import {mockOf} from "../../helpers/mock";
 // src/__tests__/lib/amelia/memory-extract.test.ts
 import { describe, it, expect, jest, beforeEach } from "@jest/globals";
 
-const chat = jest.fn();
-jest.mock("@/lib/amelia/llm", () => ({ chat: (...a: unknown[]) => chat(...a) }));
+const chat=mockOf<typeof import("@/lib/amelia/llm").chat>();
+jest.mock("@/lib/amelia/llm", () => ({ chat: (...a: Parameters<typeof chat>) => chat(...a) }));
 
 import { isHighStakes, extractMemories } from "@/lib/amelia/memory";
 
-beforeEach(() => chat.mockReset());
+beforeEach(() => {chat.mockReset();});
 
 describe("isHighStakes", () => {
   it("flags medical kinds as high-stakes", () => {

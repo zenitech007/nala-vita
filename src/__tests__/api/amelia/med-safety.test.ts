@@ -1,14 +1,16 @@
+import {mockOf,mockQuery} from "../../helpers/mock";
+import type {AuthReply,UserProjection} from "../../helpers/projections";
 jest.mock("@/lib/visible-patient-record", () => ({ loadVisiblePatientRecord: async () => ({ patient: { allergies: ["penicillin"] }, prescriptions: [{ medication: "Aspirin", dosage: "81mg", isActive: true }] }) }));
 import { describe, it, expect, jest, beforeEach } from "@jest/globals";
 
-const getUser = jest.fn();
+const getUser=mockQuery<AuthReply>();
 jest.mock("@/lib/supabase-server", () => ({
   createServerSupabaseClient: () => ({
     auth: { getUser: () => getUser() },
   }),
 }));
 
-const userFindUnique = jest.fn();
+const userFindUnique=mockQuery<UserProjection|null>();
 jest.mock("@/lib/prisma", () => ({
   prisma: {
     user: { findUnique: (...a: unknown[]) => userFindUnique(...a) },
@@ -23,9 +25,9 @@ jest.mock("@/lib/rate-limit", () => ({
   }),
 }));
 
-const getCachedOrAnalyze = jest.fn();
+const getCachedOrAnalyze=mockOf<typeof import("@/lib/amelia/medsafety").getCachedOrAnalyze>();
 jest.mock("@/lib/amelia/medsafety", () => ({
-  getCachedOrAnalyze: (...a: unknown[]) => getCachedOrAnalyze(...a),
+  getCachedOrAnalyze: (...a: Parameters<typeof getCachedOrAnalyze>) => getCachedOrAnalyze(...a),
 }));
 
 import { GET } from "@/app/api/amelia/med-safety/route";
@@ -54,7 +56,7 @@ describe("GET /api/amelia/med-safety", () => {
         prescriptions: [{ medication: "Aspirin", dosage: "81mg" }],
       },
     });
-    getCachedOrAnalyze.mockResolvedValue({
+    getCachedOrAnalyze.mockResolvedValue({status:"available",
       interactions: [],
       dosingNotes: [],
       allergyConflicts: [],

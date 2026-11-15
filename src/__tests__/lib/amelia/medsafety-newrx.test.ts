@@ -1,10 +1,12 @@
-jest.mock("@/lib/visible-patient-record", () => ({ loadVisiblePatientRecord: async () => { const row: any = await findUnique(); if (!row) throw new Error("Patient not available"); return { patient: { allergies: row.allergies }, prescriptions: row.prescriptions.map((p: object) => ({ ...p, isActive: true })) }; } }));
+import {mockOf,mockQuery} from "../../helpers/mock";
+import type {PatientProjection} from "../../helpers/projections";
+jest.mock("@/lib/visible-patient-record", () => ({ loadVisiblePatientRecord: async () => { const row = await findUnique(); if (!row) throw new Error("Patient not available"); return { patient: { allergies: row.allergies }, prescriptions: (row.prescriptions??[]).map((p: object) => ({ ...p, isActive: true })) }; } }));
 // src/__tests__/lib/amelia/medsafety-newrx.test.ts
 import { describe, it, expect, jest, beforeEach } from "@jest/globals";
-const chat = jest.fn();
-const findUnique = jest.fn();
+const chat=mockOf<typeof import("@/lib/amelia/llm").chat>();
+const findUnique=mockQuery<PatientProjection|null>();
 const createNotification = jest.fn();
-jest.mock("@/lib/amelia/llm", () => ({ chat: (...a: unknown[]) => chat(...a) }));
+jest.mock("@/lib/amelia/llm", () => ({ chat: (...a: Parameters<typeof chat>) => chat(...a) }));
 jest.mock("@/lib/prisma", () => ({ prisma: { patient: { findUniqueOrThrow: (...a: unknown[]) => findUnique(...a) } } }));
 jest.mock("@/lib/notifications", () => ({ createNotification: (...a: unknown[]) => createNotification(...a) }));
 

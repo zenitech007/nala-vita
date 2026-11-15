@@ -1,13 +1,14 @@
+import {mockOf} from "../../helpers/mock";
 // src/__tests__/lib/amelia/medsafety-analyze.test.ts
 import { describe, it, expect, jest, beforeEach } from "@jest/globals";
-const chat = jest.fn();
-jest.mock("@/lib/amelia/llm", () => ({ chat: (...a: unknown[]) => chat(...a) }));
+const chat=mockOf<typeof import("@/lib/amelia/llm").chat>();
+jest.mock("@/lib/amelia/llm", () => ({ chat: (...a: Parameters<typeof chat>) => chat(...a) }));
 jest.mock("@/lib/prisma", () => ({ prisma: {} }));
 jest.mock("@/lib/notifications", () => ({ createNotification: jest.fn() }));
 
 import { analyzeMedications, getCachedOrAnalyze } from "@/lib/amelia/medsafety";
 
-beforeEach(() => chat.mockReset());
+beforeEach(() => {chat.mockReset();});
 
 describe("analyzeMedications", () => {
   it("parses the LLM result and merges the deterministic allergy net", async () => {

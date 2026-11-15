@@ -1,11 +1,12 @@
+import {mockOf} from "../../helpers/mock";
 // src/__tests__/lib/amelia/labvision.test.ts
 import { describe, it, expect, jest, beforeEach } from "@jest/globals";
-const visionChat = jest.fn();
-jest.mock("@/lib/amelia/llm", () => ({ visionChat: (...a: unknown[]) => visionChat(...a) }));
+const visionChat=mockOf<typeof import("@/lib/amelia/llm").visionChat>();
+jest.mock("@/lib/amelia/llm", () => ({ visionChat: (...a: Parameters<typeof visionChat>) => visionChat(...a) }));
 
 import { extractLabsFromImage } from "@/lib/amelia/labvision";
 
-beforeEach(() => visionChat.mockReset());
+beforeEach(() => {visionChat.mockReset();});
 
 describe("extractLabsFromImage", () => {
   it("parses extracted labs + summary and normalizes flags", async () => {
