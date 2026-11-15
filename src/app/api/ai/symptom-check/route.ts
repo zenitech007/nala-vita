@@ -1,3 +1,4 @@
+import {symptomAssessmentSchema,parseClinicalAssessment,clinicalAssessmentUnavailable} from "@/lib/clinical-ai-response";
 import { ProviderTimeoutError, providerTimeoutResponse, withProviderDeadline } from "@/lib/provider-deadline";
 import { requireApiUser } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
@@ -87,38 +88,17 @@ Provide 2-4 possible conditions, a clear recommendation, and 3-5 self-care tips.
         responseText = response.text?.trim() || "";
       } catch (gemErr) {
         if (gemErr instanceof ProviderTimeoutError || req.signal.aborted) throw gemErr;
-        console.warn("Gemini symptom-check error, using clinical triage fallback:", gemErr);
+        console.warn("Clinical AI provider failed; assessment unavailable.");
       }
     }
 
-    let result: unknown = null;
-    if (responseText) {
-      try {
-        const cleaned = responseText.replace(/^```json\s*/i, "").replace(/```\s*$/, "").trim();
-        const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
-        result = JSON.parse(jsonMatch ? jsonMatch[0] : cleaned);
-      } catch {
-        result = null;
-      }
-    }
-
-    if (!result) {
-      result = {
-        urgency: "Medium",
-        possibleConditions: ["Acute symptomatic presentation", "General viral or inflammatory response"],
-        recommendation: "Rest and monitor your symptoms. If they persist beyond 48 hours or intensify, consult your healthcare provider.",
-        selfCareAdvice: [
-          "Stay well hydrated with fluids and electrolyte solutions",
-          "Allow time for physical rest and recovery",
-          "Track your symptoms and temperature",
-          "Seek immediate medical attention if you experience severe shortness of breath or high fever",
-        ],
-      };
-    }
+    const result = parseClinicalAssessment(responseText, symptomAssessmentSchema);
+    if (!result) return clinicalAssessmentUnavailable();
 
     return NextResponse.json(
       {
-        ...(result && typeof result === "object" ? result : {}),
+        ...result,
+        status: "available",
         disclaimer:
           "This assessment is for informational purposes only and does not constitute medical advice. Always consult a qualified healthcare professional for proper diagnosis and treatment.",
       },

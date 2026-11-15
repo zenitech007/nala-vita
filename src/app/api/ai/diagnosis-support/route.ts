@@ -1,3 +1,4 @@
+import {diagnosisAssessmentSchema,parseClinicalAssessment,clinicalAssessmentUnavailable} from "@/lib/clinical-ai-response";
 import { ProviderTimeoutError, providerTimeoutResponse, withProviderDeadline } from "@/lib/provider-deadline";
 import { requireApiUser } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
@@ -157,46 +158,16 @@ Guidelines:
         responseText = response.text?.trim() || "";
       } catch (gemErr) {
         if (gemErr instanceof ProviderTimeoutError || req.signal.aborted) throw gemErr;
-        console.warn("Gemini diagnosis-support error, using clinical fallback:", gemErr);
+        console.warn("Clinical AI provider failed; assessment unavailable.");
       }
     }
 
-    let result: unknown = null;
-    if (responseText) {
-      try {
-        const cleaned = responseText.replace(/^```json\s*/i, "").replace(/```\s*$/, "").trim();
-        const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
-        result = JSON.parse(jsonMatch ? jsonMatch[0] : cleaned);
-      } catch {
-        result = null;
-      }
-    }
-
-    if (!result) {
-      result = {
-        differentialDiagnoses: [
-          {
-            condition: "Symptomatic Presentation Under Evaluation",
-            probability: "Moderate",
-            rationale: "Clinical features align with presenting symptoms; routine diagnostics recommended to exclude secondary etiology.",
-            icd10: "R68.89"
-          }
-        ],
-        drugInteractions: [],
-        recommendedTests: [
-          { test: "Complete Blood Count (CBC)", reason: "Assess for baseline systemic or inflammatory response" },
-          { test: "Comprehensive Metabolic Panel (CMP)", reason: "Evaluate renal and hepatic baseline" }
-        ],
-        treatmentOptions: [
-          { treatment: "Supportive care and monitoring", details: "Maintain adequate hydration and rest pending confirmatory testing." }
-        ],
-        redFlags: [],
-        summary: "Clinical decision support generated from presenting symptoms. Standard laboratory evaluation recommended."
-      };
-    }
+    const result = parseClinicalAssessment(responseText, diagnosisAssessmentSchema);
+    if (!result) return clinicalAssessmentUnavailable();
 
     return NextResponse.json({
-      ...(result && typeof result === "object" ? result : {}),
+      ...result,
+        status: "available",
       disclaimer:
         "This AI-generated clinical decision support is intended to assist licensed physicians only. It does not replace professional clinical judgment. All treatment decisions must be made by a qualified healthcare provider.",
       generatedAt: new Date().toISOString(),
