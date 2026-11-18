@@ -1,7 +1,12 @@
+import {notificationFixture} from "../helpers/fixtures";
+import {mockOf,mockQuery} from "../helpers/mock";
+import {routeContext} from "../helpers/requests";
+import type {AuthReply,UserProjection,PatientProjection,DoctorProjection,ReferralProjection,NoteProjection} from "../helpers/projections";
+import type {Appointment,RecordAccessRequest} from "@prisma/client";
 import { describe, it, expect, jest, beforeEach } from "@jest/globals";
 
 // Mock Supabase Server
-const getUser = jest.fn();
+const getUser = mockQuery<AuthReply>();
 jest.mock("@/lib/supabase-server", () => ({
   createServerSupabaseClient: () => ({
     auth: { getUser: () => getUser() },
@@ -9,7 +14,7 @@ jest.mock("@/lib/supabase-server", () => ({
 }));
 
 // Mock Supabase Admin
-const createUser = jest.fn();
+const createUser = mockQuery<AuthReply>();
 jest.mock("@/lib/supabase-admin", () => ({
   supabaseAdmin: {
     auth: {
@@ -21,39 +26,42 @@ jest.mock("@/lib/supabase-admin", () => ({
 }));
 
 // Mock Notifications
-const createNotification = jest.fn();
+const createNotification=mockOf<typeof import("@/lib/notifications").createNotification>();
+const patientRequest = mockQuery<Partial<RecordAccessRequest>>();
+jest.mock('@/lib/record-access-requests', () => ({ createPatientRecordRequest: (...args: unknown[]) => patientRequest(...args), ConsentError: class extends Error {} }));
 jest.mock("@/lib/notifications", () => ({
-  createNotification: (...args: unknown[]) => createNotification(...args),
+  createNotification: (...args: Parameters<typeof createNotification>) => createNotification(...args),
 }));
 
 // Mock Prisma
-const userFindUnique = jest.fn();
-const userFindFirst = jest.fn();
-const userCreate = jest.fn();
-const userUpdate = jest.fn();
-const doctorFindUnique = jest.fn();
-const doctorFindMany = jest.fn();
-const patientFindUnique = jest.fn();
-const patientFindMany = jest.fn();
-const patientCreate = jest.fn();
-const appointmentFindFirst = jest.fn();
-const appointmentFindMany = jest.fn();
-const appointmentCreate = jest.fn();
-const referralFindFirst = jest.fn();
-const referralFindMany = jest.fn();
-const referralCreate = jest.fn();
-const referralUpdate = jest.fn();
-const medicalNoteFindFirst = jest.fn();
-const medicalNoteFindMany = jest.fn();
-const medicalNoteCreate = jest.fn();
-const medicalNoteUpdate = jest.fn();
-const auditLogCreate = jest.fn();
+const userFindUnique = mockQuery<UserProjection|null>();
+const userFindFirst = mockQuery<UserProjection|null>();
+const userCreate = mockQuery<UserProjection>();
+const userUpdate = mockQuery<UserProjection>();
+const doctorFindUnique = mockQuery<DoctorProjection|null>();
+const doctorFindMany = mockQuery<DoctorProjection[]>();
+const patientFindUnique = mockQuery<PatientProjection|null>();
+const patientFindMany = mockQuery<PatientProjection[]>();
+const patientCreate = mockQuery<PatientProjection>();
+const appointmentFindFirst = mockQuery<Partial<Appointment>|null>();
+const appointmentFindMany = mockQuery<Partial<Appointment>[]>();
+const appointmentCreate = mockQuery<Pick<Appointment,"id">>();
+const referralFindFirst = mockQuery<ReferralProjection|null>();
+const referralFindMany = mockQuery<ReferralProjection[]>();
+const referralCreate = mockQuery<ReferralProjection>();
+const referralUpdate = mockQuery<ReferralProjection|{count:number}>();
+const medicalNoteFindFirst = mockQuery<NoteProjection|null>();
+const medicalNoteFindMany = mockQuery<NoteProjection[]>();
+const medicalNoteCreate = mockQuery<NoteProjection>();
+const medicalNoteUpdate = mockQuery<NoteProjection>();
+const auditLogCreate = mockQuery<{id:string}>();
 
 jest.mock("@/lib/prisma", () => ({
   prisma: {
     user: {
       findUnique: (...a: unknown[]) => userFindUnique(...a),
       findFirst: (...a: unknown[]) => userFindFirst(...a),
+      findMany: async () => [],
       create: (...a: unknown[]) => userCreate(...a),
       update: (...a: unknown[]) => userUpdate(...a),
     },
@@ -62,6 +70,7 @@ jest.mock("@/lib/prisma", () => ({
       findMany: (...a: unknown[]) => doctorFindMany(...a),
     },
     patient: {
+      findFirst: async () => null,
       findUnique: (...a: unknown[]) => patientFindUnique(...a),
       findMany: (...a: unknown[]) => patientFindMany(...a),
       create: (...a: unknown[]) => patientCreate(...a),
@@ -76,6 +85,7 @@ jest.mock("@/lib/prisma", () => ({
       findMany: (...a: unknown[]) => referralFindMany(...a),
       create: (...a: unknown[]) => referralCreate(...a),
       update: (...a: unknown[]) => referralUpdate(...a),
+      updateMany: (...a: unknown[]) => referralUpdate(...a),
     },
     medicalNote: {
       findFirst: (...a: unknown[]) => medicalNoteFindFirst(...a),
@@ -107,77 +117,21 @@ import { GET as getPatientRecordHandler } from "@/app/api/patients/[id]/route";
 
 describe("Patient Records Lifecycle & Privacy Suite", () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    jest.resetAllMocks();
     auditLogCreate.mockResolvedValue({ id: "audit-1" });
-    createNotification.mockResolvedValue(true);
+    createNotification.mockResolvedValue(notificationFixture());
+    doctorFindMany.mockResolvedValue([]);
+    patientRequest.mockResolvedValue({ id: 'request', status: 'PENDING' });
   });
 
   describe("1. Patient Account Claiming (Hospital Pre-registered Profile)", () => {
-    it("should allow a patient to claim their hospital-provisioned account using their email", async () => {
-      // Existing patient created by hospital clinic with emailVerified: false
-      userFindUnique.mockResolvedValueOnce({
-        id: "u-hospital-1",
-        email: "claimant@test.com",
-        firstName: "Jane",
-        lastName: "HospitalPatient",
-        phone: "+15551234",
-        role: "PATIENT",
-        emailVerified: false,
-        patient: { id: "p-hospital-1" },
-      });
-
-      // Supabase user creation succeeds
-      createUser.mockResolvedValueOnce({
-        data: { user: { id: "new-supabase-uid" } },
-        error: null,
-      });
-
-      // Update Prisma user with Supabase ID and emailVerified: true
-      userUpdate.mockResolvedValueOnce({
-        id: "u-hospital-1",
-        email: "claimant@test.com",
-        firstName: "Jane",
-        lastName: "HospitalPatient",
-        role: "PATIENT",
-        emailVerified: true,
-        patient: { id: "p-hospital-1" },
-      });
-
-      const request = new Request("http://localhost/api/auth/register", {
-        method: "POST",
-        body: JSON.stringify({
-          email: "claimant@test.com",
-          password: "SecurePassword123!",
-          firstName: "Jane",
-          lastName: "HospitalPatient",
-          role: "PATIENT",
-          dateOfBirth: "1990-01-01",
-          gender: "female",
-        }),
-      });
-
-      const res = await registerHandler(request as never);
-      const json = await res.json();
-
-      expect(res.status).toBe(201);
-      expect(json.claimed).toBe(true);
-      expect(json.message).toContain("prior medical records");
-      expect(userUpdate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { id: "u-hospital-1" },
-          data: expect.objectContaining({
-            supabaseId: "new-supabase-uid",
-            emailVerified: true,
-          }),
-        })
-      );
-    });
-
+    it('F01 rejects claiming an existing provisional email',async()=>{createUser.mockResolvedValueOnce({data:{user:{id:'attacker'}}});userUpdate.mockResolvedValueOnce({id:'victim',patient:{id:'p'}});userFindUnique.mockResolvedValueOnce({id:'victim',role:'PATIENT',emailVerified:false,patient:{id:'p'}});const res=await registerHandler(new Request('http://localhost/api/auth/register',{method:'POST',body:JSON.stringify({firstName:'Test',lastName:'Person',email:'victim@example.test',password:'password123',role:'PATIENT',dateOfBirth:'1990-01-01',gender:'other'})}) as never);expect(res.status).toBe(409);expect(userUpdate).not.toHaveBeenCalled();expect(createUser).not.toHaveBeenCalled();});
+    it('F01 creates a separate record without phone matching or email confirmation',async()=>{userFindUnique.mockResolvedValueOnce(null);userFindFirst.mockResolvedValueOnce({id:'victim',role:'PATIENT',emailVerified:false,patient:{id:'p'}});createUser.mockResolvedValueOnce({data:{user:{id:'new-auth'}}});userCreate.mockResolvedValueOnce({id:'new',role:'PATIENT',email:'new@example.test'});const res=await registerHandler(new Request('http://localhost/api/auth/register',{method:'POST',body:JSON.stringify({firstName:'Test',lastName:'Person',phone:'victim-phone',email:'new@example.test',password:'password123',role:'PATIENT',dateOfBirth:'1990-01-01',gender:'other'})}) as never);expect(res.status).toBe(201);expect(userFindFirst).not.toHaveBeenCalled();expect(userUpdate).not.toHaveBeenCalled();expect(createUser).toHaveBeenCalledWith(expect.objectContaining({email_confirm:false}));expect(userCreate).toHaveBeenCalledWith(expect.objectContaining({data:expect.objectContaining({emailVerified:false})}));});
     it("should reject claiming if user already has an active verified account", async () => {
       userFindUnique.mockResolvedValueOnce({
         id: "u-active",
         email: "active@test.com",
-        role: "PATIENT",
+        role: "PATIENT", isActive: true,
         emailVerified: true,
       });
 
@@ -188,7 +142,7 @@ describe("Patient Records Lifecycle & Privacy Suite", () => {
           password: "SecurePassword123!",
           firstName: "Active",
           lastName: "User",
-          role: "PATIENT",
+          role: "PATIENT", isActive: true,
           dateOfBirth: "1990-01-01",
           gender: "female",
         }),
@@ -205,7 +159,8 @@ describe("Patient Records Lifecycle & Privacy Suite", () => {
       userFindUnique.mockResolvedValueOnce({
         id: "u-doc",
         role: "DOCTOR",
-        doctor: { id: "doc-1" },
+        isActive: true,
+        doctor: { id: "doc-1", isVerified: true },
       });
 
       // No existing user
@@ -244,17 +199,17 @@ describe("Patient Records Lifecycle & Privacy Suite", () => {
 
       expect(res.status).toBe(201);
       expect(json.message).toContain("registered successfully");
-      expect(appointmentCreate).toHaveBeenCalled();
+      expect(appointmentCreate).not.toHaveBeenCalled();
       expect(medicalNoteCreate).toHaveBeenCalled();
     });
   });
 
   describe("3. Doctor-to-Doctor Transfer with Patient Approval", () => {
-    it("should allow a patient to approve a pending doctor transfer referral", async () => {
+    it("accepts a referral operationally without claiming record sharing was approved", async () => {
       getUser.mockResolvedValueOnce({ data: { user: { id: "pat-sb-id" } } });
       userFindUnique.mockResolvedValueOnce({
         id: "u-patient",
-        role: "PATIENT",
+        role: "PATIENT", isActive: true,
         patient: { id: "p-1" },
         firstName: "Alex",
         lastName: "Morgan",
@@ -274,7 +229,7 @@ describe("Patient Records Lifecycle & Privacy Suite", () => {
 
       referralUpdate.mockResolvedValueOnce({
         id: "ref-1",
-        status: "ACCEPTED",
+        status: "ACCEPTED", count: 1,
       });
 
       const request = new Request("http://localhost/api/referrals", {
@@ -289,22 +244,22 @@ describe("Patient Records Lifecycle & Privacy Suite", () => {
       const json = await res.json();
 
       expect(res.status).toBe(200);
-      expect(json.message).toContain("approved");
+      expect(json.message).toContain("separate email-verified approval");
       expect(referralUpdate).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: "ref-1" },
+          where: { id: "ref-1", status: "PENDING", patientId: "p-1" },
           data: { status: "ACCEPTED" },
         })
       );
-      expect(createNotification).toHaveBeenCalledTimes(2); // Both Doctor A and Doctor B notified
+      expect(appointmentCreate).not.toHaveBeenCalled(); // Both Doctor A and Doctor B notified
     });
 
-    it("should grant Doctor B access to patient records when referral is accepted", async () => {
+    it("does not turn accepted referral status into historical record approval", async () => {
       getUser.mockResolvedValueOnce({ data: { user: { id: "doc-b-sb-id" } } });
       userFindUnique.mockResolvedValueOnce({
         id: "u-doc-b",
-        role: "DOCTOR",
-        doctor: { id: "doc-b" },
+        role: "DOCTOR", isActive: true,
+        doctor: { id: "doc-b", isVerified: true },
       });
 
       // No direct appointment
@@ -321,10 +276,10 @@ describe("Patient Records Lifecycle & Privacy Suite", () => {
 
       const request = new Request("http://localhost/api/patients/p-1");
       const res = await getPatientRecordHandler(request as never, {
-        params: { id: "p-1" },
+        ...routeContext({id:"p-1"}),
       });
 
-      expect(res.status).toBe(200);
+      expect(res.status).toBe(403);
     });
 
     it("should deny Doctor B access if referral is pending or not accepted", async () => {
@@ -341,7 +296,7 @@ describe("Patient Records Lifecycle & Privacy Suite", () => {
 
       const request = new Request("http://localhost/api/patients/p-1");
       const res = await getPatientRecordHandler(request as never, {
-        params: { id: "p-1" },
+        ...routeContext({id:"p-1"}),
       });
 
       expect(res.status).toBe(403);
@@ -349,11 +304,11 @@ describe("Patient Records Lifecycle & Privacy Suite", () => {
   });
 
   describe("4. Patient Direct Self-Share to Doctor", () => {
-    it("should allow a patient to share their records directly with a doctor", async () => {
+    it("prepares a pending request; email approval is a separate step", async () => {
       getUser.mockResolvedValueOnce({ data: { user: { id: "pat-sb-id" } } });
       userFindUnique.mockResolvedValueOnce({
         id: "u-patient",
-        role: "PATIENT",
+        role: "PATIENT", isActive: true,
         patient: { id: "p-1" },
         firstName: "Alex",
         lastName: "Morgan",
@@ -378,18 +333,10 @@ describe("Patient Records Lifecycle & Privacy Suite", () => {
       const res = await shareHandler(request as never);
       const json = await res.json();
 
-      expect(res.status).toBe(200);
-      expect(json.success).toBe(true);
-      expect(appointmentCreate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            patientId: "p-1",
-            doctorId: "doc-target",
-            status: "CONFIRMED",
-          }),
-        })
-      );
-      expect(createNotification).toHaveBeenCalled();
+      expect(res.status).toBe(202);
+      expect(json.request).toEqual({ id: 'request', status: 'PENDING' });
+      expect(appointmentCreate).not.toHaveBeenCalled();
+      expect(patientRequest).toHaveBeenCalled();
     });
   });
 
@@ -398,7 +345,7 @@ describe("Patient Records Lifecycle & Privacy Suite", () => {
       getUser.mockResolvedValueOnce({ data: { user: { id: "pat-sb-id" } } });
       userFindUnique.mockResolvedValueOnce({
         id: "u-patient",
-        role: "PATIENT",
+        role: "PATIENT", isActive: true,
         patient: { id: "p-1" },
       });
 
@@ -438,7 +385,7 @@ describe("Patient Records Lifecycle & Privacy Suite", () => {
       getUser.mockResolvedValueOnce({ data: { user: { id: "pat-sb-id" } } });
       userFindUnique.mockResolvedValueOnce({
         id: "u-patient",
-        role: "PATIENT",
+        role: "PATIENT", isActive: true,
         patient: { id: "p-1" },
       });
 

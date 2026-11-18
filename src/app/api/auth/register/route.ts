@@ -1,7 +1,9 @@
+import { isIanaTimeZone } from "@/lib/appointment-availability";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { limitByTrustedIp } from "@/lib/request-rate-limit";
 
 // ─── Shared base fields ───────────────────────────────────
 
@@ -38,9 +40,11 @@ const doctorSchema = baseSchema.extend({
     .max(60, "Years of experience must be 60 or less"),
   consultationFee: z
     .number()
+    .multipleOf(0.01, "Consultation fee must use whole cents")
     .min(0, "Consultation fee must be 0 or more")
     .max(10_000, "Consultation fee seems too high"),
   bio: z.string().optional(),
+  timeZone:z.string().max(100).refine(isIanaTimeZone,"Choose a valid IANA timezone").optional(),
 });
 
 const registerSchema = z.discriminatedUnion("role", [patientSchema, doctorSchema]);
@@ -48,110 +52,22 @@ const registerSchema = z.discriminatedUnion("role", [patientSchema, doctorSchema
 // ─── POST: Register a new user ────────────────────────────
 
 export async function POST(req: NextRequest) {
+  let createdAuthId: string | null = null;
   try {
+    const limited = await limitByTrustedIp(req, "register", { maxRequests: 10, windowMs: 3_600_000 });
+    if (limited) return limited;
     const body = await req.json();
     const validated = registerSchema.parse(body);
 
     // Check if user already exists in Prisma by email
-    let existingUser = await prisma.user.findUnique({
+    const existingUser = await prisma.user.findUnique({
       where: { email: validated.email },
       include: { patient: true },
     });
 
-    // If not found by email, check if a clinic registered a patient profile with this phone
-    if (!existingUser && validated.phone) {
-      existingUser = await prisma.user.findFirst({
-        where: {
-          phone: validated.phone,
-          role: "PATIENT",
-          emailVerified: false,
-        },
-        include: { patient: true },
-      });
-    }
-
-    // If existing user was provisionally created by a clinic/doctor (unverified), allow claiming
-    if (existingUser) {
-      if (existingUser.role === "PATIENT" && validated.role === "PATIENT" && !existingUser.emailVerified) {
-        // Create user credentials in Supabase Auth
-        const { data: authData, error: authError } =
-          await supabaseAdmin.auth.admin.createUser({
-            email: validated.email,
-            password: validated.password,
-            email_confirm: true,
-            user_metadata: {
-              first_name: validated.firstName,
-              last_name: validated.lastName,
-              role: validated.role,
-            },
-          });
-
-        if (authError || !authData.user) {
-          return NextResponse.json(
-            { error: authError?.message || "Failed to create authentication credentials" },
-            { status: 400 }
-          );
-        }
-
-        // Claim and update existing profile with the new Supabase ID and verified status
-        const claimedUser = await prisma.user.update({
-          where: { id: existingUser.id },
-          data: {
-            supabaseId: authData.user.id,
-            email: validated.email,
-            firstName: validated.firstName,
-            lastName: validated.lastName,
-            phone: validated.phone || existingUser.phone,
-            emailVerified: true,
-          },
-          include: { patient: true },
-        });
-
-        if (!claimedUser.patient) {
-          await prisma.patient.create({
-            data: {
-              userId: claimedUser.id,
-              dateOfBirth: new Date(validated.dateOfBirth),
-              gender: validated.gender,
-            },
-          });
-        }
-
-        await prisma.auditLog.create({
-          data: {
-            userId: claimedUser.id,
-            action: "CLAIM_RECORD",
-            resourceType: "PATIENT_RECORD",
-            resourceId: claimedUser.patient?.id || claimedUser.id,
-            metadata: JSON.stringify({
-              method: "hospital_record_claimed",
-              email: validated.email,
-              phone: validated.phone,
-            }),
-          },
-        }).catch(() => {});
-
-        return NextResponse.json(
-          {
-            message: "Welcome! Your prior medical records from your healthcare provider have been successfully claimed and connected to your account.",
-            claimed: true,
-            user: {
-              id: claimedUser.id,
-              email: claimedUser.email,
-              firstName: claimedUser.firstName,
-              lastName: claimedUser.lastName,
-              role: claimedUser.role,
-            },
-          },
-          { status: 201 }
-        );
-      }
-
-      return NextResponse.json(
-        { error: "An account with this email already exists" },
-        { status: 409 }
-      );
-    }
+    // TODO(F01): verified invitation/OTP claim flow must prove ownership before
+    // linking historical clinical records. Registration never claims by contact details.
+    if (existingUser) return NextResponse.json({error:'An account with this email already exists'}, {status:409});
 
     // Doctor-specific: ensure license number is not already taken
     if (validated.role === "DOCTOR") {
@@ -171,7 +87,7 @@ export async function POST(req: NextRequest) {
       await supabaseAdmin.auth.admin.createUser({
         email: validated.email,
         password: validated.password,
-        email_confirm: true,
+        email_confirm: false,
         user_metadata: {
           first_name: validated.firstName,
           last_name: validated.lastName,
@@ -187,6 +103,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Create User record in Prisma with the role-specific relation
+    createdAuthId = authData.user.id;
     const user = await prisma.user.create({
       data: {
         supabaseId: authData.user.id,
@@ -195,7 +112,7 @@ export async function POST(req: NextRequest) {
         lastName: validated.lastName,
         phone: validated.phone || null,
         role: validated.role,
-        emailVerified: true,
+        emailVerified: false,
         ...(validated.role === "PATIENT"
           ? {
               patient: {
@@ -213,6 +130,7 @@ export async function POST(req: NextRequest) {
                   yearsOfExperience: validated.yearsOfExperience,
                   consultationFee: validated.consultationFee,
                   bio: validated.bio || null,
+                  timeZone:validated.timeZone??null,
                   // Doctors are unverified until an admin manually verifies them
                   isVerified: false,
                 },
@@ -224,6 +142,7 @@ export async function POST(req: NextRequest) {
         doctor: true,
       },
     });
+    createdAuthId = null; // The identity is now durably bound; later response errors must not delete it.
 
     return NextResponse.json(
       {
@@ -243,6 +162,12 @@ export async function POST(req: NextRequest) {
       { status: 201 }
     );
   } catch (error) {
+    if (createdAuthId) {
+      try {
+        const compensation = await supabaseAdmin.auth.admin.deleteUser(createdAuthId);
+        if (compensation.error) return NextResponse.json({ error: "Account reconciliation is required. Contact support before retrying." }, { status: 503 });
+      } catch { return NextResponse.json({ error: "Account reconciliation is required. Contact support before retrying." }, { status: 503 }); }
+    }
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: "Validation failed", details: error.issues },
@@ -250,8 +175,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const message = error instanceof Error ? error.message : "Unknown error";
-    console.error("Registration error:", message, error);
+    console.error("Registration persistence failed");
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

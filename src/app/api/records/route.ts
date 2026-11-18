@@ -1,33 +1,21 @@
-import { NextRequest, NextResponse } from "next/server";
+import { requireApiUser } from "@/lib/auth";
+import { getRecordVisibility } from "@/lib/record-visibility";
+import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { createServerSupabaseClient } from "@/lib/supabase-server";
 
-export async function GET(_req: NextRequest) {
+
+export async function GET() {
   try {
-    const supabase = createServerSupabaseClient();
-    const {
-      data: { user: authUser },
-    } = await supabase.auth.getUser();
-
-    if (!authUser) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { supabaseId: authUser.id },
-      include: { patient: true },
-    });
-
-    if (!user || !user.patient) {
-      return NextResponse.json({ error: "Patient not found" }, { status: 404 });
-    }
-
-    const patientId = user.patient.id;
+    const auth = await requireApiUser({ roles: ["PATIENT"], profile: "patient" });
+    if (!auth.ok) return auth.response;
+    const user = auth.user;
+    const patientId = user.patient!.id;
+    const access = await getRecordVisibility(user, patientId);
 
     const [medicalNotes, labOrders, prescriptions, vitals, referrals] =
       await Promise.all([
         prisma.medicalNote.findMany({
-          where: { patientId },
+          where: access.where("NOTES"),
           orderBy: { createdAt: "desc" },
           include: {
             doctor: {
@@ -38,7 +26,7 @@ export async function GET(_req: NextRequest) {
           },
         }),
         prisma.labOrder.findMany({
-          where: { patientId },
+          where: access.where("LAB_TESTS"),
           orderBy: { orderedAt: "desc" },
           include: {
             results: true,
@@ -50,7 +38,7 @@ export async function GET(_req: NextRequest) {
           },
         }),
         prisma.prescription.findMany({
-          where: { patientId },
+          where: access.where("PRESCRIPTIONS"),
           orderBy: { prescribedAt: "desc" },
           include: {
             doctor: {
@@ -61,11 +49,11 @@ export async function GET(_req: NextRequest) {
           },
         }),
         prisma.vital.findMany({
-          where: { patientId },
+          where: access.where("VITALS"),
           orderBy: { recordedAt: "desc" },
         }),
         prisma.referral.findMany({
-          where: { patientId },
+          where: access.where("REFERRALS"),
           orderBy: { createdAt: "desc" },
           include: {
             referringDoctor: {
@@ -98,6 +86,7 @@ export async function GET(_req: NextRequest) {
         latestVitals[key] = {
           value: reading[key],
           recordedAt: reading.recordedAt,
+          ...(key === "temperature" ? { unit: "C", originalValue: reading.temperatureOriginal, originalUnit: reading.temperatureOriginalUnit } : {}),
         };
       }
     }

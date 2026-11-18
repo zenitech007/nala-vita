@@ -1,8 +1,10 @@
+import { ProviderTimeoutError, providerTimeoutResponse } from "@/lib/provider-deadline";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { generateSpeech } from "@/lib/gemini";
 import { checkRateLimitAsync } from "@/lib/rate-limit";
-import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { requireApiUser } from "@/lib/auth";
+import { limitByTrustedIp, rateLimitResponse } from "@/lib/request-rate-limit";
 
 const bodySchema = z.object({
   text: z.string().min(1).max(5000),
@@ -11,23 +13,12 @@ const bodySchema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = createServerSupabaseClient();
-    const authRes = await supabase.auth.getUser().catch(() => null);
-    const user = authRes?.data?.user;
-    
-    // Rate limit per user or client IP
-    const clientId = user?.id || req.headers.get("x-forwarded-for") || "anonymous";
-    const limit = await checkRateLimitAsync(`ai:tts:${clientId}`, {
-      maxRequests: 30,
-      windowMs: 60_000,
-    });
-
-    if (!limit.allowed) {
-      return NextResponse.json(
-        { error: "Too many requests. Please wait a moment.", fallback: true },
-        { status: 429 }
-      );
-    }
+    const auth = await requireApiUser({ roles: ["PATIENT", "DOCTOR"] });
+    if (!auth.ok) return auth.response;
+    const ipLimited = await limitByTrustedIp(req, "tts", { maxRequests: 120, windowMs: 60_000 });
+    if (ipLimited) return ipLimited;
+    const limit = await checkRateLimitAsync(`ai:tts:user:${auth.user.id}`, { maxRequests: 30, windowMs: 60_000 });
+    if (!limit.allowed) return rateLimitResponse(limit);
 
     const { text, voice } = bodySchema.parse(await req.json());
 
@@ -39,6 +30,7 @@ export async function POST(req: NextRequest) {
 
     const { audioBase64, mimeType } = await generateSpeech({
       text: plainText,
+      signal: req.signal,
       voiceName: voice,
     });
 
@@ -58,6 +50,7 @@ export async function POST(req: NextRequest) {
       message: "Server TTS unavailable, client speech synthesis recommended",
     });
   } catch (error) {
+    if (error instanceof ProviderTimeoutError) return providerTimeoutResponse({ fallback: true });
     console.error("TTS generation error:", error);
     return NextResponse.json(
       { success: false, fallback: true, error: "Failed to generate speech" },

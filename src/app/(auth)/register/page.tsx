@@ -1,5 +1,7 @@
 "use client";
 
+import TimezoneSelect,{useBrowserTimeZone} from "@/components/settings/TimezoneSelect";
+import {useTranslations} from "next-intl";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -11,12 +13,13 @@ import { cn } from "@/lib/utils";
 
 // ─── Validation schemas ───────────────────────────────────
 
+function createRegisterSchema(t:(key:string,values?:Record<string,string|number>)=>string){
 const baseSchema = z.object({
-  firstName: z.string().min(2, "First name must be at least 2 characters"),
-  lastName: z.string().min(2, "Last name must be at least 2 characters"),
-  email: z.string().email("Invalid email address"),
+  firstName: z.string().min(2, t("minChars",{field:t("firstName"),min:2})),
+  lastName: z.string().min(2, t("minChars",{field:t("lastName"),min:2})),
+  email: z.string().email(t("invalidEmail")),
   phone: z.string().optional(),
-  password: z.string().min(8, "Password must be at least 8 characters"),
+  password: z.string().min(8, t("minChars",{field:t("password"),min:8})),
   confirmPassword: z.string(),
   role: z.enum(["PATIENT", "DOCTOR"]),
   // Patient fields
@@ -27,28 +30,32 @@ const baseSchema = z.object({
   specialization: z.string().optional(),
   yearsOfExperience: z.coerce.number<number>().optional(),
   consultationFee: z.coerce.number<number>().optional(),
+  timeZone:z.string().optional(),
 });
 
 const registerSchema = baseSchema
   .refine((d) => d.password === d.confirmPassword, {
-    message: "Passwords do not match",
+    message: t("mismatch"),
     path: ["confirmPassword"],
   })
   .refine(
     (d) => d.role !== "PATIENT" || (!!d.dateOfBirth && !!d.gender),
-    { message: "Date of birth is required for patients", path: ["dateOfBirth"] }
+    { message: t("dateRequired"), path: ["dateOfBirth"] }
   )
   .refine(
     (d) => d.role !== "PATIENT" || !!d.gender,
-    { message: "Gender is required for patients", path: ["gender"] }
+    { message: t("genderRequired"), path: ["gender"] }
   )
   .refine(
     (d) =>
       d.role !== "DOCTOR" ||
       (!!d.licenseNumber && !!d.specialization &&
         d.yearsOfExperience !== undefined && d.consultationFee !== undefined),
-    { message: "License number is required for doctors", path: ["licenseNumber"] }
+    { message: t("licenseRequired"), path: ["licenseNumber"] }
   );
+
+  return registerSchema;
+}
 
 // Explicit form type — avoids z.coerce inference issues with react-hook-form generics
 interface RegisterForm {
@@ -67,29 +74,33 @@ interface RegisterForm {
   specialization?: string;
   yearsOfExperience?: number;
   consultationFee?: number;
+  timeZone?: string;
 }
 
 // ─── Field wrapper ────────────────────────────────────────
 
 function Field({
+  id,
   label,
   optional,
   error,
   children,
 }: {
+  id: string;
   label: string;
   optional?: boolean;
   error?: string;
   children: React.ReactNode;
 }) {
+  const t=useTranslations("auth");
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">
+      <label htmlFor={id} className="block text-sm font-medium text-gray-700 mb-1">
         {label}{" "}
-        {optional && <span className="text-gray-400 font-normal">(optional)</span>}
+        {optional && <span className="text-gray-400 font-normal">({t("optional")})</span>}
       </label>
       {children}
-      {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
+      {error && <p id={id+"-error"} role="alert" className="mt-1 text-xs text-red-500">{error}</p>}
     </div>
   );
 }
@@ -100,6 +111,9 @@ const inputCls =
 // ─── Page ─────────────────────────────────────────────────
 
 export default function RegisterPage() {
+  const browserZone=useBrowserTimeZone();
+  const t = useTranslations("auth");
+  const registerSchema=createRegisterSchema(t);
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
@@ -107,6 +121,7 @@ export default function RegisterPage() {
 
   const {
     register,
+    setValue,
     handleSubmit,
     watch,
     formState: { errors, isSubmitting },
@@ -144,6 +159,7 @@ export default function RegisterPage() {
             specialization: data.specialization,
             yearsOfExperience: Number(data.yearsOfExperience),
             consultationFee: Number(data.consultationFee),
+            timeZone:data.timeZone||browserZone,
           };
 
     try {
@@ -156,14 +172,14 @@ export default function RegisterPage() {
       const result = await res.json();
 
       if (!res.ok) {
-        setServerError(result.error || "Registration failed");
+        setServerError(result.error || t("registrationFailed"));
         return;
       }
 
-      setSuccessMessage(result.message || "Account created successfully! Redirecting to login...");
-      setTimeout(() => router.push("/login"), 3000);
+      setSuccessMessage(t("emailVerifyNext"));
+      setTimeout(() => router.push("/verify-email"), 1500);
     } catch {
-      setServerError("Something went wrong. Please try again.");
+      setServerError(t("unexpectedError"));
     }
   };
 
@@ -176,19 +192,19 @@ export default function RegisterPage() {
             <Heart className="w-8 h-8 text-white" />
           </div>
           <h1 className="text-3xl font-bold text-gray-900">Nala Vita</h1>
-          <p className="text-gray-500 mt-1">Create your account</p>
+          <p className="text-gray-500 mt-1">{t("createSubtitle")}</p>
         </div>
 
         {/* Form Card */}
         <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-8">
           {successMessage && (
-            <div className="mb-6 p-4 bg-green-50 border border-green-200 text-green-700 rounded-xl text-sm">
+            <div role="status" className="mb-6 p-4 bg-green-50 border border-green-200 text-green-700 rounded-xl text-sm">
               {successMessage}
             </div>
           )}
 
           {serverError && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm">
+            <div role="alert" className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm">
               {serverError}
             </div>
           )}
@@ -196,11 +212,12 @@ export default function RegisterPage() {
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
             {/* Role Toggle */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">I am a</label>
-              <div className="grid grid-cols-2 gap-3">
+              <p id="account-type-label" className="block text-sm font-medium text-gray-700 mb-2">{t("iam")}</p>
+              <div role="radiogroup" aria-labelledby="account-type-label" className="grid grid-cols-2 gap-3">
                 {(["PATIENT", "DOCTOR"] as const).map((role) => (
                   <label
                     key={role}
+                    htmlFor={"register-role-"+role}
                     className={cn(
                       "flex items-center justify-center p-3 rounded-xl border-2 cursor-pointer transition-all",
                       selectedRole === role
@@ -209,13 +226,14 @@ export default function RegisterPage() {
                     )}
                   >
                     <input
+                      id={"register-role-"+role}
                       type="radio"
                       value={role}
                       {...register("role")}
                       className="sr-only"
                     />
                     <span className="font-medium">
-                      {role === "PATIENT" ? "Patient" : "Doctor"}
+                      {role === "PATIENT" ? t("patient") : t("doctor")}
                     </span>
                   </label>
                 ))}
@@ -224,16 +242,16 @@ export default function RegisterPage() {
 
             {/* Name Fields */}
             <div className="grid grid-cols-2 gap-4">
-              <Field label="First Name" error={errors.firstName?.message}>
+              <Field id="register-firstName" label={t("firstName")} error={errors.firstName?.message}>
                 <input
-                  {...register("firstName")}
+                  id="register-firstName" aria-invalid={!!errors.firstName} aria-describedby={errors.firstName ? "register-firstName-error" : undefined} {...register("firstName")}
                   className={inputCls}
                   placeholder="John"
                 />
               </Field>
-              <Field label="Last Name" error={errors.lastName?.message}>
+              <Field id="register-lastName" label={t("lastName")} error={errors.lastName?.message}>
                 <input
-                  {...register("lastName")}
+                  id="register-lastName" aria-invalid={!!errors.lastName} aria-describedby={errors.lastName ? "register-lastName-error" : undefined} {...register("lastName")}
                   className={inputCls}
                   placeholder="Doe"
                 />
@@ -241,29 +259,29 @@ export default function RegisterPage() {
             </div>
 
             {/* Email */}
-            <Field label="Email" error={errors.email?.message}>
-              <input type="email" {...register("email")} className={inputCls} placeholder="john@example.com" />
+            <Field id="register-email" label={t("email")} error={errors.email?.message}>
+              <input type="email" id="register-email" aria-invalid={!!errors.email} aria-describedby={errors.email ? "register-email-error" : undefined} {...register("email")} className={inputCls} placeholder="john@example.com" />
             </Field>
 
             {/* Phone */}
-            <Field label="Phone" optional>
-              <input type="tel" {...register("phone")} className={inputCls} placeholder="+1 (555) 000-0000" />
+            <Field id="register-phone" label={t("phone")} optional>
+              <input type="tel" id="register-phone" aria-invalid={!!errors.phone} aria-describedby={errors.phone ? "register-phone-error" : undefined} {...register("phone")} className={inputCls} placeholder="+1 (555) 000-0000" />
             </Field>
 
             {/* ── Patient-specific fields ── */}
             {selectedRole === "PATIENT" && (
               <>
                 <div className="grid grid-cols-2 gap-4">
-                  <Field label="Date of Birth" error={errors.dateOfBirth?.message}>
-                    <input type="date" {...register("dateOfBirth")} className={inputCls} />
+                  <Field id="register-dateOfBirth" label={t("dateOfBirth")} error={errors.dateOfBirth?.message}>
+                    <input type="date" id="register-dateOfBirth" aria-invalid={!!errors.dateOfBirth} aria-describedby={errors.dateOfBirth ? "register-dateOfBirth-error" : undefined} {...register("dateOfBirth")} className={inputCls} />
                   </Field>
-                  <Field label="Gender" error={errors.gender?.message}>
-                    <select {...register("gender")} className={inputCls}>
-                      <option value="">Select gender</option>
-                      <option value="Male">Male</option>
-                      <option value="Female">Female</option>
-                      <option value="Non-binary">Non-binary</option>
-                      <option value="Prefer not to say">Prefer not to say</option>
+                  <Field id="register-gender" label={t("gender")} error={errors.gender?.message}>
+                    <select id="register-gender" aria-invalid={!!errors.gender} aria-describedby={errors.gender ? "register-gender-error" : undefined} {...register("gender")} className={inputCls}>
+                      <option value="">{t("selectGender")}</option>
+                      <option value="Male">{t("male")}</option>
+                      <option value="Female">{t("female")}</option>
+                      <option value="Non-binary">{t("nonBinary")}</option>
+                      <option value="Prefer not to say">{t("preferNot")}</option>
                     </select>
                   </Field>
                 </div>
@@ -274,39 +292,40 @@ export default function RegisterPage() {
             {selectedRole === "DOCTOR" && (
               <>
                 <div className="p-4 bg-amber-50 border border-amber-200 text-amber-700 rounded-xl text-sm">
-                  ⚠️ Doctor accounts require admin verification before you can see patients.
+                  {t("doctorNotice")}
                 </div>
-                <Field label="Medical License Number" error={errors.licenseNumber?.message}>
+                <Field id="register-timezone" label="Doctor availability timezone" error={errors.timeZone?.message}><TimezoneSelect id="register-timezone" value={watch("timeZone")||browserZone} onChange={value=>setValue("timeZone",value,{shouldValidate:true,shouldDirty:true})}/></Field>
+                <Field id="register-licenseNumber" label={t("licenseNumber")} error={errors.licenseNumber?.message}>
                   <input
-                    {...register("licenseNumber")}
+                    id="register-licenseNumber" aria-invalid={!!errors.licenseNumber} aria-describedby={errors.licenseNumber ? "register-licenseNumber-error" : undefined} {...register("licenseNumber")}
                     className={inputCls}
                     placeholder="e.g. MD-12345"
                   />
                 </Field>
-                <Field label="Specialization" error={errors.specialization?.message}>
+                <Field id="register-specialization" label={t("specialization")} error={errors.specialization?.message}>
                   <input
-                    {...register("specialization")}
+                    id="register-specialization" aria-invalid={!!errors.specialization} aria-describedby={errors.specialization ? "register-specialization-error" : undefined} {...register("specialization")}
                     className={inputCls}
                     placeholder="e.g. Cardiology"
                   />
                 </Field>
                 <div className="grid grid-cols-2 gap-4">
-                  <Field label="Years of Experience" error={errors.yearsOfExperience?.message}>
+                  <Field id="register-yearsOfExperience" label={t("yearsExperience")} error={errors.yearsOfExperience?.message}>
                     <input
                       type="number"
                       min={0}
                       max={60}
-                      {...register("yearsOfExperience")}
+                      id="register-yearsOfExperience" aria-invalid={!!errors.yearsOfExperience} aria-describedby={errors.yearsOfExperience ? "register-yearsOfExperience-error" : undefined} {...register("yearsOfExperience")}
                       className={inputCls}
                       placeholder="5"
                     />
                   </Field>
-                  <Field label="Consultation Fee (USD)" error={errors.consultationFee?.message}>
+                  <Field id="register-consultationFee" label={t("consultationFee")} error={errors.consultationFee?.message}>
                     <input
                       type="number"
                       min={0}
                       step={0.01}
-                      {...register("consultationFee")}
+                      id="register-consultationFee" aria-invalid={!!errors.consultationFee} aria-describedby={errors.consultationFee ? "register-consultationFee-error" : undefined} {...register("consultationFee")}
                       className={inputCls}
                       placeholder="150.00"
                     />
@@ -316,16 +335,17 @@ export default function RegisterPage() {
             )}
 
             {/* Password */}
-            <Field label="Password" error={errors.password?.message}>
+            <Field id="register-password" label={t("password")} error={errors.password?.message}>
               <div className="relative">
                 <input
                   type={showPassword ? "text" : "password"}
-                  {...register("password")}
+                  id="register-password" aria-invalid={!!errors.password} aria-describedby={errors.password ? "register-password-error" : undefined} {...register("password")}
                   className={cn(inputCls, "pr-10")}
-                  placeholder="Min. 8 characters"
+                  placeholder={t("newPasswordPlaceholder")}
                 />
                 <button
                   type="button"
+                  aria-label={showPassword ? t("hidePassword") : t("showPassword")} aria-pressed={showPassword} aria-controls="register-password"
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                 >
@@ -335,12 +355,12 @@ export default function RegisterPage() {
             </Field>
 
             {/* Confirm Password */}
-            <Field label="Confirm Password" error={errors.confirmPassword?.message}>
+            <Field id="register-confirmPassword" label={t("confirmPassword")} error={errors.confirmPassword?.message}>
               <input
                 type="password"
-                {...register("confirmPassword")}
+                id="register-confirmPassword" aria-invalid={!!errors.confirmPassword} aria-describedby={errors.confirmPassword ? "register-confirmPassword-error" : undefined} {...register("confirmPassword")}
                 className={inputCls}
-                placeholder="Re-enter your password"
+                placeholder={t("confirmPlaceholder")}
               />
             </Field>
 
@@ -353,19 +373,20 @@ export default function RegisterPage() {
               {isSubmitting ? (
                 <>
                   <Loader2 className="w-5 h-5 animate-spin" />
-                  Creating account...
+                  {t("creatingAccount")}
                 </>
               ) : (
-                "Create Account"
+                t("createAccount")
               )}
             </button>
           </form>
 
           {/* Footer */}
+          <p className="text-center text-sm text-gray-700 mt-6">{t("clinicRecord")} <Link href="/claim" className="underline">{t("claimRecord")}</Link></p>
           <p className="text-center text-sm text-gray-500 mt-6">
-            Already have an account?{" "}
+            {t("hasAccount")}{" "}
             <Link href="/login" className="text-[var(--primary)] hover:opacity-80 font-medium">
-              Sign in
+              {t("login")}
             </Link>
           </p>
         </div>

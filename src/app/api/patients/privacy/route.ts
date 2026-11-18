@@ -1,7 +1,9 @@
+import { logAudit } from "@/lib/audit";
+import { requireApiUser } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { createServerSupabaseClient } from "@/lib/supabase-server";
+
 
 const privacySchema = z.object({
   noteId: z.string().min(1, "Note ID is required"),
@@ -10,34 +12,16 @@ const privacySchema = z.object({
 
 export async function PATCH(req: NextRequest) {
   try {
-    const supabase = createServerSupabaseClient();
-    const {
-      data: { user: authUser },
-    } = await supabase.auth.getUser();
-
-    if (!authUser) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { supabaseId: authUser.id },
-      include: { patient: true },
-    });
-
-    if (!user || user.role !== "PATIENT" || !user.patient) {
-      return NextResponse.json(
-        { error: "Forbidden: Only patients can manage their record privacy" },
-        { status: 403 }
-      );
-    }
-
+    const auth = await requireApiUser({ roles: ["PATIENT"], profile: "patient" });
+    if (!auth.ok) return auth.response;
+    const user = auth.user;
     const body = await req.json();
     const validated = privacySchema.parse(body);
 
     const note = await prisma.medicalNote.findFirst({
       where: {
         id: validated.noteId,
-        patientId: user.patient.id,
+        patientId: user.patient!.id,
       },
     });
 
@@ -54,25 +38,20 @@ export async function PATCH(req: NextRequest) {
     });
 
     // Audit log for compliance & HIPAA traceability
-    await prisma.auditLog.create({
-      data: {
-        userId: user.id,
-        action: validated.isPrivate ? "RESTRICT_RECORD" : "UNRESTRICT_RECORD",
-        resourceType: "MEDICAL_NOTE",
-        resourceId: validated.noteId,
-        metadata: JSON.stringify({
-          noteTitle: note.title,
-          isPrivate: validated.isPrivate,
-        }),
-      },
-    }).catch(() => {});
+    await logAudit({
+      userId: user.id,
+      action: validated.isPrivate ? "RESTRICT_RECORD" : "UNRESTRICT_RECORD",
+      resourceType: "MEDICAL_NOTE",
+      resourceId: validated.noteId,
+      metadata: { isPrivate: validated.isPrivate },
+    });
 
     return NextResponse.json({
       success: true,
       isPrivate: updated.isPrivate,
       message: updated.isPrivate
         ? "Record restricted. It is now hidden from transferred doctors and external providers."
-        : "Record shared. It is now visible to your authorized healthcare team.",
+        : "Record may be viewed only within an approved access grant. Its author retains access.",
     });
   } catch (error) {
     if (error instanceof z.ZodError) {

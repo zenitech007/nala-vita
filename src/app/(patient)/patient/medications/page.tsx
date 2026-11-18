@@ -1,4 +1,6 @@
 "use client";
+import {fetchJson} from "@/lib/api-fetch";
+import RefillRequests from "@/components/medications/RefillRequests";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import Link from "next/link";
@@ -52,7 +54,7 @@ interface Medication {
   usageLogs?: string[];
   last7DaysLogs?: string[];
   takenToday?: boolean;
-  adherenceRate7Days?: number;
+  adherenceRate7Days?: number | null;
   takenDaysCount?: number;
   doctor?: {
     user: { firstName: string; lastName: string };
@@ -61,7 +63,7 @@ interface Medication {
 
 interface AdherenceStats {
   window?: string;
-  weeklyAdherenceRate?: number;
+  weeklyAdherenceRate?: number | null;
   totalLogged7Days?: number;
   totalPrescriptions?: number;
 }
@@ -172,6 +174,7 @@ const DOSE_STATUS_RING: Record<DoseStatus, string> = {
 
 export default function PatientMedicationsPage() {
   const [medications, setMedications] = useState<Medication[]>([]);
+  const [loadError,setLoadError]=useState("");
   const [last7Days, setLast7Days] = useState<string[]>(getFallback7Days());
   const [todayStr, setTodayStr] = useState<string>(
     new Date().toISOString().split("T")[0]
@@ -188,6 +191,7 @@ export default function PatientMedicationsPage() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
   // Loading indicators for micro-actions
+  const [refillRevision, setRefillRevision] = useState(0);
   const [refillLoadingId, setRefillLoadingId] = useState<string | null>(null);
   const [loggingActionKey, setLoggingActionKey] = useState<string | null>(null);
   const [togglingPrivacyId, setTogglingPrivacyId] = useState<string | null>(null);
@@ -206,26 +210,12 @@ export default function PatientMedicationsPage() {
   }, [toast]);
 
   // Fetch medications & adherence
-  const fetchMedications = useCallback(async () => {
-    try {
-      const res = await fetch("/api/medications");
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data)) {
-          setMedications(data);
-        } else if (data && typeof data === "object") {
-          setMedications(Array.isArray(data.medications) ? data.medications : []);
-          if (Array.isArray(data.last7Days)) setLast7Days(data.last7Days);
-          if (data.today) setTodayStr(data.today);
-          if (data.adherenceStats) setAdherenceStats(data.adherenceStats);
-        }
-      }
-    } catch (err) {
-      console.error("Failed to fetch medications:", err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const fetchMedications=useCallback(()=>fetchJson<Medication[]|{medications:Medication[];last7Days?:string[];today?:string;adherenceStats?:AdherenceStats}>("/api/medications")
+    .then(data=>{
+      if(Array.isArray(data))setMedications(data);
+      else{setMedications(Array.isArray(data.medications)?data.medications:[]);if(data.last7Days)setLast7Days(data.last7Days);if(data.today)setTodayStr(data.today);if(data.adherenceStats)setAdherenceStats(data.adherenceStats);}
+      setLoadError("");setLoading(false);
+    }).catch(error=>{setLoadError(error instanceof Error?error.message:"Medications unavailable");setLoading(false);}),[]);
 
   useEffect(() => {
     fetchMedications();
@@ -348,7 +338,8 @@ export default function PatientMedicationsPage() {
         method: "PATCH",
       });
       if (res.ok) {
-        setToast({ message: "Refill request sent successfully", type: "success" });
+        setToast({ message: "Refill review requested", type: "success" });
+        setRefillRevision(value => value + 1);
         await fetchMedications();
       } else {
         const data = await res.json();
@@ -510,10 +501,12 @@ export default function PatientMedicationsPage() {
       </header>
 
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8 space-y-8">
+        <RefillRequests revision={refillRevision} />
         <MedSafetyPanel />
 
         {/* ────────────────────────────────────────────────── */}
         {/* Strict 7-Day Adherence Tracker Hero Card           */}
+        <p className="mb-3 text-sm text-gray-600">Estimated from daily entries in UTC and prescribed frequency. Individual dose events are unavailable. PRN, unknown schedules and inactive courses are excluded.</p>
         {/* ────────────────────────────────────────────────── */}
         <section className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 sm:p-8 overflow-hidden relative">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
@@ -546,7 +539,7 @@ export default function PatientMedicationsPage() {
                 </svg>
                 <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
                   <span className="text-xl font-bold text-gray-900 leading-none">
-                    {weeklyRate}%
+                    {adherenceStats?.weeklyAdherenceRate == null ? "—" : `${weeklyRate}%`}
                   </span>
                   <span className="text-[10px] text-gray-400 font-medium mt-0.5">
                     Adherence
@@ -561,7 +554,7 @@ export default function PatientMedicationsPage() {
                   </span>
                 </div>
                 <h2 className="text-lg font-bold text-gray-900 mt-1">
-                  7-Day Adherence Overview
+                  7-Day Adherence Estimate
                 </h2>
                 <p className="text-xs text-gray-500">
                   {dosesTakenCount} dose(s) logged across {activeMedications.length} active medication(s).
@@ -761,7 +754,7 @@ export default function PatientMedicationsPage() {
             </div>
           </div>
 
-          {filteredActiveMedications.length === 0 ? (
+          {loadError ? <p role="alert" aria-label="Medication loading error">{loadError}</p> : filteredActiveMedications.length === 0 ? (
             <div className="bg-white rounded-3xl border border-gray-100 p-10 text-center shadow-sm">
               <Pill className="w-12 h-12 text-gray-300 mx-auto mb-3" />
               <p className="text-gray-700 font-semibold text-base mb-1">

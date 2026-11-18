@@ -1,5 +1,7 @@
 "use client";
 
+import { fetchJson } from "@/lib/api-fetch";
+
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
@@ -21,7 +23,7 @@ interface StaffMember {
   id: string;
   name: string;
   email: string;
-  role: "DOCTOR" | "NURSE";
+  role: "DOCTOR";
   speciality: string;
   licenceNumber: string;
   department: string;
@@ -53,24 +55,21 @@ const SPECIALITIES = [
   "Radiologist",
   "Dermatologist",
   "Psychiatrist",
-  "Nurse Practitioner",
-  "Registered Nurse",
-  "ICU Nurse",
-  "OR Nurse",
 ];
 
 // ─── Component ──────────────────────────────────────────
 
 export default function AdminStaffPage() {
   const [search, setSearch] = useState("");
-  const [roleFilter, setRoleFilter] = useState<"ALL" | "DOCTOR" | "NURSE">("ALL");
+  const [roleFilter, setRoleFilter] = useState<"ALL" | "DOCTOR">("ALL");
   const [showAddForm, setShowAddForm] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [mutationError, setMutationError] = useState("");
 
   // Add form state
   const [formName, setFormName] = useState("");
   const [formEmail, setFormEmail] = useState("");
-  const [formRole, setFormRole] = useState<"DOCTOR" | "NURSE">("DOCTOR");
+  const [formRole, setFormRole] = useState<"DOCTOR">("DOCTOR");
   const [formSpeciality, setFormSpeciality] = useState("");
   const [formLicence, setFormLicence] = useState("");
   const [formDepartment, setFormDepartment] = useState("");
@@ -83,23 +82,11 @@ export default function AdminStaffPage() {
 
   const [staffList, setStaffList] = useState<StaffMember[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError,setLoadError]=useState("");
 
-  const fetchStaff = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch("/api/admin/staff");
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data.staff)) {
-          setStaffList(data.staff);
-        }
-      }
-    } catch (err) {
-      console.error("Failed to load staff list:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const fetchStaff=()=>fetchJson<{staff:StaffMember[]}>("/api/admin/staff")
+    .then(data=>{if(Array.isArray(data.staff))setStaffList(data.staff);setLoadError("");setLoading(false);})
+    .catch(error=>{setLoadError(error instanceof Error?error.message:"Staff directory unavailable");setLoading(false);});
 
   useEffect(() => {
     fetchStaff();
@@ -118,36 +105,41 @@ export default function AdminStaffPage() {
 
   async function toggleActive(id: string) {
     const target = staffList.find((s) => s.id === id);
-    if (!target) return;
+    if (!target || saving) return;
     const nextState = !target.isActive;
-    setStaffList((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, isActive: nextState } : s))
-    );
+    setMutationError("");
+    setSaving(true);
     try {
-      await fetch("/api/admin/staff", {
+      await fetchJson("/api/admin/staff", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ doctorId: id, isActive: nextState }),
       });
-    } catch (err) {
-      console.error("Failed to toggle staff active state:", err);
+      setStaffList(prev => prev.map(staff => staff.id === id ? { ...staff, isActive: nextState } : staff));
+    } catch (error) {
+      setMutationError(error instanceof Error ? error.message : "Could not update staff status.");
+    } finally {
+      setSaving(false);
     }
   }
 
   async function assignDepartment(id: string, dept: string) {
-    setStaffList((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, department: dept, speciality: dept } : s))
-    );
-    setDeptModalId(null);
-    setDeptModalValue("");
+    if (saving) return;
+    setMutationError("");
+    setSaving(true);
     try {
-      await fetch("/api/admin/staff", {
+      await fetchJson("/api/admin/staff", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ doctorId: id, department: dept }),
       });
-    } catch (err) {
-      console.error("Failed to update staff department:", err);
+      setStaffList(prev => prev.map(staff => staff.id === id ? { ...staff, department: dept, speciality: dept } : staff));
+      setDeptModalId(null);
+      setDeptModalValue("");
+    } catch (error) {
+      setMutationError(error instanceof Error ? error.message : "Could not update the department.");
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -156,7 +148,7 @@ export default function AdminStaffPage() {
     setSaving(true);
     const newStaff: StaffMember = {
       id: `s${Date.now()}`,
-      name: formRole === "DOCTOR" ? `Dr. ${formName}` : `Nurse ${formName}`,
+      name: `Dr. ${formName}`,
       email: formEmail,
       role: formRole,
       speciality: formSpeciality,
@@ -179,7 +171,6 @@ export default function AdminStaffPage() {
   // ─── Stats ─────────────────────────────────────────────
 
   const totalDoctors = staffList.filter((s) => s.role === "DOCTOR").length;
-  const totalNurses = staffList.filter((s) => s.role === "NURSE").length;
   const activeCount = staffList.filter((s) => s.isActive).length;
 
   return (
@@ -200,23 +191,24 @@ export default function AdminStaffPage() {
                   Staff Management
                 </h1>
                 <p className="text-gray-500 text-sm">
-                  {totalDoctors} doctors &middot; {totalNurses} nurses &middot;{" "}
+                  {totalDoctors} doctors &middot;{" "}
                   {activeCount} active
                 </p>
               </div>
             </div>
             <button
-              onClick={() => setShowAddForm(true)}
+              disabled title="Staff creation is not available yet" onClick={() => setShowAddForm(true)}
               className="flex items-center gap-2 px-4 py-2 bg-[var(--primary)] hover:opacity-90 text-white font-medium rounded-xl transition text-sm"
             >
               <UserPlus className="w-4 h-4" />
-              Add Staff
+              Add Staff — not available yet
             </button>
           </div>
         </div>
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {mutationError && !deptModalId && <p role="alert" className="mb-4 text-sm text-red-700">{mutationError}</p>}
         {/* Filters */}
         <div className="flex flex-col sm:flex-row gap-3 mb-6">
           <div className="relative flex-1">
@@ -230,7 +222,7 @@ export default function AdminStaffPage() {
             />
           </div>
           <div className="flex gap-1 bg-gray-100 p-0.5 rounded-lg self-start">
-            {(["ALL", "DOCTOR", "NURSE"] as const).map((r) => (
+            {(["ALL", "DOCTOR"] as const).map((r) => (
               <button
                 key={r}
                 onClick={() => setRoleFilter(r)}
@@ -241,7 +233,7 @@ export default function AdminStaffPage() {
                     : "text-gray-500"
                 )}
               >
-                {r === "ALL" ? "All" : r === "DOCTOR" ? "Doctors" : "Nurses"}
+                {r === "ALL" ? "All" : "Doctors"}
               </button>
             ))}
           </div>
@@ -284,7 +276,7 @@ export default function AdminStaffPage() {
                       <p className="text-gray-500 text-sm">Loading staff directory...</p>
                     </td>
                   </tr>
-                ) : filtered.length === 0 ? (
+                ) : loadError ? <tr><td colSpan={7} role="alert">{loadError}</td></tr> : filtered.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="text-center py-12">
                       <Search className="w-10 h-10 text-gray-300 mx-auto mb-2" />
@@ -330,6 +322,7 @@ export default function AdminStaffPage() {
                       <td className="px-6 py-4">
                         <button
                           onClick={() => {
+                            setMutationError("");
                             setDeptModalId(staff.id);
                             setDeptModalValue(staff.department);
                           }}
@@ -343,6 +336,8 @@ export default function AdminStaffPage() {
                         {/* Toggle Switch */}
                         <button
                           onClick={() => toggleActive(staff.id)}
+                          disabled={saving}
+                          aria-label={`${staff.isActive ? "Deactivate" : "Activate"} ${staff.name}`}
                           className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:ring-offset-2"
                           style={{
                             backgroundColor: staff.isActive
@@ -435,7 +430,7 @@ export default function AdminStaffPage() {
                   Role
                 </label>
                 <div className="flex gap-2">
-                  {(["DOCTOR", "NURSE"] as const).map((r) => (
+                  {(["DOCTOR"] as const).map((r) => (
                     <button
                       key={r}
                       onClick={() => setFormRole(r)}
@@ -446,7 +441,7 @@ export default function AdminStaffPage() {
                           : "border-gray-200 text-gray-600 hover:bg-gray-50"
                       )}
                     >
-                      {r === "DOCTOR" ? "Doctor" : "Nurse"}
+                      Doctor
                     </button>
                   ))}
                 </div>
@@ -514,18 +509,11 @@ export default function AdminStaffPage() {
               </button>
               <button
                 onClick={handleAddStaff}
-                disabled={
-                  saving ||
-                  !formName ||
-                  !formEmail ||
-                  !formSpeciality ||
-                  !formLicence ||
-                  !formDepartment
-                }
+                disabled
                 className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium text-white bg-[var(--primary)] hover:opacity-90 transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-                {saving ? "Adding..." : "Add Staff"}
+                {saving ? "Adding..." : "Add Staff — not available yet"}
               </button>
             </div>
           </div>
@@ -547,6 +535,7 @@ export default function AdminStaffPage() {
                 <X className="w-5 h-5 text-gray-400" />
               </button>
             </div>
+            {mutationError && <p role="alert" className="mb-3 text-sm text-red-700">{mutationError}</p>}
             <select
               value={deptModalValue}
               onChange={(e) => setDeptModalValue(e.target.value)}
@@ -567,6 +556,7 @@ export default function AdminStaffPage() {
               </button>
               <button
                 onClick={() => assignDepartment(deptModalId, deptModalValue)}
+                disabled={saving}
                 className="px-4 py-2 rounded-xl text-sm font-medium text-white bg-[var(--primary)] hover:opacity-90 transition"
               >
                 Save

@@ -9,12 +9,16 @@ export interface ReminderSuggestionUI {
   frequency: string;
   nextFireAt: string;
   schedule: string;
+  timeZone?: string;
 }
 
 export default function ReminderCard({ suggestion }: { suggestion: ReminderSuggestionUI }) {
   const [state, setState] = useState<"idle" | "saving" | "done" | "dismissed">("idle");
 
+  const [error, setError] = useState("");
+
   const setReminder = async () => {
+    setError("");
     setState("saving");
     try {
       const res = await fetch("/api/amelia/reminders", {
@@ -25,10 +29,16 @@ export default function ReminderCard({ suggestion }: { suggestion: ReminderSugge
           label: suggestion.label,
           frequency: suggestion.frequency,
           nextFireAt: suggestion.nextFireAt,
+          timeZone: suggestion.timeZone,
         }),
       });
+      if (!res.ok) {
+        const data = await res.json();
+        setError(typeof data.error === "string" ? data.error : "Could not set the reminder. Please retry.");
+      }
       setState(res.ok ? "done" : "idle");
     } catch {
+      setError("Could not set the reminder. Check your connection and retry.");
       setState("idle");
     }
   };
@@ -47,7 +57,8 @@ export default function ReminderCard({ suggestion }: { suggestion: ReminderSugge
             <BellPlus className="w-4 h-4 text-[var(--primary)]" />
             Remind you to <span className="font-medium">{suggestion.label}</span>, {suggestion.schedule}?
           </p>
-          <div className="flex gap-2">
+          {error && <p role="alert" className="mb-2 text-sm text-red-700">{error}</p>}
+          <div className="flex flex-wrap gap-2">
             <button
               onClick={setReminder}
               disabled={state === "saving"}

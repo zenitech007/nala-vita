@@ -1,30 +1,11 @@
 "use client";
+import ClinicInvitation from "@/components/patients/ClinicInvitation";
+import { temperatureFromCelsius } from "@/lib/temperature";
 
 import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import {
-  ChevronLeft,
-  Loader2,
-  Heart,
-  Thermometer,
-  Droplets,
-  Activity,
-  Weight,
-  Candy,
-  Pill,
-  FileText,
-  FlaskConical,
-  ArrowRightLeft,
-  Plus,
-  X,
-  AlertTriangle,
-  Phone,
-  User,
-  Video,
-  Clock as _Clock,
-  AlertCircle,
-} from "lucide-react";
+import { ChevronLeft, Loader2, Heart, Thermometer, Droplets, Activity, Weight, Candy, Pill, FileText, FlaskConical, ArrowRightLeft, Plus, X, AlertTriangle, Phone, User, Video, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import {
@@ -49,7 +30,7 @@ interface PatientUser {
 
 interface PatientDetail {
   id: string;
-  dateOfBirth: string;
+  dateOfBirth: string | null;
   gender: string;
   bloodType: string | null;
   allergies: string[];
@@ -139,7 +120,8 @@ type TabKey =
 
 // ─── Helpers ─────────────────────────────────────────────
 
-function calculateAge(dateOfBirth: string): number {
+function calculateAge(dateOfBirth: string | null): number | string {
+  if (!dateOfBirth) return "Unknown";
   return Math.floor(
     (Date.now() - new Date(dateOfBirth).getTime()) / 31557600000
   );
@@ -181,9 +163,7 @@ const NOTE_CATEGORIES = [
 
 // ─── Component ───────────────────────────────────────────
 
-export default function PatientDetailPage() {
-  const params = useParams();
-  const patientId = params.id as string;
+function PatientDetailContent({ patientId }: { patientId: string }) {
 
   const [data, setData] = useState<PatientResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -196,19 +176,15 @@ export default function PatientDetailPage() {
   });
   const [noteSubmitting, setNoteSubmitting] = useState(false);
 
-  const fetchPatient = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/patients/${patientId}`);
+  const fetchPatient = useCallback(() => {
+    return fetch(`/api/patients/${patientId}`).then(async res => {
       if (res.ok) {
         const json: PatientResponse = await res.json();
         setData(json);
       }
-    } catch {
-      // network error
-    } finally {
-      setLoading(false);
-    }
+    }).catch(() => {
+      // Keep existing results if the network is unavailable.
+    }).finally(() => setLoading(false));
   }, [patientId]);
 
   useEffect(() => {
@@ -266,6 +242,7 @@ export default function PatientDetailPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <p role="status" className="px-6 py-3 text-sm bg-amber-50">Only your authored records and patient-approved records are shown. Missing details are unavailable. <a className="underline" href={`/doctor/record-access?patientId=${patient.id}`}>Request access</a></p>
       {/* ─── Sticky Patient Header ─── */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
@@ -336,6 +313,7 @@ export default function PatientDetailPage() {
           </div>
         </div>
       </header>
+      <div className="mx-auto max-w-7xl px-4 pt-4"><ClinicInvitation key={patient.id} patientId={patient.id}/></div>
 
       {/* ─── Tabs ─── */}
       <div className="bg-white border-b border-gray-200">
@@ -517,7 +495,7 @@ function OverviewTab({
           label: "Temperature",
           value:
             latest.temperature != null
-              ? latest.temperature.toFixed(1)
+              ? temperatureFromCelsius(latest.temperature, "F").toFixed(1)
               : "--",
           unit: "°F",
           icon: Thermometer,
@@ -713,7 +691,7 @@ function VitalsTab({ vitals }: { vitals: Vital[] }) {
       label: "Temperature",
       unit: "°F",
       color: "#f97316",
-      getData: (v: Vital) => v.temperature,
+      getData: (v: Vital) => v.temperature == null ? null : temperatureFromCelsius(v.temperature, "F"),
     },
     {
       key: "oxygenSaturation",
@@ -1192,4 +1170,10 @@ function ReferralsTab({ referrals }: { referrals: Referral[] }) {
       ))}
     </div>
   );
+}
+
+export default function PatientDetailPage() {
+  const params = useParams();
+  const patientId = params.id as string;
+  return <PatientDetailContent key={patientId} patientId={patientId} />;
 }

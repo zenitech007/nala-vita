@@ -1,4 +1,5 @@
 "use client";
+import { temperatureFromCelsius, TEMPERATURE, TEMPERATURE_RANGE_F } from "@/lib/temperature";
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
@@ -15,7 +16,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { format, subDays } from "date-fns";
+import { format } from "date-fns";
 import {
   LineChart,
   Line,
@@ -32,15 +33,15 @@ import {
 interface PatientVitalSummary {
   id: string;
   name: string;
-  age: number;
+  age: number | string;
   gender: string;
   lastUpdated: string;
-  bloodPressure: { value: string; status: "normal" | "borderline" | "abnormal" };
-  heartRate: { value: string; status: "normal" | "borderline" | "abnormal" };
-  bloodSugar: { value: string; status: "normal" | "borderline" | "abnormal" };
-  oxygenSaturation: { value: string; status: "normal" | "borderline" | "abnormal" };
-  temperature: { value: string; status: "normal" | "borderline" | "abnormal" };
-  weight: { value: string; status: "normal" | "borderline" | "abnormal" };
+  bloodPressure: { value: string; status: "normal" | "borderline" | "abnormal" | "unavailable" };
+  heartRate: { value: string; status: "normal" | "borderline" | "abnormal" | "unavailable" };
+  bloodSugar: { value: string; status: "normal" | "borderline" | "abnormal" | "unavailable" };
+  oxygenSaturation: { value: string; status: "normal" | "borderline" | "abnormal" | "unavailable" };
+  temperature: { value: string; status: "normal" | "borderline" | "abnormal" | "unavailable" };
+  weight: { value: string; status: "normal" | "borderline" | "abnormal" | "unavailable" };
 }
 
 interface VitalHistoryPoint {
@@ -50,12 +51,14 @@ interface VitalHistoryPoint {
 }
 
 const STATUS_COLORS = {
+  unavailable: "bg-gray-100 text-gray-600",
   normal: "bg-green-100 text-green-700",
   borderline: "bg-amber-100 text-amber-700",
   abnormal: "bg-red-100 text-red-700",
 };
 
 const STATUS_DOT = {
+  unavailable: "bg-gray-400",
   normal: "bg-green-500",
   borderline: "bg-amber-500",
   abnormal: "bg-red-500",
@@ -63,24 +66,24 @@ const STATUS_DOT = {
 
 // ─── Status assessment helpers ─────────────────────────
 
-function assessStatus(val: number | null | undefined, min: number, max: number): "normal" | "borderline" | "abnormal" {
-  if (val == null) return "normal";
+function assessStatus(val: number | null | undefined, min: number, max: number): "normal" | "borderline" | "abnormal" | "unavailable" {
+  if (val == null) return "unavailable";
   if (val < min * 0.9 || val > max * 1.1) return "abnormal";
   if (val < min || val > max) return "borderline";
   return "normal";
 }
 
-function assessBpStatus(bp: string | null | undefined): "normal" | "borderline" | "abnormal" {
-  if (!bp) return "normal";
+function assessBpStatus(bp: string | null | undefined): "normal" | "borderline" | "abnormal" | "unavailable" {
+  if (!bp) return "unavailable";
   const [sys, dia] = bp.split("/").map(Number);
-  if (!sys || !dia) return "normal";
+  if (!sys || !dia) return "unavailable";
   if (sys > 140 || sys < 90 || dia > 90 || dia < 60) return "abnormal";
   if (sys > 125 || dia > 82) return "borderline";
   return "normal";
 }
 
-function calculateAge(dob: string | Date | null | undefined): number {
-  if (!dob) return 35;
+function calculateAge(dob: string | Date | null | undefined): number | string {
+  if (!dob) return "Unknown";
   const birth = new Date(dob);
   const diff = Date.now() - birth.getTime();
   return Math.max(1, Math.floor(diff / (1000 * 60 * 60 * 24 * 365.25)));
@@ -93,7 +96,7 @@ const DETAIL_VITALS = [
   { key: "heartRate" as const, label: "Heart Rate", unit: "bpm", icon: Heart, color: "#ef4444", normalMin: 60, normalMax: 100 },
   { key: "bloodSugar" as const, label: "Blood Sugar", unit: "mg/dL", icon: Activity, color: "#f59e0b", normalMin: 70, normalMax: 140 },
   { key: "oxygenSaturation" as const, label: "SpO2", unit: "%", icon: Wind, color: "#06b6d4", normalMin: 95, normalMax: 100 },
-  { key: "temperature" as const, label: "Temperature", unit: "°F", icon: Thermometer, color: "#10b981", normalMin: 97, normalMax: 99.5 },
+  { key: "temperature" as const, label: "Temperature", unit: "°F", icon: Thermometer, color: "#10b981", normalMin: TEMPERATURE_RANGE_F.min, normalMax: TEMPERATURE_RANGE_F.max },
 ];
 
 export default function DoctorMonitoringPage() {
@@ -102,8 +105,10 @@ export default function DoctorMonitoringPage() {
   const [selectedPatient, setSelectedPatient] = useState<PatientVitalSummary | null>(null);
   const [detailVitalKey, setDetailVitalKey] = useState<string>("bloodPressure");
   const [filterStatus, setFilterStatus] = useState<"all" | "abnormal">("all");
-  const [historyData, setHistoryData] = useState<VitalHistoryPoint[]>([]);
-  const [loadingHistory, setLoadingHistory] = useState(false);
+  const historyKey = selectedPatient ? `${selectedPatient.id}:${detailVitalKey}` : null;
+  const [history, setHistory] = useState<{ key: string; points: VitalHistoryPoint[] } | null>(null);
+  const historyData = history?.key === historyKey ? history.points : [];
+  const loadingHistory = historyKey !== null && history?.key !== historyKey;
 
   useEffect(() => {
     async function loadPatients() {
@@ -132,7 +137,7 @@ export default function DoctorMonitoringPage() {
               const hr = latestVital?.heartRate != null ? String(latestVital.heartRate) : "--";
               const sugar = latestVital?.bloodSugar != null ? String(latestVital.bloodSugar) : "--";
               const spo2 = latestVital?.oxygenSaturation != null ? String(latestVital.oxygenSaturation) : "--";
-              const temp = latestVital?.temperature != null ? String(latestVital.temperature) : "--";
+              const temp = latestVital?.temperature != null ? String(temperatureFromCelsius(latestVital.temperature, "F")) : "--";
               const wt = latestVital?.weight != null ? String(latestVital.weight) : "--";
 
               return {
@@ -145,7 +150,7 @@ export default function DoctorMonitoringPage() {
                 heartRate: { value: hr, status: assessStatus(latestVital?.heartRate, 60, 100) },
                 bloodSugar: { value: sugar, status: assessStatus(latestVital?.bloodSugar, 70, 140) },
                 oxygenSaturation: { value: spo2, status: assessStatus(latestVital?.oxygenSaturation, 95, 100) },
-                temperature: { value: temp, status: assessStatus(latestVital?.temperature, 97, 99.5) },
+                temperature: { value: temp, status: assessStatus(latestVital?.temperature, TEMPERATURE.normalMinC, TEMPERATURE.normalMaxC) },
                 weight: { value: wt, status: assessStatus(latestVital?.weight, 40, 150) },
               };
             });
@@ -162,14 +167,12 @@ export default function DoctorMonitoringPage() {
   }, []);
 
   useEffect(() => {
-    if (!selectedPatient) {
-      setHistoryData([]);
-      return;
-    }
+    if (!selectedPatient || !historyKey) return;
+    const key = historyKey;
+    const controller = new AbortController();
     async function loadHistory() {
-      setLoadingHistory(true);
       try {
-        const res = await fetch(`/api/vitals?patientId=${selectedPatient!.id}&limit=30`);
+        const res = await fetch(`/api/vitals?patientId=${selectedPatient!.id}&limit=30`, { signal: controller.signal });
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data.vitals)) {
@@ -183,6 +186,7 @@ export default function DoctorMonitoringPage() {
                   val = typeof v[detailVitalKey] === "number" ? (v[detailVitalKey] as number) : null;
                 }
                 if (val == null || isNaN(val)) return null;
+                if (detailVitalKey === "temperature") val = temperatureFromCelsius(val, "F");
                 return {
                   date: format(new Date(v.recordedAt as string), "MMM d"),
                   value: val,
@@ -191,17 +195,18 @@ export default function DoctorMonitoringPage() {
               })
               .filter((p: VitalHistoryPoint | null): p is VitalHistoryPoint => p !== null)
               .reverse();
-            setHistoryData(pts);
+            if (!controller.signal.aborted) setHistory({ key, points: pts });
           }
-        }
+        } else if (!controller.signal.aborted) { setHistory({ key, points: [] }); }
       } catch (err) {
         console.error("Failed to load patient history:", err);
       } finally {
-        setLoadingHistory(false);
+        if (!controller.signal.aborted) setHistory(current => current?.key === key ? current : { key, points: [] });
       }
     }
-    loadHistory();
-  }, [selectedPatient, detailVitalKey]);
+    void loadHistory();
+    return () => controller.abort();
+  }, [selectedPatient, detailVitalKey, historyKey]);
 
   const filteredPatients = filterStatus === "all"
     ? patients

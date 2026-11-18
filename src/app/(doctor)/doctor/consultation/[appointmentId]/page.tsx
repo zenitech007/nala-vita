@@ -1,27 +1,10 @@
 "use client";
+import { formatTemperature } from "@/lib/temperature";
 
 import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import {
-  ArrowLeft,
-  Loader2,
-  Calendar,
-  Clock,
-  User,
-  Stethoscope,
-  Activity,
-  Pill,
-  AlertTriangle,
-  FileText,
-  Save,
-  Mic,
-  MicOff,
-  CheckCircle,
-  Sparkles,
-  Wand2,
-  PictureInPicture2,
-} from "lucide-react";
+import { ArrowLeft, Loader2, Calendar, Clock, User, Stethoscope, Activity, Pill, AlertTriangle, FileText, Save, Mic, MicOff, CheckCircle, Sparkles, PictureInPicture2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 import { format } from "date-fns";
@@ -179,7 +162,6 @@ export default function DoctorConsultationPage() {
   }, [appointmentId]);
 
   const patient = appointment?.patient || null;
-  const displayAppointment = appointment;
 
   const calculateAge = (dob: string) => {
     const birth = new Date(dob);
@@ -282,7 +264,7 @@ export default function DoctorConsultationPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+      <div className="min-h-dvh bg-gray-950 flex items-center justify-center">
         <Loader2 className="w-10 h-10 animate-spin text-[var(--primary)]" />
       </div>
     );
@@ -290,7 +272,7 @@ export default function DoctorConsultationPage() {
 
   if (!appointment || !patient) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="min-h-dvh bg-gray-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl border border-gray-100 p-8 text-center max-w-md">
           <div className="w-14 h-14 bg-red-50 text-red-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
             <AlertTriangle className="w-7 h-7" />
@@ -314,7 +296,7 @@ export default function DoctorConsultationPage() {
 
   if (callEnded) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="min-h-dvh bg-gray-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl border border-gray-100 p-10 text-center max-w-md">
           <div className="w-16 h-16 bg-green-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
             <Stethoscope className="w-8 h-8 text-green-600" />
@@ -364,7 +346,7 @@ export default function DoctorConsultationPage() {
   // ─── Main consultation view ────────────────────────────
 
   return (
-    <div className="min-h-screen bg-gray-950 flex flex-col">
+    <div className="min-h-dvh bg-gray-950 flex flex-col">
       {/* Header */}
       <header className="bg-gray-900 border-b border-gray-800 px-6 py-3 flex-shrink-0">
         <div className="flex items-center justify-between">
@@ -583,11 +565,11 @@ export default function DoctorConsultationPage() {
                           </span>
                         </div>
                       )}
-                      {v.temperature && (
+                      {v.temperature != null && (
                         <div>
                           <span className="text-gray-500">Temp: </span>
                           <span className="text-gray-200 font-medium">
-                            {v.temperature}°F
+                            {formatTemperature(v.temperature, "F")}
                           </span>
                         </div>
                       )}

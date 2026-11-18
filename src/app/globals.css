@@ -121,3 +121,102 @@ body {
     text-wrap: balance;
   }
 }
+
+/* Action colors are independent of decorative brand accents. */
+:root,
+.theme-rose,
+html[data-brand="rose"] {
+  --action-bg: #9f1239;
+  --action-fg: #ffffff;
+  --action-hover-bg: #881337;
+  --action-hover-fg: #ffffff;
+  --action-disabled-bg: #fce7f3;
+  --action-disabled-fg: #831843;
+  --action-focus-bg: #881337;
+  --action-focus-fg: #ffffff;
+  --focus-outline: #9f1239;
+}
+.theme-fuchsia,
+html[data-brand="fuchsia"] {
+  --action-bg: #86198f;
+  --action-fg: #ffffff;
+  --action-hover-bg: #701a75;
+  --action-hover-fg: #ffffff;
+  --action-disabled-bg: #fae8ff;
+  --action-disabled-fg: #701a75;
+  --action-focus-bg: #701a75;
+  --action-focus-fg: #ffffff;
+  --focus-outline: #86198f;
+}
+.theme-ocean,
+html[data-brand="ocean"] {
+  --action-bg: #1d4ed8;
+  --action-fg: #ffffff;
+  --action-hover-bg: #1e40af;
+  --action-hover-fg: #ffffff;
+  --action-disabled-bg: #dbeafe;
+  --action-disabled-fg: #1e3a8a;
+  --action-focus-bg: #1e40af;
+  --action-focus-fg: #ffffff;
+  --focus-outline: #1d4ed8;
+}
+.theme-emerald,
+html[data-brand="emerald"] {
+  --action-bg: #047857;
+  --action-fg: #ffffff;
+  --action-hover-bg: #065f46;
+  --action-hover-fg: #ffffff;
+  --action-disabled-bg: #d1fae5;
+  --action-disabled-fg: #064e3b;
+  --action-focus-bg: #065f46;
+  --action-focus-fg: #ffffff;
+  --focus-outline: #047857;
+}
+html.dark,
+html.dark[data-brand] { --focus-outline: #f9fafb; }
+html.high-contrast,
+html.high-contrast[data-brand] {
+  --action-bg: #ffff00;
+  --action-fg: #000000;
+  --action-hover-bg: #fef08a;
+  --action-hover-fg: #000000;
+  --action-disabled-bg: #d1d5db;
+  --action-disabled-fg: #000000;
+  --action-focus-bg: #ffff00;
+  --action-focus-fg: #000000;
+  --focus-outline: #ffff00;
+}
+
+:is(.brand-action, [class~="bg-[var(--primary)]"]) {
+  color: var(--action-fg) !important;
+  background-color: var(--action-bg) !important;
+  opacity: 1 !important;
+}
+:is(.brand-action, [class~="bg-[var(--primary)]"]):hover {
+  color: var(--action-hover-fg) !important;
+  background-color: var(--action-hover-bg) !important;
+}
+:is(.brand-action, [class~="bg-[var(--primary)]"]):focus-visible {
+  color: var(--action-focus-fg) !important;
+  background-color: var(--action-focus-bg) !important;
+}
+:is(.brand-action, [class~="bg-[var(--primary)]"]):is(:disabled, [aria-disabled="true"]) {
+  color: var(--action-disabled-fg) !important;
+  background-color: var(--action-disabled-bg) !important;
+  opacity: 1 !important;
+}
+:is(.brand-action, [class~="bg-[var(--primary)]"]) .text-white { color: inherit !important; }
+:where(button, a, input, select, textarea):focus-visible {
+  outline: 2px solid var(--focus-outline);
+  outline-offset: 3px;
+}
+
+/* Honor reduced motion for CSS effects as well as MotionConfig animations. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

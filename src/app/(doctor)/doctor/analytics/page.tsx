@@ -1,10 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import {
   ChevronLeft,
-  Loader2,
   Users,
   Clock,
   Star,
@@ -36,13 +35,8 @@ type DateRange = "7d" | "30d" | "90d" | "12m";
 // ─── Component ──────────────────────────────────────────
 
 export default function DoctorAnalyticsPage() {
-  const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState<DateRange>("30d");
 
-  useEffect(() => {
-    const timer = setTimeout(() => setLoading(false), 600);
-    return () => clearTimeout(timer);
-  }, [dateRange]);
 
   // ─── Summary cards data ────────────────────────────────
 
@@ -100,7 +94,7 @@ export default function DoctorAnalyticsPage() {
         date: isMonthly
           ? format(date, "MMM yyyy")
           : format(date, dateRange === "7d" ? "EEE" : "MMM d"),
-        appointments: Math.max(1, Math.floor(base + Math.random() * variance - variance / 2)),
+        appointments: Math.max(1, Math.floor(base + ((i * 7) % 11) / 11 * variance - variance / 2)),
       };
     });
   };
@@ -136,7 +130,7 @@ export default function DoctorAnalyticsPage() {
           : isWeekly
           ? `Week ${i + 1}`
           : format(date, dateRange === "7d" ? "EEE" : "MMM d"),
-        revenue: Math.max(100, Math.floor(base + Math.random() * variance - variance / 3)),
+        revenue: Math.max(100, Math.floor(base + ((i * 7) % 11) / 11 * variance - variance / 3)),
       };
     });
   };
@@ -181,7 +175,7 @@ export default function DoctorAnalyticsPage() {
               {dateRanges.map((r) => (
                 <button
                   key={r.key}
-                  onClick={() => { setLoading(true); setDateRange(r.key); }}
+                  onClick={() => { setDateRange(r.key); }}
                   className={cn(
                     "px-4 py-2 rounded-lg text-sm font-medium transition",
                     dateRange === r.key ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"
@@ -196,12 +190,8 @@ export default function DoctorAnalyticsPage() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
-        {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <Loader2 className="w-8 h-8 animate-spin text-[var(--primary)]" />
-          </div>
-        ) : (
-          <>
+        <p role="status" className="mb-6 text-sm font-medium">Sample data. Metrics, alerts and charts are illustrative; live reporting is unavailable.</p>
+        <>
             {/* Summary cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
               {summaryCards.map((card) => {
@@ -424,8 +414,7 @@ export default function DoctorAnalyticsPage() {
                 </div>
               </div>
             </div>
-          </>
-        )}
+        </>
       </main>
     </div>
   );

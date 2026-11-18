@@ -29,4 +29,4 @@ export const EMERGENCY_MESSAGE =
   "⚠️ Your symptoms may indicate a medical emergency. Please call emergency services (911 or your local equivalent) or go to the nearest emergency room immediately.";
 
 export const PRIVACY_NOTICE =
-  "Your conversations with Amelia are private and protected under applicable health privacy regulations (e.g., HIPAA). I only access the medical record of the signed-in patient.";
+  "Amelia uses records available to your signed-in account. Avoid sharing information you do not want processed by this service.";

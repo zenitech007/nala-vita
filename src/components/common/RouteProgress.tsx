@@ -6,23 +6,20 @@ import { usePathname, useSearchParams } from "next/navigation";
 function RouteProgressContent() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [isNavigating, setIsNavigating] = useState(false);
-  const [progress, setProgress] = useState(0);
+  const route = `${pathname}?${searchParams.toString()}`;
+  const [navigation, setNavigation] = useState<{ from: string; progress: number } | null>(null);
+  const completed = navigation !== null && navigation.from !== route;
+  const progress = completed ? 100 : navigation?.progress ?? 0;
 
-  // Complete progress on route change
   useEffect(() => {
-    if (isNavigating) {
-      setProgress(100);
-      const timer = setTimeout(() => {
-        setIsNavigating(false);
-        setProgress(0);
-      }, 250);
-      return () => clearTimeout(timer);
-    }
-  }, [pathname, searchParams]);
+    if (!completed) return;
+    const timer = setTimeout(() => setNavigation(null), 250);
+    return () => clearTimeout(timer);
+  }, [completed, route]);
 
   // Intercept click on internal links to give immediate feedback
   useEffect(() => {
+    const timers: ReturnType<typeof setTimeout>[] = [];
     const handleClick = (e: MouseEvent) => {
       const target = (e.target as HTMLElement)?.closest("a");
       if (!target) return;
@@ -44,10 +41,12 @@ function RouteProgressContent() {
       ) {
         const currentUrl = window.location.pathname + window.location.search;
         if (href !== currentUrl) {
-          setIsNavigating(true);
-          setProgress(25);
-          setTimeout(() => setProgress(65), 100);
-          setTimeout(() => setProgress(85), 300);
+          timers.forEach(clearTimeout);
+          const from = `${window.location.pathname}?${new URLSearchParams(window.location.search).toString()}`;
+          setNavigation({ from, progress: 25 });
+          for (const [delay, value] of [[100, 65], [300, 85]]) {
+            timers.push(setTimeout(() => setNavigation(current => current?.from === from ? { ...current, progress: value } : current), delay));
+          }
         }
       }
     };
@@ -55,10 +54,11 @@ function RouteProgressContent() {
     document.addEventListener("click", handleClick, { capture: true });
     return () => {
       document.removeEventListener("click", handleClick, { capture: true });
+      timers.forEach(clearTimeout);
     };
   }, []);
 
-  if (!isNavigating && progress === 0) return null;
+  if (!navigation) return null;
 
   return (
     <div

@@ -1,28 +1,9 @@
 "use client";
+import {fetchJson} from "@/lib/api-fetch";
 
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import {
-  Building2,
-  MapPin,
-  Mail,
-  Users,
-  Database,
-  Shield,
-  CreditCard,
-  Cpu,
-  CheckCircle,
-  Loader2,
-  Settings,
-  Phone,
-  Clock,
-  Award,
-  RefreshCw,
-  Server,
-  Lock,
-  Activity,
-  Zap,
-} from "lucide-react";
+import { Building2, MapPin, Mail, Users, Database, Shield, CreditCard, Cpu, CheckCircle, Loader2, Settings, Phone, Clock, Award, RefreshCw, Lock, Activity, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // ─── Types ───────────────────────────────────────────────
@@ -30,7 +11,7 @@ import { cn } from "@/lib/utils";
 interface SystemService {
   name: string;
   icon: React.ComponentType<{ className?: string }>;
-  status: "operational" | "degraded" | "down";
+  status: "unavailable" | "degraded" | "down";
   description: string;
   badge?: string;
 }
@@ -42,20 +23,9 @@ export default function AdminSettingsPage() {
   const [staffLoading, setStaffLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const fetchStaffCount = async () => {
-    try {
-      const res = await fetch("/api/admin/reports");
-      if (res.ok) {
-        const data = await res.json();
-        setStaffCount(data.overview?.totalDoctors ?? 0);
-      }
-    } catch {
-      // silently fallback
-    } finally {
-      setStaffLoading(false);
-      setRefreshing(false);
-    }
-  };
+  const fetchStaffCount=()=>fetchJson<{overview?:{totalDoctors?:number}}>("/api/admin/reports")
+    .then(data=>{const count=data.overview?.totalDoctors;setStaffCount(typeof count==="number"&&Number.isFinite(count)?count:null);setStaffLoading(false);setRefreshing(false);})
+    .catch(()=>{setStaffCount(null);setStaffLoading(false);setRefreshing(false);});
 
   useEffect(() => {
     fetchStaffCount();
@@ -107,29 +77,29 @@ export default function AdminSettingsPage() {
     {
       name: "Google Gemini 2.5 Flash",
       icon: Cpu,
-      status: "operational",
-      description: "Multimodal & Audio TTS Active",
+      status: "unavailable",
+      description: "Live status unavailable",
       badge: "AI Engine",
     },
     {
       name: "PostgreSQL Database",
       icon: Database,
-      status: "operational",
-      description: "Prisma 7 Pool Connected",
+      status: "unavailable",
+      description: "Live status unavailable",
       badge: "Storage",
     },
     {
       name: "Supabase Platform",
       icon: Shield,
-      status: "operational",
-      description: "Auth & Storage Active",
+      status: "unavailable",
+      description: "Live status unavailable",
       badge: "Security",
     },
     {
       name: "Paystack Gateway",
       icon: CreditCard,
-      status: "operational",
-      description: "Webhooks Connected",
+      status: "unavailable",
+      description: "Live status unavailable",
       badge: "Billing",
     },
   ];
@@ -138,10 +108,10 @@ export default function AdminSettingsPage() {
     string,
     { label: string; color: string; dotColor: string }
   > = {
-    operational: {
-      label: "Operational",
-      color: "bg-emerald-50 text-emerald-700 border-emerald-200",
-      dotColor: "bg-emerald-500",
+    unavailable: {
+      label: "Status unavailable",
+      color: "bg-gray-50 text-gray-700 border-gray-200",
+      dotColor: "bg-gray-400",
     },
     degraded: {
       label: "Degraded",
@@ -242,7 +212,7 @@ export default function AdminSettingsPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs font-medium text-gray-500">System Security</p>
-              <p className="text-lg font-bold text-gray-900 mt-1">HIPAA Compliant</p>
+              <p className="text-lg font-bold text-gray-900 mt-1">Review required</p>
             </div>
             <div className="w-11 h-11 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
               <Lock className="w-5 h-5" />
@@ -250,7 +220,7 @@ export default function AdminSettingsPage() {
           </div>
           <p className="text-[11px] text-blue-600 font-medium mt-3 flex items-center gap-1">
             <Shield className="w-3 h-3" />
-            TLS 1.3 + PHI Redaction
+            Security and compliance review pending
           </p>
         </motion.div>
 

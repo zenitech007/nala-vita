@@ -1,26 +1,30 @@
+import {mockOf,mockQuery} from "../../helpers/mock";
+import type {AuthReply,UserProjection,PatientProjection} from "../../helpers/projections";
 import { describe, it, expect, jest, beforeEach } from "@jest/globals";
 
-const getUser = jest.fn();
+const getUser=mockQuery<AuthReply>();
 jest.mock("@/lib/supabase-server", () => ({
   createServerSupabaseClient: () => ({
     auth: { getUser: () => getUser() },
   }),
 }));
 
-const userFindUnique = jest.fn();
-const patientFindUnique = jest.fn();
-const $transaction = jest.fn();
+const userFindUnique=mockQuery<UserProjection|null>();
+const patientFindUnique=mockQuery<PatientProjection|null>();
+const $transaction=mockQuery<{prescription:Partial<import("@prisma/client").Prescription>;notification:Partial<import("@prisma/client").Notification>}>();
 jest.mock("@/lib/prisma", () => ({
   prisma: {
     user: { findUnique: (...a: unknown[]) => userFindUnique(...a) },
     patient: { findUnique: (...a: unknown[]) => patientFindUnique(...a) },
+    appointment: {findFirst: async()=>({id:"care"})},
+    referral: {findFirst: async()=>null},
     $transaction: (...a: unknown[]) => $transaction(...a),
   },
 }));
 
-const checkNewPrescriptionSafety = jest.fn();
+const checkNewPrescriptionSafety=mockOf<typeof import("@/lib/amelia/medsafety").checkNewPrescriptionSafety>();
 jest.mock("@/lib/amelia/medsafety", () => ({
-  checkNewPrescriptionSafety: (...a: unknown[]) => checkNewPrescriptionSafety(...a),
+  checkNewPrescriptionSafety: (...a: Parameters<typeof checkNewPrescriptionSafety>) => checkNewPrescriptionSafety(...a),
 }));
 
 import { POST } from "@/app/api/prescriptions/route";
@@ -40,10 +44,10 @@ describe("POST /api/prescriptions med-safety hook", () => {
   it("calls checkNewPrescriptionSafety after a successful create", async () => {
     getUser.mockResolvedValue({ data: { user: { id: "sub1" } } });
     userFindUnique.mockResolvedValue({
-      id: "u1",
+      id: "u1", role: "DOCTOR", isActive: true,
       firstName: "A",
       lastName: "B",
-      doctor: { id: "doc1" },
+      doctor: { id: "doc1", isVerified: true },
     });
     patientFindUnique.mockResolvedValue({
       id: "pat1",
@@ -66,6 +70,6 @@ describe("POST /api/prescriptions med-safety hook", () => {
       })
     );
     expect(res.status).toBe(201);
-    expect(checkNewPrescriptionSafety).toHaveBeenCalledWith("pat1", "Amoxicillin");
+    expect(checkNewPrescriptionSafety).toHaveBeenCalledWith("pat1", "Amoxicillin", expect.objectContaining({ doctor: { id: "doc1", isVerified: true } }));
   });
 });

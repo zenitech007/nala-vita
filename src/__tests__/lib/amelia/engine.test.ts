@@ -1,14 +1,15 @@
+import {mockOf} from "../../helpers/mock";
 // src/__tests__/lib/amelia/engine.test.ts
 import { describe, it, expect, jest, beforeEach } from "@jest/globals";
 
-const getPatientContext = jest.fn();
-const chat = jest.fn();
-jest.mock("@/lib/amelia/context", () => ({ getPatientContext: (...a: unknown[]) => getPatientContext(...a) }));
-jest.mock("@/lib/amelia/llm", () => ({ chat: (...a: unknown[]) => chat(...a) }));
-const getMemoriesForGrounding = jest.fn();
-jest.mock("@/lib/amelia/memory", () => ({ getMemoriesForGrounding: (...a: unknown[]) => getMemoriesForGrounding(...a) }));
+const getPatientContext=mockOf<typeof import("@/lib/amelia/context").getPatientContext>();
+const chat=mockOf<typeof import("@/lib/amelia/llm").chat>();
+jest.mock("@/lib/amelia/context", () => ({ getPatientContext: (...a: Parameters<typeof getPatientContext>) => getPatientContext(...a) }));
+jest.mock("@/lib/amelia/llm", () => ({ chat: (...a: Parameters<typeof chat>) => chat(...a) }));
+const getMemoriesForGrounding=mockOf<typeof import("@/lib/amelia/memory").getMemoriesForGrounding>();
+jest.mock("@/lib/amelia/memory", () => ({ getMemoriesForGrounding: (...a: Parameters<typeof getMemoriesForGrounding>) => getMemoriesForGrounding(...a) }));
 
-import { runAmeliaTurn } from "@/lib/amelia/engine";
+import { runAmeliaTurn, runAmeliaTurnStream } from "@/lib/amelia/engine";
 
 beforeEach(() => {
   getPatientContext.mockReset();
@@ -20,7 +21,7 @@ beforeEach(() => {
 describe("runAmeliaTurn", () => {
   it("short-circuits on an emergency without calling the LLM", async () => {
     const reply = await runAmeliaTurn({
-      audience: "patient",
+      audience: "patient", viewer: { id: "u", role: "PATIENT", isActive: true, patient: { id: "p1" } },
       patientId: "p1",
       messages: [{ role: "user", content: "I have crushing chest pain" }],
     });
@@ -40,7 +41,7 @@ describe("runAmeliaTurn", () => {
     chat.mockResolvedValue("Let's look at your hands. Worth seeing a clinician.");
 
     const reply = await runAmeliaTurn({
-      audience: "patient",
+      audience: "patient", viewer: { id: "u", role: "PATIENT", isActive: true, patient: { id: "p1" } },
       patientId: "p1",
       messages: [{ role: "user", content: "my key sticks after work but my wife can open it fine" }],
     });
@@ -61,7 +62,7 @@ describe("runAmeliaTurn", () => {
     chat.mockResolvedValue("Rest and fluids.");
 
     await runAmeliaTurn({
-      audience: "patient",
+      audience: "patient", viewer: { id: "u", role: "PATIENT", isActive: true, patient: { id: "p1" } },
       patientId: "p1",
       messages: [{ role: "user", content: "I have a mild headache and a runny nose" }],
     });
@@ -79,12 +80,12 @@ describe("runAmeliaTurn", () => {
     chat.mockResolvedValue("Here is some careful advice. Please confirm with a doctor.");
 
     const reply = await runAmeliaTurn({
-      audience: "patient",
+      audience: "patient", viewer: { id: "u", role: "PATIENT", isActive: true, patient: { id: "p1" } },
       patientId: "p1",
       messages: [{ role: "user", content: "I have a mild sore throat" }],
     });
 
-    expect(getPatientContext).toHaveBeenCalledWith("p1");
+    expect(getPatientContext).toHaveBeenCalledWith("p1", expect.objectContaining({ id: "u" }));
     expect(getMemoriesForGrounding).toHaveBeenCalledWith("p1");
     expect(chat).toHaveBeenCalledTimes(1);
     expect(reply.urgency).toBe("routine");
@@ -92,3 +93,5 @@ describe("runAmeliaTurn", () => {
     expect(reply.disclaimer).toMatch(/not a substitute/i);
   });
 });
+
+it.each([false,true])('F03 screens raw input independently (stream=%s)',async(stream)=>{const input={audience:'patient' as const,patientId:'p1',messages:[{role:'user' as const,content:'old greeting'}],rawMessage:'crushing chest pain'};if(stream){const events=[];for await(const evt of runAmeliaTurnStream(input))events.push(evt);expect(events[0]).toMatchObject({type:'start',meta:{urgency:'emergency'}});}else expect(await runAmeliaTurn(input)).toMatchObject({urgency:'emergency'});expect(chat).not.toHaveBeenCalled();expect(getPatientContext).not.toHaveBeenCalled();});

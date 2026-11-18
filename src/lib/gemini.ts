@@ -1,3 +1,4 @@
+import { ProviderTimeoutError, withProviderDeadline } from "@/lib/provider-deadline";
 import { GoogleGenAI } from "@google/genai";
 import OpenAI from "openai";
 
@@ -19,16 +20,18 @@ export const ai = new GoogleGenAI({
 export async function generateSpeech(params: {
   text: string;
   voiceName?: string;
+  signal?: AbortSignal;
 }): Promise<{ audioBase64: string | null; mimeType: string | null }> {
   const { text, voiceName = "Puck" } = params;
 
   // 1. Try Gemini Text-to-Speech (gemini-2.5-flash)
   if (geminiApiKey) {
     try {
-      const response = await ai.models.generateContent({
+      const response = await withProviderDeadline(signal => ai.models.generateContent({
         model: GEMINI_TTS_MODEL,
         contents: text,
         config: {
+          abortSignal: signal,
           responseModalities: ["AUDIO"],
           speechConfig: {
             voiceConfig: {
@@ -37,8 +40,8 @@ export async function generateSpeech(params: {
               },
             },
           },
-        } as any,
-      });
+        },
+      }), params.signal);
 
       const candidates = response.candidates;
       if (candidates && candidates[0]?.content?.parts) {
@@ -52,26 +55,26 @@ export async function generateSpeech(params: {
         }
       }
     } catch (geminiError) {
-      console.warn("Gemini TTS call failed, falling back to secondary providers:", (geminiError as Error)?.message || geminiError);
+      if (geminiError instanceof ProviderTimeoutError || params.signal?.aborted) throw geminiError;
+      console.warn("Speech provider request failed");
     }
   }
 
   // 2. Try OpenAI TTS fallback
   if (process.env.OPENAI_API_KEY) {
     try {
-      const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-      const mp3 = await openai.audio.speech.create({
-        model: "tts-1",
-        voice: "nova",
-        input: text,
-      });
-      const buffer = Buffer.from(await mp3.arrayBuffer());
+      const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, maxRetries: 0 });
+      const buffer = await withProviderDeadline(async signal => {
+        const mp3 = await openai.audio.speech.create({ model: "tts-1", voice: "nova", input: text }, { signal });
+        return Buffer.from(await mp3.arrayBuffer());
+      }, params.signal);
       return {
         audioBase64: buffer.toString("base64"),
         mimeType: "audio/mp3",
       };
     } catch (openAiError) {
-      console.warn("OpenAI TTS fallback failed:", (openAiError as Error)?.message || openAiError);
+      if (openAiError instanceof ProviderTimeoutError || params.signal?.aborted) throw openAiError;
+      console.warn("Speech provider request failed");
     }
   }
 

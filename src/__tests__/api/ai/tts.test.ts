@@ -1,16 +1,19 @@
+import {mockOf,mockQuery} from "../../helpers/mock";
+import type {AuthReply} from "../../helpers/projections";
 // src/__tests__/api/ai/tts.test.ts
 import { describe, it, expect, jest, beforeEach } from "@jest/globals";
 
-const getUser = jest.fn();
+const getUser = mockQuery<AuthReply>();
 jest.mock("@/lib/supabase-server", () => ({
   createServerSupabaseClient: () => ({
     auth: { getUser: () => getUser() },
   }),
 }));
 
-const generateSpeech = jest.fn();
+jest.mock("@/lib/prisma", () => ({ prisma: { user: { findUnique: async () => ({ id: "u1", role: "PATIENT", isActive: true, patient: { id: "p" } }) } } }));
+const generateSpeech=mockOf<typeof import("@/lib/gemini").generateSpeech>();
 jest.mock("@/lib/gemini", () => ({
-  generateSpeech: (...args: unknown[]) => generateSpeech(...args),
+  generateSpeech: (...args: Parameters<typeof import("@/lib/gemini").generateSpeech>) => generateSpeech(...args),
   GEMINI_MODEL: "gemini-2.5-flash",
   GEMINI_TTS_MODEL: "gemini-2.5-flash",
 }));

@@ -1,4 +1,5 @@
 "use client";
+import {fetchJson} from "@/lib/api-fetch";
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
@@ -45,32 +46,14 @@ const STATUS_ICON: Record<OrderStatus, typeof Pill> = {
 export default function PatientPharmacyPage() {
   const [items, setItems] = useState<PharmacyItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError,setLoadError]=useState("");
   const [orderingId, setOrderingId] = useState<string | null>(null);
 
-  const fetchItems = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await fetch("/api/medications");
-      if (res.ok) {
-        const meds = await res.json();
-        const list: MedicationRecord[] = Array.isArray(meds) ? meds : [];
-        setItems(
-          list
-            .filter((m) => m.isActive)
-            .map((m) => ({
-              id: m.id,
-              medication: m.medication,
-              dosage: m.dosage,
-              refillsRemaining: m.refillsAllowed - m.refillsUsed,
-              prescribedAt: m.prescribedAt,
-              orderStatus: "available" as OrderStatus,
-            }))
-        );
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const fetchItems=useCallback(()=>fetchJson<{medications:MedicationRecord[]}>("/api/medications")
+    .then(data=>{const list=Array.isArray(data.medications)?data.medications:[];
+      setItems(list.filter(item=>item.isActive).map(item=>({id:item.id,medication:item.medication,dosage:item.dosage,refillsRemaining:item.refillsAllowed-item.refillsUsed,prescribedAt:item.prescribedAt,orderStatus:"available"})));
+      setLoadError("");setLoading(false);
+    }).catch(error=>{setLoadError(error instanceof Error?error.message:"Prescriptions unavailable");setLoading(false);}),[]);
 
   useEffect(() => {
     fetchItems();
@@ -95,7 +78,7 @@ export default function PatientPharmacyPage() {
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 space-y-6">
         <PageHeader
           title="Pharmacy"
-          subtitle="Order your prescriptions for collection or delivery"
+          subtitle="Review prescriptions. Ordering is not available yet."
           icon={<Pill className="w-5 h-5" />}
           action={
             <Link
@@ -111,7 +94,7 @@ export default function PatientPharmacyPage() {
           <div className="flex items-center justify-center py-20">
             <Loader2 className="w-8 h-8 animate-spin text-[var(--primary)]" />
           </div>
-        ) : (
+        ) : loadError ? <p role="alert">{loadError}</p> : (
           <>
             <SectionCard
               title="Available for order"
@@ -162,13 +145,13 @@ export default function PatientPharmacyPage() {
                         {it.orderStatus === "available" && (
                           <button
                             onClick={() => requestOrder(it.id)}
-                            disabled={orderingId === it.id || it.refillsRemaining === 0}
+                            disabled title="Ordering is not available yet"
                             className="px-4 py-2 rounded-xl bg-[var(--primary)] text-white text-sm font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
                           >
                             {orderingId === it.id ? (
                               <Loader2 className="w-4 h-4 animate-spin" />
                             ) : (
-                              "Order"
+                              "Order — not available yet"
                             )}
                           </button>
                         )}

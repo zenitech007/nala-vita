@@ -122,3 +122,5 @@ describe("AmeliaChat", () => {
     await waitFor(() => expect(screen.getByText(/Possible emergency/i)).toBeInTheDocument());
   });
 });
+
+it('F02 announces unreadable image from stream metadata',async()=>{mockAmeliaFetch({frames:[{type:'meta',conversationId:'c1',imageStatus:'unavailable'},{type:'start',urgency:'routine',redFlags:[],disclaimer:'d'},{type:'delta',text:'Reply'},{type:'done'}]});render(<AmeliaChat/>);fireEvent.change(screen.getByLabelText('message'),{target:{value:'Review image'}});fireEvent.click(screen.getByText('send'));await waitFor(()=>expect(screen.getByText(/attached image could not be read/i)).toBeInTheDocument());});

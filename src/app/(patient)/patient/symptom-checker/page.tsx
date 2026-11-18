@@ -137,7 +137,8 @@ export default function SymptomCheckerPage() {
 
       const data = await res.json();
 
-      if (!res.ok) {
+      if (!res.ok || data.status === "unavailable") {
+        setResult(null);
         setError(data.error || "Failed to analyze symptoms");
         return;
       }
@@ -248,7 +249,7 @@ export default function SymptomCheckerPage() {
         </div>
 
         {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm">
+          <div role="alert" className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm">
             {error}
           </div>
         )}

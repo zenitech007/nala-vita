@@ -18,7 +18,7 @@ export type AuthenticatedUser = Prisma.UserGetPayload<{
 }>;
 
 export type ApiAuthResult =
-  | { ok: true; user: AuthenticatedUser; authUserId: string }
+  | { ok: true; user: AuthenticatedUser; authUserId: string; emailContactVerified: boolean }
   | { ok: false; response: NextResponse };
 
 interface RequireApiUserOptions {
@@ -26,6 +26,7 @@ interface RequireApiUserOptions {
   profile?: RequiredProfile;
   /** Only verification/status endpoints should opt out. */
   allowUnverifiedDoctor?: boolean;
+  verifiedEmail?: boolean;
 }
 
 function errorResponse(status: number, error: string): ApiAuthResult {
@@ -42,6 +43,7 @@ function errorResponse(status: number, error: string): ApiAuthResult {
 export async function getCurrentUser(): Promise<{
   user: AuthenticatedUser;
   authUserId: string;
+  emailContactVerified: boolean;
 } | null> {
   const supabase = createServerSupabaseClient();
   const {
@@ -56,7 +58,8 @@ export async function getCurrentUser(): Promise<{
     include: AUTH_USER_INCLUDE,
   });
 
-  return user ? { user, authUserId: authUser.id } : null;
+  return user ? { user, authUserId: authUser.id, emailContactVerified: !!authUser.email_confirmed_at && !!user.emailVerified
+    && !!user.email && authUser.email?.toLowerCase() === user.email.toLowerCase() } : null;
 }
 
 /**
@@ -70,6 +73,7 @@ export async function requireApiUser(
   if (!current) return errorResponse(401, "Unauthorized");
 
   const { user, authUserId } = current;
+  if (options.verifiedEmail && !current.emailContactVerified) return errorResponse(403, "Verify your current email before approving records access");
 
   if (!user.isActive) {
     return errorResponse(403, "This account has been deactivated");
@@ -87,10 +91,12 @@ export async function requireApiUser(
     return errorResponse(403, "Doctor account is pending verification");
   }
 
+  if (user.role === "PATIENT" && !user.patient) return errorResponse(403, "Required patient profile not found");
+
   if (options.profile && !user[options.profile]) {
     return errorResponse(403, `Required ${options.profile} profile not found`);
   }
 
-  return { ok: true, user, authUserId };
+  return { ok: true, user, authUserId, emailContactVerified: current.emailContactVerified };
 }
 

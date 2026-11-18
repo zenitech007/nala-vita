@@ -1,44 +1,20 @@
+import { parsePagination, cursorWhere, pageResult, PaginationError } from "@/lib/pagination";
+import { requireApiUser } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { createServerSupabaseClient } from "@/lib/supabase-server";
-import { fireDueReminders } from "@/lib/amelia/reminders";
 
 // ─── GET: Return notifications for the current user ──────
 
 export async function GET(req: NextRequest) {
   try {
-    const supabase = createServerSupabaseClient();
-    const {
-      data: { user: authUser },
-    } = await supabase.auth.getUser();
-
-    if (!authUser) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { supabaseId: authUser.id },
-      include: { patient: true },
-    });
-
-    if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
-    }
-
-    // Lazily fire any due reminders for patients before listing notifications.
-    if (user.patient) {
-      try {
-        await fireDueReminders(user.patient.id, user.id);
-      } catch (remErr) {
-        console.error("fireDueReminders failed:", remErr);
-      }
-    }
+    const auth = await requireApiUser({ roles: ["PATIENT", "DOCTOR", "ADMIN"] });
+    if (!auth.ok) return auth.response;
+    const user = auth.user;
 
     const { searchParams } = new URL(req.url);
     const unreadOnly = searchParams.get("unreadOnly") === "true";
-    const limit = parseInt(searchParams.get("limit") || "20");
-    const offset = parseInt(searchParams.get("offset") || "0");
+    const { limit, cursor } = parsePagination(searchParams, 20);
 
     const whereClause: Record<string, unknown> = { userId: user.id };
     if (unreadOnly) {
@@ -47,18 +23,19 @@ export async function GET(req: NextRequest) {
 
     const [notifications, unreadCount] = await Promise.all([
       prisma.notification.findMany({
-        where: whereClause,
-        orderBy: { createdAt: "desc" },
-        take: limit,
-        skip: offset,
+        where: { AND: [whereClause, cursorWhere(cursor, "createdAt")] },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        take: limit + 1,
       }),
       prisma.notification.count({
         where: { userId: user.id, isRead: false },
       }),
     ]);
 
-    return NextResponse.json({ notifications, unreadCount });
+    const page = pageResult(notifications, limit, "createdAt");
+    return NextResponse.json({ notifications: page.items, unreadCount, nextCursor: page.nextCursor });
   } catch (error) {
+    if (error instanceof PaginationError) return NextResponse.json({ error: error.message }, { status: 400 });
     console.error("GET /api/notifications error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
@@ -76,22 +53,9 @@ const markReadSchema = z.object({
 
 export async function PATCH(req: NextRequest) {
   try {
-    const supabase = createServerSupabaseClient();
-    const {
-      data: { user: authUser },
-    } = await supabase.auth.getUser();
-
-    if (!authUser) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { supabaseId: authUser.id },
-    });
-
-    if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
-    }
+    const auth = await requireApiUser({ roles: ["PATIENT", "DOCTOR", "ADMIN"] });
+    if (!auth.ok) return auth.response;
+    const user = auth.user;
 
     const body = await req.json();
     const validated = markReadSchema.parse(body);

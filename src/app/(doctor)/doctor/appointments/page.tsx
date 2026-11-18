@@ -1,4 +1,6 @@
 "use client";
+import { useTranslations, useFormatter } from "next-intl";
+import { formatTemperature } from "@/lib/temperature";
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
@@ -79,6 +81,8 @@ const TYPE_ICON: Record<string, typeof Video> = {
 };
 
 export default function DoctorAppointmentsPage() {
+  const t = useTranslations("appointments");
+  const formatter = useFormatter();
   const [activeTab, setActiveTab] = useState<TabKey>("upcoming");
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [appointments, setAppointments] = useState<DoctorAppointment[]>([]);
@@ -86,25 +90,21 @@ export default function DoctorAppointmentsPage() {
   const [selectedAppointment, setSelectedAppointment] = useState<DoctorAppointment | null>(null);
   const [calendarWeekStart, setCalendarWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 1 }));
 
-  const fetchAppointments = useCallback(async () => {
-    setLoading(true);
-    try {
-      const statusMap: Record<TabKey, string> = {
-        upcoming: "upcoming",
-        in_progress: "upcoming", // API groups these together
-        completed: "past",
-        cancelled: "cancelled",
-      };
-      const res = await fetch(`/api/appointments?status=${statusMap[activeTab]}`);
+  const fetchAppointments = useCallback(() => {
+    const statusMap: Record<TabKey, string> = {
+      upcoming: "upcoming",
+      in_progress: "upcoming", // API groups these together
+      completed: "past",
+      cancelled: "cancelled",
+    };
+    return fetch(`/api/appointments?status=${statusMap[activeTab]}`).then(async res => {
       if (res.ok) {
         const data = await res.json();
         setAppointments(data.appointments || []);
       }
-    } catch {
-      // placeholder data handles no-api case
-    } finally {
-      setLoading(false);
-    }
+    }).catch(() => {
+      // Keep existing results if the network is unavailable.
+    }).finally(() => setLoading(false));
   }, [activeTab]);
 
   useEffect(() => {
@@ -153,7 +153,7 @@ export default function DoctorAppointmentsPage() {
                 <ChevronLeft className="w-5 h-5" />
               </Link>
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">Appointments</h1>
+                <h1 className="text-2xl font-bold text-gray-900">{t("title")}</h1>
                 <p className="text-gray-500 text-sm">Manage your patient appointments</p>
               </div>
             </div>
@@ -190,10 +190,15 @@ export default function DoctorAppointmentsPage() {
         <div className={cn("flex-1 min-w-0", selectedAppointment ? "lg:mr-0" : "")}>
           {/* Tabs */}
           <div className="flex gap-1 bg-gray-100 p-1 rounded-xl mb-6 w-fit">
-            {STATUS_TABS.map((tab) => (
+            {[
+              { key: "upcoming" as TabKey, label: t("upcoming") },
+              { key: "in_progress" as TabKey, label: "In Progress" },
+              { key: "completed" as TabKey, label: t("past") },
+              { key: "cancelled" as TabKey, label: "Cancelled" },
+            ].map((tab) => (
               <button
                 key={tab.key}
-                onClick={() => setActiveTab(tab.key)}
+                onClick={() => { if (tab.key !== activeTab) { setLoading(true); setActiveTab(tab.key); } }}
                 className={cn(
                   "px-5 py-2.5 rounded-lg text-sm font-medium transition",
                   activeTab === tab.key ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
@@ -254,7 +259,7 @@ export default function DoctorAppointmentsPage() {
                           <div className="flex items-center gap-4 mt-1.5 text-xs text-gray-400">
                             <span className="inline-flex items-center gap-1">
                               <Calendar className="w-3.5 h-3.5" />
-                              {format(new Date(apt.scheduledAt), "MMM d, yyyy")}
+                              {formatter.dateTime(new Date(apt.scheduledAt), { year: "numeric", month: "short", day: "numeric" })}
                             </span>
                             <span className="inline-flex items-center gap-1">
                               <Clock className="w-3.5 h-3.5" />
@@ -512,7 +517,7 @@ function PatientSidebar({
                 <div className="flex gap-3 text-gray-700">
                   {v.bloodPressure && <span>BP: {v.bloodPressure}</span>}
                   {v.heartRate && <span>HR: {v.heartRate}</span>}
-                  {v.temperature && <span>Temp: {v.temperature}°F</span>}
+                  {v.temperature != null && <span>Temp: {formatTemperature(v.temperature, "F")}</span>}
                 </div>
               </div>
             ))}

@@ -5,12 +5,14 @@ import { ThemeSwitcher } from "@/components/ui/ThemeSwitcher";
 // Mock next-themes — capture setTheme calls
 const setTheme = jest.fn();
 jest.mock("next-themes", () => ({
-  useTheme: () => ({ theme: "theme-rose", setTheme }),
+  useTheme: () => ({ theme: "dark", setTheme }),
 }));
 
 describe("ThemeSwitcher", () => {
   beforeEach(() => {
     setTheme.mockClear();
+    localStorage.clear();
+    document.documentElement.className = "dark";
   });
 
   it("renders one button per theme", () => {
@@ -27,14 +29,24 @@ describe("ThemeSwitcher", () => {
     expect(screen.getByRole("button", { name: /ocean/i })).toHaveAttribute("aria-pressed", "false");
   });
 
-  it("calls setTheme on click", () => {
+  it("keeps brightness when selecting a brand", () => {
     render(<ThemeSwitcher />);
     fireEvent.click(screen.getByRole("button", { name: /ocean/i }));
-    expect(setTheme).toHaveBeenCalledWith("theme-ocean");
+    expect(setTheme).not.toHaveBeenCalled();
+    expect(localStorage.getItem("nala-brand")).toBe("ocean");
+    expect(document.documentElement).toHaveClass("dark");
   });
 
   it("wraps buttons in a group with an accessible label", () => {
     render(<ThemeSwitcher />);
-    expect(screen.getByRole("group")).toHaveAccessibleName(/color theme/i);
+    expect(screen.getByRole("group", { name: /color theme/i })).toHaveAccessibleName(/color theme/i);
   });
+});
+
+it("changes brightness without overwriting the brand preference", () => {
+  localStorage.setItem("nala-brand", "emerald");
+  render(<ThemeSwitcher />);
+  fireEvent.change(screen.getByRole("combobox", { name: "Brightness" }), { target: { value: "light" } });
+  expect(setTheme).toHaveBeenCalledWith("light");
+  expect(localStorage.getItem("nala-brand")).toBe("emerald");
 });

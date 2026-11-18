@@ -1,9 +1,10 @@
+import {mockOf} from "../helpers/mock";
 import { describe, it, expect, jest, beforeEach } from "@jest/globals";
 import { render, screen, fireEvent } from "@testing-library/react";
 import ChatInput from "@/components/chat/ChatInput";
 
 const onChange = jest.fn();
-const onSend = jest.fn();
+const onSend=mockOf<React.ComponentProps<typeof ChatInput>["onSend"]>();
 
 beforeEach(() => {
   onChange.mockClear();

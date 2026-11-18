@@ -10,8 +10,9 @@ describe("nav-config", () => {
     expect(DOCTOR_NAV).toHaveLength(11);
   });
 
-  it("ADMIN_NAV has 5 entries", () => {
-    expect(ADMIN_NAV).toHaveLength(5);
+  it("ADMIN_NAV has six entries including doctor verification", () => {
+    expect(ADMIN_NAV).toHaveLength(6);
+    expect(ADMIN_NAV).toEqual(expect.arrayContaining([expect.objectContaining({ href: "/admin/doctors", label: "Doctor verification" })]));
   });
 
   it("every patient href starts with /patient/", () => {

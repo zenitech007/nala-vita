@@ -1,9 +1,11 @@
 "use client";
 
+import {useLocalPreference,readBoolean} from "@/hooks/useLocalPreference";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import {useTranslations} from "next-intl";
 import { usePathname, useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
+import AccessibleDialog from "@/components/ui/AccessibleDialog";
 import { Menu, LogOut, X, Heart, Settings as SettingsIcon, Search as SearchIcon } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
@@ -31,11 +33,20 @@ const EXPANDED_W = "w-72";
 const STORAGE_KEY = (role: SidebarRole) => `sidebar-collapsed-${role}`;
 
 export function SidebarShell({ role, roleLabel, brand = "Nala Vita", user, nav }: Props) {
+  const t = useTranslations("nav");
+  const localizedNav = nav.map(item => ({...item,label:item.messageKey ? t(item.messageKey) : item.label}));
   const pathname = usePathname();
   const router = useRouter();
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useLocalPreference(STORAGE_KEY(role),false,readBoolean);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isCommandOpen, setIsCommandOpen] = useState(false);
+  const [signOutError, setSignOutError] = useState("");
+  useEffect(() => {
+    const closeOnDesktop = () => { if (window.innerWidth >= 1024) setIsMobileOpen(false); };
+    window.addEventListener("resize", closeOnDesktop);
+    return () => window.removeEventListener("resize", closeOnDesktop);
+  }, []);
+
 
   // Global Cmd+K / Ctrl+K listener
   useEffect(() => {
@@ -49,27 +60,20 @@ export function SidebarShell({ role, roleLabel, brand = "Nala Vita", user, nav }
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY(role));
-    if (stored !== null) setIsCollapsed(stored === "true");
-  }, [role]);
-
-  const toggleCollapse = () => {
-    setIsCollapsed((v) => {
-      const next = !v;
-      localStorage.setItem(STORAGE_KEY(role), String(next));
-      return next;
-    });
-  };
+  const toggleCollapse = () => setIsCollapsed(value => !value);
 
   const handleSignOut = async () => {
+    setSignOutError("");
+    window.dispatchEvent(new Event("nala-auth-changing"));
     try {
-      await supabase.auth.signOut();
-    } catch (e) {
-      console.warn("Sign out error:", e);
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      router.push("/login");
+      router.refresh();
+    } catch {
+      setSignOutError("Sign out failed. Please retry.");
+      window.dispatchEvent(new Event("nala-auth-change-failed"));
     }
-    router.push("/login");
-    router.refresh();
   };
 
   const settingsHref = `/${role}/settings`;
@@ -98,10 +102,11 @@ export function SidebarShell({ role, roleLabel, brand = "Nala Vita", user, nav }
 
   return (
     <>
+      {signOutError && <p role="alert" className="fixed bottom-4 left-4 z-50 rounded-lg bg-white p-3 text-sm text-red-700">{signOutError}</p>}
       <button
         onClick={() => setIsMobileOpen(true)}
         className="lg:hidden fixed top-3 left-3 z-30 p-2.5 bg-white dark:bg-[#1E1F22] border border-gray-200 dark:border-gray-800 rounded-full shadow-sm text-gray-600 dark:text-gray-300"
-        aria-label="Open menu"
+        aria-label={t("openMenu")}
       >
         <Menu size={20} />
       </button>
@@ -169,7 +174,7 @@ export function SidebarShell({ role, roleLabel, brand = "Nala Vita", user, nav }
         </div>
 
         <nav className="flex-1 overflow-y-auto py-2 px-3 space-y-1">
-          {nav.map((item) => (
+          {localizedNav.map((item) => (
             <NavLink key={item.href} item={item} />
           ))}
         </nav>
@@ -177,7 +182,7 @@ export function SidebarShell({ role, roleLabel, brand = "Nala Vita", user, nav }
         <div className="p-3 space-y-1 shrink-0 border-t border-gray-200 dark:border-gray-800">
           <Link
             href={settingsHref}
-            title={isCollapsed ? "Settings" : undefined}
+            title={isCollapsed ? t("settings") : undefined}
             className={cn(
               "flex items-center px-3 py-3 rounded-xl transition-colors text-sm font-medium",
               isCollapsed ? "justify-center" : "gap-3",
@@ -187,11 +192,11 @@ export function SidebarShell({ role, roleLabel, brand = "Nala Vita", user, nav }
             )}
           >
             <SettingsIcon size={20} className="shrink-0" />
-            {!isCollapsed && <span>Settings</span>}
+            {!isCollapsed && <span>{t("settings")}</span>}
           </Link>
           <button
             onClick={handleSignOut}
-            aria-label="Sign Out"
+            aria-label={t("signOut")}
             className={cn(
               "flex items-center w-full px-3 py-3 rounded-xl transition-colors text-sm font-medium",
               isCollapsed ? "justify-center" : "gap-3",
@@ -199,28 +204,13 @@ export function SidebarShell({ role, roleLabel, brand = "Nala Vita", user, nav }
             )}
           >
             <LogOut size={20} className="shrink-0" />
-            {!isCollapsed && <span>Sign Out</span>}
+            {!isCollapsed && <span>{t("signOut")}</span>}
           </button>
         </div>
       </aside>
 
-      <AnimatePresence>
-        {isMobileOpen && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setIsMobileOpen(false)}
-              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden"
-            />
-            <motion.aside
-              initial={{ x: "-100%" }}
-              animate={{ x: 0 }}
-              exit={{ x: "-100%" }}
-              transition={{ type: "spring", damping: 25, stiffness: 200 }}
-              className="fixed inset-y-0 left-0 w-72 bg-[#f9f9f9] dark:bg-[#1E1F22] shadow-2xl z-50 flex flex-col lg:hidden border-r border-gray-200 dark:border-gray-800"
-            >
+      <AccessibleDialog isOpen={isMobileOpen} onClose={() => setIsMobileOpen(false)} label={t("navigation")}
+        className="fixed inset-y-0 left-0 w-72 max-w-[calc(100vw-2rem)] h-dvh bg-[#f9f9f9] dark:bg-[#1E1F22] shadow-2xl flex flex-col border-r border-gray-200 dark:border-gray-800">
               <div className="h-16 flex items-center justify-between px-4 border-b border-gray-200 dark:border-gray-800">
                 <div className="flex items-center gap-2">
                   <Heart className="w-5 h-5 text-[var(--primary)]" />
@@ -228,7 +218,7 @@ export function SidebarShell({ role, roleLabel, brand = "Nala Vita", user, nav }
                 </div>
                 <button
                   onClick={() => setIsMobileOpen(false)}
-                  aria-label="Close menu"
+                  aria-label={t("closeMenu")}
                   className="p-2 bg-gray-200 dark:bg-gray-800 rounded-full text-gray-500"
                 >
                   <X size={18} />
@@ -270,7 +260,7 @@ export function SidebarShell({ role, roleLabel, brand = "Nala Vita", user, nav }
               </div>
 
               <nav className="flex-1 overflow-y-auto py-2 px-3 space-y-1">
-                {nav.map((item) => (
+                {localizedNav.map((item) => (
                   <Link
                     key={item.href}
                     href={item.href}
@@ -295,21 +285,18 @@ export function SidebarShell({ role, roleLabel, brand = "Nala Vita", user, nav }
                   className="flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800/50"
                 >
                   <SettingsIcon size={20} />
-                  <span>Settings</span>
+                  <span>{t("settings")}</span>
                 </Link>
                 <button
                   onClick={() => { setIsMobileOpen(false); handleSignOut(); }}
-                  aria-label="Sign Out"
+                  aria-label={t("signOut")}
                   className="flex items-center gap-3 w-full px-3 py-3 rounded-xl text-sm font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10"
                 >
                   <LogOut size={20} />
-                  <span>Sign Out</span>
+                  <span>{t("signOut")}</span>
                 </button>
               </div>
-            </motion.aside>
-          </>
-        )}
-      </AnimatePresence>
+      </AccessibleDialog>
 
       {/* Global Command Palette */}
       <CommandPalette

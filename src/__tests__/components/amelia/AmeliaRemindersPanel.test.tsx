@@ -15,7 +15,7 @@ function mockFetch() {
   return calls;
 }
 
-beforeEach(() => mockFetch());
+beforeEach(() => {mockFetch();});
 
 describe("AmeliaRemindersPanel", () => {
   it("lists active reminders with their schedule", async () => {

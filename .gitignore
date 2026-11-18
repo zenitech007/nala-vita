@@ -51,3 +51,6 @@ next-env.d.ts
 
 # local Claude Code launch config
 /.claude/
+
+# Windows user search connector directory
+/Searches/

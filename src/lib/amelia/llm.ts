@@ -1,3 +1,4 @@
+import { ProviderTimeoutError, withProviderDeadline, withProviderStreamDeadline } from "@/lib/provider-deadline";
 // src/lib/amelia/llm.ts
 import { ai, GEMINI_MODEL } from "@/lib/gemini";
 import OpenAI from "openai";
@@ -15,8 +16,8 @@ export interface ChatTurn {
 export interface ChatOptions {
   temperature?: number;
   maxTokens?: number;
-  model?: string;
   context?: AmeliaContext;
+  signal?: AbortSignal;
 }
 
 export async function chat(
@@ -44,43 +45,46 @@ export async function chat(
   const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
   if (geminiKey) {
     try {
-      const response = await ai.models.generateContent({
-        model: opts?.model ?? GEMINI_MODEL,
+      const response = await withProviderDeadline(signal => ai.models.generateContent({
+        model: GEMINI_MODEL,
         contents: input,
         config: {
+          abortSignal: signal,
           systemInstruction: systemInstruction || undefined,
           maxOutputTokens: opts?.maxTokens,
           temperature: opts?.temperature,
         },
-      });
+      }), opts?.signal);
 
       const text = response.text?.trim();
       if (text) return text;
     } catch (geminiError) {
-      console.warn("Gemini chat failed, falling back to OpenAI/Clinical:", (geminiError as Error)?.message || geminiError);
+      if (geminiError instanceof ProviderTimeoutError || opts?.signal?.aborted) throw geminiError;
+      console.warn("AI provider request failed");
     }
   }
 
   // 2. Try OpenAI fallback
   if (process.env.OPENAI_API_KEY) {
     try {
-      const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+      const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, maxRetries: 0 });
       const openAiMessages = messages.map((m) => ({
         role: m.role as "system" | "user" | "assistant",
         content: m.content,
       }));
 
-      const res = await openai.chat.completions.create({
+      const res = await withProviderDeadline(signal => openai.chat.completions.create({
         model: "gpt-4o-mini",
         messages: openAiMessages,
         max_tokens: opts?.maxTokens,
         temperature: opts?.temperature,
-      });
+      }, { signal }), opts?.signal);
 
       const text = res.choices[0]?.message?.content?.trim();
       if (text) return text;
     } catch (openAiError) {
-      console.warn("OpenAI fallback failed, using Clinical Intelligence Engine:", (openAiError as Error)?.message || openAiError);
+      if (openAiError instanceof ProviderTimeoutError || opts?.signal?.aborted) throw openAiError;
+      console.warn("AI provider request failed");
     }
   }
 
@@ -112,21 +116,23 @@ export async function* chatStream(
           .map((m) => `${m.role === "assistant" ? "Assistant" : "User"}: ${m.content}`)
           .join("\n\n");
 
+  let streamedAny = false;
+
   // 1. Try Gemini streaming
   const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
   if (geminiKey) {
     try {
-      const stream = await ai.models.generateContentStream({
-        model: opts?.model ?? GEMINI_MODEL,
+      const stream = withProviderStreamDeadline(signal => ai.models.generateContentStream({
+        model: GEMINI_MODEL,
         contents: input,
         config: {
+          abortSignal: signal,
           systemInstruction: systemInstruction || undefined,
           maxOutputTokens: opts?.maxTokens,
           temperature: opts?.temperature,
         },
-      });
+      }), opts?.signal);
 
-      let streamedAny = false;
       for await (const chunk of stream) {
         const text = chunk.text;
         if (text) {
@@ -136,28 +142,28 @@ export async function* chatStream(
       }
       if (streamedAny) return;
     } catch (geminiError) {
-      console.warn("Gemini stream failed, trying OpenAI/Clinical fallback:", (geminiError as Error)?.message || geminiError);
+      if (streamedAny || geminiError instanceof ProviderTimeoutError || opts?.signal?.aborted) throw geminiError;
+      console.warn("AI provider request failed");
     }
   }
 
   // 2. Try OpenAI streaming fallback
   if (process.env.OPENAI_API_KEY) {
     try {
-      const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+      const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, maxRetries: 0 });
       const openAiMessages = messages.map((m) => ({
         role: m.role as "system" | "user" | "assistant",
         content: m.content,
       }));
 
-      const stream = await openai.chat.completions.create({
+      const stream = withProviderStreamDeadline(signal => openai.chat.completions.create({
         model: "gpt-4o-mini",
         messages: openAiMessages,
         max_tokens: opts?.maxTokens,
         temperature: opts?.temperature,
         stream: true,
-      });
+      }, { signal }), opts?.signal);
 
-      let streamedAny = false;
       for await (const chunk of stream) {
         const text = chunk.choices[0]?.delta?.content;
         if (text) {
@@ -167,7 +173,8 @@ export async function* chatStream(
       }
       if (streamedAny) return;
     } catch (openAiError) {
-      console.warn("OpenAI stream fallback failed, using Clinical Intelligence Engine:", (openAiError as Error)?.message || openAiError);
+      if (streamedAny || openAiError instanceof ProviderTimeoutError || opts?.signal?.aborted) throw openAiError;
+      console.warn("AI provider request failed");
     }
   }
 
@@ -183,7 +190,7 @@ export async function* chatStream(
 export async function visionChat(
   prompt: string,
   imageDataUrl: string,
-  opts?: { temperature?: number; maxTokens?: number; model?: string }
+  opts?: { temperature?: number; maxTokens?: number; signal?: AbortSignal }
 ): Promise<string> {
   let mimeType = "image/jpeg";
   let base64Data = imageDataUrl;
@@ -198,8 +205,8 @@ export async function visionChat(
   const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
   if (geminiKey) {
     try {
-      const response = await ai.models.generateContent({
-        model: opts?.model ?? GEMINI_MODEL,
+      const response = await withProviderDeadline(signal => ai.models.generateContent({
+        model: GEMINI_MODEL,
         contents: [
           {
             role: "user",
@@ -215,23 +222,25 @@ export async function visionChat(
           },
         ],
         config: {
+          abortSignal: signal,
           maxOutputTokens: opts?.maxTokens ?? 1000,
           temperature: opts?.temperature ?? 0.2,
         },
-      });
+      }), opts?.signal);
 
       const text = response.text?.trim();
       if (text) return text;
     } catch (geminiError) {
-      console.warn("Gemini vision failed, attempting OpenAI vision:", (geminiError as Error)?.message || geminiError);
+      if (geminiError instanceof ProviderTimeoutError || opts?.signal?.aborted) throw geminiError;
+      console.warn("AI provider request failed");
     }
   }
 
   // 2. Try OpenAI Vision (gpt-4o-mini supports high-resolution image URLs)
   if (process.env.OPENAI_API_KEY) {
     try {
-      const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-      const res = await openai.chat.completions.create({
+      const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, maxRetries: 0 });
+      const res = await withProviderDeadline(signal => openai.chat.completions.create({
         model: "gpt-4o-mini",
         messages: [
           {
@@ -247,28 +256,16 @@ export async function visionChat(
         ],
         max_tokens: opts?.maxTokens ?? 1000,
         temperature: opts?.temperature ?? 0.2,
-      });
+      }, { signal }), opts?.signal);
 
       const text = res.choices[0]?.message?.content?.trim();
       if (text) return text;
     } catch (openAiError) {
-      console.warn("OpenAI vision failed, providing clinical fallback:", (openAiError as Error)?.message || openAiError);
+      if (openAiError instanceof ProviderTimeoutError || opts?.signal?.aborted) throw openAiError;
+      console.warn("AI provider request failed");
     }
   }
 
-  // 3. Resilient fallback: Return a structured response so lab photo parsing never crashes
-  return JSON.stringify({
-    results: [
-      {
-        name: "Blood Chemistry & Vitals Panel",
-        value: "Detected",
-        unit: null,
-        referenceRange: "Standard Diagnostic Ranges",
-        flag: "normal",
-      },
-    ],
-    summary:
-      "Your uploaded lab image was received and inspected. Values appear within expected parameters. Please confirm any specific diagnostic flags with your physician during your next consultation.",
-    overallNote: "Always review official laboratory results directly with your healthcare provider.",
-  });
+  // Provider failure must never manufacture clinical findings.
+  return JSON.stringify({status: 'unavailable', results: [], summary: 'The report could not be read. Please retry.', overallNote: 'Review the original report with your healthcare provider.'});
 }

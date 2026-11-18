@@ -1,13 +1,20 @@
+import { dailyVitalDaySchema, dailyVitalsSchema } from "@/lib/daily-vitals";
+import { parsePagination, cursorWhere, pageResult, PaginationError } from "@/lib/pagination";
+import { requireApiUser } from "@/lib/auth";
+import { getRecordVisibility, workspacePatientWhere } from "@/lib/record-visibility";
+import { loadVisiblePatientRecord } from "@/lib/visible-patient-record";
+import { doctorHasPatientAccess } from "@/lib/access-control";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { createServerSupabaseClient } from "@/lib/supabase-server";
+
+import { TEMPERATURE, temperatureToCelsius } from "@/lib/temperature";
 
 // ─── Reference ranges for anomaly detection ──────────────
 
 const REFERENCE_RANGES = {
   heartRate: { min: 60, max: 100, label: "Heart Rate" },
-  temperature: { min: 97, max: 99.5, label: "Temperature" },
+  temperature: { min: TEMPERATURE.normalMinC, max: TEMPERATURE.normalMaxC, label: "Temperature (°C)" },
   oxygenSaturation: { min: 95, max: 100, label: "SpO2" },
   bloodSugar: { min: 70, max: 140, label: "Blood Sugar" },
   respiratoryRate: { min: 12, max: 20, label: "Respiratory Rate" },
@@ -54,73 +61,36 @@ function checkAnomalies(data: Record<string, unknown>): string[] {
 
 export async function GET(req: NextRequest) {
   try {
-    const supabase = createServerSupabaseClient();
-    const { data: { user: authUser } } = await supabase.auth.getUser();
-
-    if (!authUser) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await requireApiUser({ roles: ["PATIENT", "DOCTOR"] });
+    if (!auth.ok) return auth.response;
+    const user = auth.user;
+    const query = new URL(req.url).searchParams;
+    if(query.get("dailyVitals")==="1"){
+      if(user.role!=="PATIENT"||!user.patient) return NextResponse.json({error:"Patient profile required"},{status:403});
+      const day=dailyVitalDaySchema.parse({day:query.get("day"),timeZone:query.get("timeZone")});
+      const dailyVitals=await prisma.dailyVitalSnapshot.findUnique({where:{patientId_day_timeZone:{patientId:user.patient.id,...day}}});
+      return NextResponse.json({dailyVitals});
     }
-
-    const user = await prisma.user.findUnique({
-      where: { supabaseId: authUser.id },
-      include: { patient: true, doctor: true },
-    });
-
-    if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
-    }
-
-    const { searchParams } = new URL(req.url);
-    const limit = parseInt(searchParams.get("limit") || "30");
-    const patientIdParam = searchParams.get("patientId");
-
-    // Determine patient ID
-    let patientId: string | undefined;
-    if (user.role === "PATIENT" && user.patient) {
-      patientId = user.patient.id;
-    } else if (patientIdParam) {
-      patientId = patientIdParam;
-    }
-
+    const patientId = user.role === "PATIENT" ? user.patient!.id : query.get("patientId");
+    const { limit, cursor } = parsePagination(query);
     if (!patientId) {
-      // Doctor requesting all monitored patients' latest vitals
-      if (user.role === "DOCTOR" && user.doctor) {
-        let patients = await prisma.patient.findMany({
-          where: {
-            appointments: {
-              some: { doctorId: user.doctor.id },
-            },
-          },
-          include: {
-            user: { select: { firstName: true, lastName: true, avatarUrl: true } },
-            vitals: { orderBy: { recordedAt: "desc" }, take: 1 },
-          },
-        });
-
-        if (patients.length === 0) {
-          patients = await prisma.patient.findMany({
-            take: 20,
-            include: {
-              user: { select: { firstName: true, lastName: true, avatarUrl: true } },
-              vitals: { orderBy: { recordedAt: "desc" }, take: 1 },
-            },
-          });
-        }
-
-        return NextResponse.json({ patients });
-      }
-
-      return NextResponse.json({ error: "Patient ID required" }, { status: 400 });
+      const targets = await prisma.patient.findMany({ where: { AND: [workspacePatientWhere(user.doctor!.id), cursorWhere(cursor, "createdAt")] }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: limit + 1, select: { id: true, createdAt: true } });
+      const page = pageResult(targets, limit, "createdAt");
+      const patients = await Promise.all(page.items.map(async target => {
+        const record = await loadVisiblePatientRecord(user, target.id);
+        return { id: target.id, user: record.patient.user, vitals: record.vitals.slice(0, 1), accessLimited: true };
+      }));
+      return NextResponse.json({ patients, nextCursor: page.nextCursor });
     }
-
-    const vitals = await prisma.vital.findMany({
-      where: { patientId },
-      orderBy: { recordedAt: "desc" },
-      take: limit,
-    });
-
-    return NextResponse.json({ vitals });
+    if (user.role === "DOCTOR" && !await doctorHasPatientAccess(user.doctor!.id, patientId)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    const access = await getRecordVisibility(user, patientId);
+    const vitals = await prisma.vital.findMany({ where: { AND: [access.where("VITALS"), cursorWhere(cursor, "recordedAt")] }, orderBy: [{ recordedAt: "desc" }, { id: "desc" }], take: limit + 1 });
+    const page = pageResult(vitals, limit, "recordedAt");
+    await access.log("VITALS", page.items);
+    return NextResponse.json({ vitals: page.items, nextCursor: page.nextCursor });
   } catch (error) {
+    if (error instanceof PaginationError) return NextResponse.json({ error: error.message }, { status: 400 });
+    if(error instanceof z.ZodError) return NextResponse.json({error:"Invalid day or timezone"},{status:422});
     console.error("GET /api/vitals error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
@@ -129,9 +99,11 @@ export async function GET(req: NextRequest) {
 // ─── POST: Save vital reading with anomaly check ─────────
 
 const createVitalSchema = z.object({
+  patientId: z.string().min(1).optional(),
   bloodPressure: z.string().optional(),
   heartRate: z.number().optional(),
   temperature: z.number().optional(),
+  temperatureUnit: z.enum(["C", "F"]).optional(),
   respiratoryRate: z.number().optional(),
   oxygenSaturation: z.number().optional(),
   weight: z.number().optional(),
@@ -139,39 +111,44 @@ const createVitalSchema = z.object({
   bloodSugar: z.number().optional(),
   notes: z.string().optional(),
   source: z.string().optional(),
+}).refine(value => (value.temperature === undefined) === (value.temperatureUnit === undefined), {
+  message: "Temperature requires an explicit C or F unit", path: ["temperatureUnit"],
 });
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = createServerSupabaseClient();
-    const { data: { user: authUser } } = await supabase.auth.getUser();
-
-    if (!authUser) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { supabaseId: authUser.id },
-      include: { patient: true },
-    });
-
-    if (!user?.patient) {
-      return NextResponse.json({ error: "Patient profile not found" }, { status: 404 });
-    }
-
+    const auth = await requireApiUser({ roles: ["PATIENT", "DOCTOR"] });
+    if (!auth.ok) return auth.response;
+    const user = auth.user;
     const body = await req.json();
+    if(body && typeof body === "object" && "dailyVitals" in body){
+      if(user.role!=="PATIENT"||!user.patient) return NextResponse.json({error:"Patient profile required"},{status:403});
+      const snapshot=z.object({dailyVitals:dailyVitalsSchema}).strict().parse(body).dailyVitals;
+      const dailyVitals=await prisma.dailyVitalSnapshot.upsert({where:{patientId_day_timeZone:{patientId:user.patient.id,day:snapshot.day,timeZone:snapshot.timeZone}},create:{patientId:user.patient.id,...snapshot},update:snapshot});
+      return NextResponse.json({dailyVitals});
+    }
     const validated = createVitalSchema.parse(body);
+    const patientId = user.role === "PATIENT" ? user.patient?.id : validated.patientId;
+    if (!patientId) return NextResponse.json({ error: "Patient profile or target required" }, { status: 403 });
+    if (user.role === "DOCTOR" && !await doctorHasPatientAccess(user.doctor!.id, patientId)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    const target = user.role === "PATIENT" ? { userId: user.id } : await prisma.patient.findUnique({ where: { id: patientId }, select: { userId: true } });
+    if (!target) return NextResponse.json({ error: "Patient not found" }, { status: 404 });
 
     // Check for anomalies
-    const anomalies = checkAnomalies(validated as Record<string, unknown>);
+    const canonicalTemperature = validated.temperature === undefined ? null : temperatureToCelsius(validated.temperature, validated.temperatureUnit!);
+    const anomalies = checkAnomalies({ ...validated, temperature: canonicalTemperature });
 
     // Create vital record
     const vital = await prisma.vital.create({
       data: {
-        patientId: user.patient.id,
+        patientId,
+        authoredByUserId: user.id, authoredByDoctorId: user.role === "DOCTOR" ? user.doctor!.id : null,
         bloodPressure: validated.bloodPressure || null,
         heartRate: validated.heartRate ?? null,
-        temperature: validated.temperature ?? null,
+        temperature: canonicalTemperature,
+        temperatureUnit: "C",
+        temperatureOriginal: validated.temperature ?? null,
+        temperatureOriginalUnit: validated.temperatureUnit ?? null,
         respiratoryRate: validated.respiratoryRate ?? null,
         oxygenSaturation: validated.oxygenSaturation ?? null,
         weight: validated.weight ?? null,
@@ -190,7 +167,7 @@ export async function POST(req: NextRequest) {
       // Notify patient
       await prisma.notification.create({
         data: {
-          userId: user.id,
+          userId: target.userId,
           title: "Abnormal Vital Reading",
           message: alertMessage,
           type: "VITAL_ALERT",
@@ -198,28 +175,8 @@ export async function POST(req: NextRequest) {
         },
       });
 
-      // Notify doctors who have appointments with this patient
-      const recentDoctors = await prisma.appointment.findMany({
-        where: {
-          patientId: user.patient.id,
-          status: { in: ["SCHEDULED", "CONFIRMED", "COMPLETED"] },
-        },
-        select: { doctor: { select: { userId: true } } },
-        distinct: ["doctorId"],
-        take: 5,
-      });
-
-      for (const appt of recentDoctors) {
-        await prisma.notification.create({
-          data: {
-            userId: appt.doctor.userId,
-            title: "Patient Vital Alert",
-            message: `${user.firstName} ${user.lastName}: ${alertMessage}`,
-            type: "VITAL_ALERT",
-            link: "/doctor/monitoring",
-          },
-        });
-      }
+      // Appointment membership alone does not authorize disclosure of vital values.
+      // The patient notification above is private; providers read through scoped monitoring.
     }
 
     return NextResponse.json(

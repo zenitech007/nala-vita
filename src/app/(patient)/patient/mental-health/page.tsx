@@ -1,4 +1,5 @@
 "use client";
+import {fetchJson} from "@/lib/api-fetch";
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
@@ -158,30 +159,13 @@ function MoodDot(props: {
 
 function BreathingExercise() {
   const [isRunning, setIsRunning] = useState(false);
-  const [phase, setPhase] = useState<"inhale" | "hold" | "exhale">("inhale");
-  const [_seconds, setSeconds] = useState(0);
+  const [seconds,setSeconds]=useState(0);
+  const phase=seconds%19<4?"inhale":seconds%19<11?"hold":"exhale";
 
   useEffect(() => {
     if (!isRunning) return;
 
-    setPhase("inhale");
-    setSeconds(0);
-
-    const interval = setInterval(() => {
-      setSeconds((prev) => {
-        const next = prev + 1;
-        // 4s inhale, 7s hold, 8s exhale = 19s total cycle
-        const cyclePos = next % 19;
-        if (cyclePos < 4) {
-          setPhase("inhale");
-        } else if (cyclePos < 11) {
-          setPhase("hold");
-        } else {
-          setPhase("exhale");
-        }
-        return next;
-      });
-    }, 1000);
+    const interval=setInterval(()=>setSeconds(value=>value+1),1000);
 
     return () => clearInterval(interval);
   }, [isRunning]);
@@ -227,7 +211,7 @@ function BreathingExercise() {
         </p>
       )}
       <button
-        onClick={() => setIsRunning(!isRunning)}
+        onClick={() => {if(!isRunning)setSeconds(0);setIsRunning(!isRunning);}}
         className={cn(
           "px-5 py-2 rounded-xl text-sm font-semibold transition",
           isRunning
@@ -260,18 +244,9 @@ export default function MentalHealthPage() {
     }
   });
 
-  const fetchEntries = useCallback(async () => {
-    try {
-      const res = await fetch("/api/mental-health");
-      if (!res.ok) throw new Error("Failed to fetch");
-      const data: MoodEntry[] = await res.json();
-      setEntries(parseMoodEntries(data));
-    } catch {
-      // silently fail
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const fetchEntries=useCallback(()=>fetchJson<MoodEntry[]>("/api/mental-health")
+    .then(data=>{setEntries(parseMoodEntries(data));setLoading(false);})
+    .catch(()=>{setLoading(false);}),[]);
 
   useEffect(() => {
     fetchEntries();

@@ -11,7 +11,7 @@ const config = {
         "**/__tests__/lib/**/*.test.ts",
       ],
       transform: {
-        "^.+\\.tsx?$": ["ts-jest", { diagnostics: false, tsconfig: "tsconfig.test.json" }],
+        "^.+\\.tsx?$": ["ts-jest", { diagnostics: true, tsconfig: "tsconfig.test.json" }],
       },
       moduleNameMapper: {
         "^@/(.*)$": "<rootDir>/src/$1",

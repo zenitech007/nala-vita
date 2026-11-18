@@ -1,14 +1,18 @@
+import {mockOf,mockQuery} from "../../helpers/mock";
+import type {AuthReply,UserProjection,ConversationProjection} from "../../helpers/projections";
+import type {AmeliaMessage} from "@prisma/client";
+type MessageWindowArgs={orderBy:{createdAt:"asc"|"desc"};take:number};
 import { describe, it, expect, jest, beforeEach } from "@jest/globals";
 
-const getUser = jest.fn();
+const getUser = mockQuery<AuthReply>();
 jest.mock("@/lib/supabase-server", () => ({ createServerSupabaseClient: () => ({ auth: { getUser: () => getUser() } }) }));
 
-const userFindUnique = jest.fn();
-const convoFindFirst = jest.fn();
-const convoCreate = jest.fn();
-const convoUpdate = jest.fn();
-const msgCreate = jest.fn();
-const msgFindMany = jest.fn();
+const userFindUnique = mockQuery<UserProjection|null>();
+const convoFindFirst = mockQuery<ConversationProjection|null>();
+const convoCreate = mockQuery<Pick<AmeliaMessage,"id">>();
+const convoUpdate = mockQuery<Pick<AmeliaMessage,"id">>();
+const msgCreate = mockQuery<Pick<AmeliaMessage,"id">>();
+const msgFindMany = mockOf<(query:MessageWindowArgs)=>Promise<Partial<AmeliaMessage>[]>>();
 jest.mock("@/lib/prisma", () => ({
   prisma: {
     user: { findUnique: (...a: unknown[]) => userFindUnique(...a) },
@@ -17,31 +21,33 @@ jest.mock("@/lib/prisma", () => ({
       create: (...a: unknown[]) => convoCreate(...a),
       update: (...a: unknown[]) => convoUpdate(...a),
     },
-    ameliaMessage: { create: (...a: unknown[]) => msgCreate(...a), findMany: (...a: unknown[]) => msgFindMany(...a) },
+    ameliaMessage: { create: (...a: unknown[]) => msgCreate(...a), findMany: (...a: Parameters<typeof msgFindMany>) => msgFindMany(...a) },
   },
 }));
 
 jest.mock("@/lib/rate-limit", () => ({ checkRateLimitAsync: async () => ({ allowed: true, remaining: 19, resetAt: Date.now() + 60000 }) }));
-const runAmeliaTurn = jest.fn();
-const runAmeliaTurnStream = jest.fn();
+const runAmeliaTurn=mockOf<typeof import("@/lib/amelia/engine").runAmeliaTurn>();
+const runAmeliaTurnStream=mockOf<typeof import("@/lib/amelia/engine").runAmeliaTurnStream>();
 jest.mock("@/lib/amelia/engine", () => ({
-  runAmeliaTurn: (...a: unknown[]) => runAmeliaTurn(...a),
-  runAmeliaTurnStream: (...a: unknown[]) => runAmeliaTurnStream(...a),
+  runAmeliaTurn: (...a: Parameters<typeof runAmeliaTurn>) => runAmeliaTurn(...a),
+  runAmeliaTurnStream: (...a: Parameters<typeof runAmeliaTurnStream>) => runAmeliaTurnStream(...a),
 }));
-const extractMemories = jest.fn();
-const saveMemories = jest.fn();
+const extractMemories=mockOf<typeof import("@/lib/amelia/memory").extractMemories>();
+const saveMemories=mockOf<typeof import("@/lib/amelia/memory").saveMemories>();
 jest.mock("@/lib/amelia/memory", () => ({
-  extractMemories: (...a: unknown[]) => extractMemories(...a),
-  saveMemories: (...a: unknown[]) => saveMemories(...a),
+  extractMemories: (...a: Parameters<typeof extractMemories>) => extractMemories(...a),
+  saveMemories: (...a: Parameters<typeof saveMemories>) => saveMemories(...a),
 }));
-const detectReminder = jest.fn();
+const detectReminder=mockOf<typeof import("@/lib/amelia/reminders").detectReminder>();
 jest.mock("@/lib/amelia/reminders", () => ({
-  detectReminder: (...a: unknown[]) => detectReminder(...a),
+  detectReminder: (...a: Parameters<typeof detectReminder>) => detectReminder(...a),
   computeNextFireAt: () => new Date(2026, 5, 12, 8, 0),
   describeSchedule: () => "every day at 8:00 AM",
 }));
-jest.mock("@/lib/amelia/audit", () => ({ logAmeliaAudit: async () => undefined }));
+jest.mock("@/lib/audit", () => ({ logAudit: async () => undefined }));
 
+const extractLabsFromImage=mockOf<typeof import("@/lib/amelia/labvision").extractLabsFromImage>();
+jest.mock('@/lib/amelia/labvision',()=>({extractLabsFromImage:(...a: Parameters<typeof extractLabsFromImage>)=>extractLabsFromImage(...a)}));
 import { POST } from "@/app/api/amelia/chat/route";
 
 /** Buffered request — the streaming path is the route default, so opt out here. */
@@ -85,7 +91,7 @@ describe("POST /api/amelia/chat", () => {
 
   it("returns Amelia's reply on the happy path", async () => {
     getUser.mockResolvedValue({ data: { user: { id: "sub-1" } } });
-    userFindUnique.mockResolvedValue({ id: "u1", patient: { id: "pat1" } });
+    userFindUnique.mockResolvedValue({ id: "u1", role: "PATIENT", timeZone: "UTC", isActive: true, patient: { id: "pat1" } });
     convoCreate.mockResolvedValue({ id: "c1" });
     msgCreate.mockResolvedValue({ id: "um1" });
     msgFindMany.mockResolvedValue([{ role: "user", content: "I have a sore throat" }]);
@@ -102,7 +108,7 @@ describe("POST /api/amelia/chat", () => {
 
   it("includes a reminderSuggestion when a reminder is detected", async () => {
     getUser.mockResolvedValue({ data: { user: { id: "sub-1" } } });
-    userFindUnique.mockResolvedValue({ id: "u1", patient: { id: "pat1" } });
+    userFindUnique.mockResolvedValue({ id: "u1", role: "PATIENT", timeZone: "UTC", isActive: true, patient: { id: "pat1" } });
     convoCreate.mockResolvedValue({ id: "c1" });
     msgCreate.mockResolvedValue({ id: "um1" });
     msgFindMany.mockResolvedValue([{ role: "user", content: "remind me to take meds at 8" }]);
@@ -121,7 +127,7 @@ describe("POST /api/amelia/chat", () => {
 describe("POST /api/amelia/chat (streaming)", () => {
   beforeEach(() => {
     getUser.mockResolvedValue({ data: { user: { id: "sub-1" } } });
-    userFindUnique.mockResolvedValue({ id: "u1", patient: { id: "pat1" } });
+    userFindUnique.mockResolvedValue({ id: "u1", role: "PATIENT", timeZone: "UTC", isActive: true, patient: { id: "pat1" } });
     convoCreate.mockResolvedValue({ id: "c1" });
     msgCreate.mockResolvedValue({ id: "um1" });
     msgFindMany.mockResolvedValue([{ role: "user", content: "I feel dizzy" }]);
@@ -173,7 +179,7 @@ describe("POST /api/amelia/chat (streaming)", () => {
     expect((done.reminderSuggestion as { label: string }).label).toBe("take meds");
   });
 
-  it("emits an error frame and saves the partial reply when the stream breaks", async () => {
+  it("emits an interrupted frame and saves the partial reply when the stream breaks", async () => {
     runAmeliaTurnStream.mockImplementation(async function* () {
       yield { type: "start", meta: { urgency: "routine", redFlags: [], disclaimer: "d" } };
       yield { type: "delta", text: "Partial" };
@@ -181,7 +187,7 @@ describe("POST /api/amelia/chat (streaming)", () => {
     });
 
     const frames = await readFrames((await POST(streamReq({ message: "I feel dizzy" }))) as Response);
-    expect(frames[frames.length - 1].type).toBe("error");
+    expect(frames[frames.length - 1].type).toBe("interrupted");
     expect(msgCreate).toHaveBeenCalledTimes(2);
     expect(msgCreate.mock.calls[1]).toEqual([
       { data: { conversationId: "c1", role: "assistant", content: "Partial" } },
@@ -194,3 +200,7 @@ describe("POST /api/amelia/chat (streaming)", () => {
     expect(res.status).toBe(401);
   });
 });
+
+it.each([false,true])('F02 propagates unavailable image status (stream=%s)',async(stream)=>{getUser.mockResolvedValue({data:{user:{id:'a'}}});userFindUnique.mockResolvedValue({id:'u',role:'PATIENT',isActive:true,patient:{id:'p'}});convoCreate.mockResolvedValue({id:'c'});msgCreate.mockResolvedValue({id:'m'});msgFindMany.mockResolvedValue([]);extractLabsFromImage.mockResolvedValue({status:'unavailable',results:[],summary:'Unavailable',overallNote:'Retry'});runAmeliaTurn.mockResolvedValue({content:'reply',urgency:'routine',redFlags:[],disclaimer:'d'});runAmeliaTurnStream.mockImplementation(async function*(){yield {type:'start',meta:{urgency:'routine',redFlags:[],disclaimer:'d'}};yield {type:'delta',text:'reply'};});const res=await POST(req({message:'image',imageDataUrl:'data:image/png;base64,iVBORw0KGgo=',stream}));if(stream){expect(await readFrames(res)).toEqual(expect.arrayContaining([expect.objectContaining({type:'meta',imageStatus:'unavailable'})]));}else expect(await res.json()).toHaveProperty('imageStatus','unavailable');});
+
+describe('F03 latest message window',()=>{it.each([19,20,21,100].flatMap(count=>[false,true].map(stream=>({count,stream}))))('includes newest input at $count (SSE=$stream)',async({count,stream})=>{getUser.mockResolvedValue({data:{user:{id:'a'}}});userFindUnique.mockResolvedValue({id:'u',role:'PATIENT',isActive:true,patient:{id:'p'}});convoCreate.mockResolvedValue({id:'c'});msgCreate.mockResolvedValue({id:'latest'});const stored=Array.from({length:count},(_,i)=>({id:i===count-1?'latest':'m'+i,role:'user',content:i===count-1?'newest chest pain':'old'+i}));msgFindMany.mockImplementation(async(q:MessageWindowArgs)=>q.orderBy.createdAt==='desc'?[...stored].reverse().slice(0,q.take):stored.slice(0,q.take));runAmeliaTurn.mockResolvedValue({content:'reply',urgency:'routine',redFlags:[],disclaimer:'d'});runAmeliaTurnStream.mockImplementation(async function*(){yield {type:'start',meta:{urgency:'routine',redFlags:[],disclaimer:'d'}};yield {type:'delta',text:'reply'};});const res=await POST(req({message:'newest chest pain',stream}));await res.text();const mock=stream?runAmeliaTurnStream:runAmeliaTurn;const input=mock.mock.calls[0][0];expect(input.messages.at(-1)?.content).toBe('newest chest pain');expect(input.messages).toHaveLength(Math.min(count,20));expect(input.rawMessage).toBe('newest chest pain');});});

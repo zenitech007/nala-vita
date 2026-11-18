@@ -1,9 +1,11 @@
+import { isIanaTimeZone } from "@/lib/appointment-availability";
+import { requireApiUser } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { prisma } from "@/lib/prisma";
 
 const updateProfileSchema = z.object({
+  timeZone: z.string().max(100).refine(isIanaTimeZone, "Choose a valid IANA timezone, such as Africa/Lagos.").optional(),
   firstName: z.string().min(1, "First name is required").max(100).optional(),
   lastName: z.string().min(1, "Last name is required").max(100).optional(),
   phone: z.string().max(20).optional().nullable(),
@@ -17,27 +19,9 @@ const updateProfileSchema = z.object({
 
 export async function GET() {
   try {
-    const supabase = createServerSupabaseClient();
-    const {
-      data: { user: authUser },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !authUser) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { supabaseId: authUser.id },
-      include: {
-        patient: true,
-        doctor: true,
-      },
-    });
-
-    if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
-    }
+    const auth = await requireApiUser({ roles: ["PATIENT", "DOCTOR", "ADMIN"] });
+    if (!auth.ok) return auth.response;
+    const user = auth.user;
 
     return NextResponse.json({
       id: user.id,
@@ -45,6 +29,7 @@ export async function GET() {
       firstName: user.firstName,
       lastName: user.lastName,
       phone: user.phone ?? "",
+      timeZone: user.timeZone ?? "",
       role: user.role,
       avatarUrl: user.avatarUrl,
       patient: user.patient
@@ -65,7 +50,7 @@ export async function GET() {
             specialization: user.doctor.specialization,
             licenseNumber: user.doctor.licenseNumber,
             yearsOfExperience: user.doctor.yearsOfExperience,
-            consultationFee: user.doctor.consultationFee,
+            consultationFee: Number(user.doctor.consultationFee),
             isVerified: user.doctor.isVerified,
           }
         : null,
@@ -81,36 +66,19 @@ export async function GET() {
 
 export async function PUT(req: NextRequest) {
   try {
-    const supabase = createServerSupabaseClient();
-    const {
-      data: { user: authUser },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !authUser) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { supabaseId: authUser.id },
-      include: {
-        patient: true,
-        doctor: true,
-      },
-    });
-
-    if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
-    }
+    const auth = await requireApiUser({ roles: ["PATIENT", "DOCTOR", "ADMIN"] });
+    if (!auth.ok) return auth.response;
+    const user = auth.user;
 
     const body = await req.json();
     const validated = updateProfileSchema.parse(body);
 
     // Update base User
-    const userUpdate: { firstName?: string; lastName?: string; phone?: string | null } = {};
+    const userUpdate: { firstName?: string; lastName?: string; phone?: string | null; timeZone?: string } = {};
     if (validated.firstName !== undefined) userUpdate.firstName = validated.firstName;
     if (validated.lastName !== undefined) userUpdate.lastName = validated.lastName;
     if (validated.phone !== undefined) userUpdate.phone = validated.phone;
+    if (validated.timeZone !== undefined) userUpdate.timeZone = validated.timeZone;
 
     if (Object.keys(userUpdate).length > 0) {
       await prisma.user.update({

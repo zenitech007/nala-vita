@@ -1,6 +1,5 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   Users,
@@ -14,7 +13,6 @@ import {
   BedDouble,
   UserCog,
   Activity,
-  Loader2,
   ChevronRight,
   Clock,
 } from "lucide-react";
@@ -36,12 +34,7 @@ interface Alert {
 // ─── Component ──────────────────────────────────────────
 
 export default function AdminDashboard() {
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const timer = setTimeout(() => setLoading(false), 500);
-    return () => clearTimeout(timer);
-  }, []);
 
   // ─── Metric cards ──────────────────────────────────────
 
@@ -56,7 +49,7 @@ export default function AdminDashboard() {
       changeUp: true,
     },
     {
-      label: "Doctors Online",
+      label: "Doctors (sample)",
       value: 18,
       icon: Stethoscope,
       lightColor: "bg-emerald-50",
@@ -89,7 +82,7 @@ export default function AdminDashboard() {
   const quickLinks = [
     {
       label: "Staff Management",
-      description: "Manage doctors and nurses",
+      description: "Manage doctor accounts",
       icon: UserCog,
       href: "/admin/staff",
       color: "bg-[var(--primary)]/10 text-[var(--primary)]",
@@ -227,12 +220,8 @@ export default function AdminDashboard() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-        {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <Loader2 className="w-8 h-8 animate-spin text-[var(--primary)]" />
-          </div>
-        ) : (
-          <>
+        <p role="status" className="mb-6 text-sm font-medium">Sample data. Metrics, alerts and charts are illustrative; live reporting is unavailable.</p>
+        <>
             {/* ── Metric Cards ─────────────────────────────── */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               {metrics.map((m) => (
@@ -263,7 +252,7 @@ export default function AdminDashboard() {
               ))}
             </div>
 
-            {/* ── Main Grid: Alerts + Live Stats ───────────── */}
+            {/* ── Main Grid: Alerts + Sample Stats ───────────── */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               {/* Alerts Feed (2/3) */}
               <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 p-6">
@@ -334,12 +323,12 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              {/* Right Sidebar: Live Stats + Quick Access */}
+              {/* Right Sidebar: Sample Stats + Quick Access */}
               <div className="space-y-6">
-                {/* Live Stats */}
+                {/* Sample Stats */}
                 <div className="bg-white rounded-2xl border border-gray-100 p-6">
                   <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                    Live Stats
+                    Sample Stats
                   </h2>
                   <div className="space-y-4">
                     {liveStats.map((stat) => (
@@ -396,8 +385,7 @@ export default function AdminDashboard() {
                 </div>
               </div>
             </div>
-          </>
-        )}
+        </>
       </main>
     </div>
   );

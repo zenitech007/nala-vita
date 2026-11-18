@@ -1,34 +1,21 @@
+import { ProviderTimeoutError, providerTimeoutResponse } from "@/lib/provider-deadline";
+import { BodyReadError, readBoundedJson } from "@/lib/bounded-body";
+import { imageDataUrlSchema, MAX_IMAGE_DATA_URL } from "@/lib/image-data-url";
+import { requireApiUser } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { createServerSupabaseClient } from "@/lib/supabase-server";
-import { prisma } from "@/lib/prisma";
+
+
 import { checkRateLimitAsync } from "@/lib/rate-limit";
 import { extractLabsFromImage } from "@/lib/amelia/labvision";
 
-const MAX_LEN = 1_800_000; // ~1.8MB of base64
-const bodySchema = z.object({
-  imageDataUrl: z
-    .string()
-    .regex(/^data:image\/[a-zA-Z]+;base64,/, "Must be a base64 image data URL")
-    .max(MAX_LEN, "Image too large"),
-});
+const bodySchema = z.object({ imageDataUrl: imageDataUrlSchema });
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = createServerSupabaseClient();
-    const { data: { user: authUser } } = await supabase.auth.getUser();
-    if (!authUser)
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-    const user = await prisma.user.findUnique({
-      where: { supabaseId: authUser.id },
-      include: { patient: true },
-    });
-    if (!user?.patient)
-      return NextResponse.json(
-        { error: "Patient profile not found" },
-        { status: 404 }
-      );
+    const auth = await requireApiUser({ roles: ["PATIENT"], profile: "patient" });
+    if (!auth.ok) return auth.response;
+    const user = auth.user;
 
     const limit = await checkRateLimitAsync(
       `amelia:lab-photo:${user.id}`,
@@ -40,10 +27,12 @@ export async function POST(req: NextRequest) {
         { status: 429 }
       );
 
-    const { imageDataUrl } = bodySchema.parse(await req.json());
-    const result = await extractLabsFromImage(imageDataUrl);
+    const { imageDataUrl } = bodySchema.parse(await readBoundedJson(req, MAX_IMAGE_DATA_URL + 32_768));
+    const result = await extractLabsFromImage(imageDataUrl, req.signal);
     return NextResponse.json(result);
   } catch (error) {
+    if (error instanceof ProviderTimeoutError) return providerTimeoutResponse();
+    if (error instanceof BodyReadError) return NextResponse.json({ error: error.message }, { status: error.status });
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: "Validation failed", details: error.issues },

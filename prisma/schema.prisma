@@ -42,11 +42,13 @@ enum UrgencyLevel {
 
 model User {
   id            String   @id @default(cuid())
-  supabaseId    String   @unique @map("supabase_id") @db.Uuid
-  email         String   @unique
+  supabaseId    String?  @unique @map("supabase_id") @db.Uuid
+  email         String?  @unique
   firstName     String   @map("first_name")
   lastName      String   @map("last_name")
   phone         String?
+  verifiedPhone String? @map("verified_phone")
+  timeZone      String? @map("time_zone")
   avatarUrl     String?  @map("avatar_url")
   role          Role     @default(PATIENT)
   isActive      Boolean  @default(true) @map("is_active")
@@ -62,6 +64,32 @@ model User {
   receivedMessages Message[]      @relation("ReceivedMessages")
   notifications    Notification[]
   fileUploads      FileUpload[]
+  otpChallenges    OtpChallenge[]
+  doctorVerificationReviews DoctorVerification[] @relation("DoctorVerificationReviewer")
+  requestedRefills RefillRequest[] @relation("RefillRequester")
+  reviewedRefills RefillRequest[] @relation("RefillReviewer")
+
+  accessRequestSourceUser RecordAccessRequest[] @relation("RequestSourceUser")
+
+  accessGrantSourceUser RecordAccessGrant[] @relation("GrantSourceUser")
+
+  requestedAccess RecordAccessRequest[] @relation("AccessRequestActor")
+
+  recordAccessLogs RecordAccessLog[] @relation("AccessLogVieweruser")
+
+  authoredAppointments Appointment[] @relation("AppointmentAuthorUser")
+
+  authoredPrescriptions Prescription[] @relation("PrescriptionAuthorUser")
+
+  authoredVitals Vital[] @relation("VitalAuthorUser")
+
+  authoredLabOrders LabOrder[] @relation("LabOrderAuthorUser")
+
+  authoredLabResults LabResult[] @relation("LabResultAuthorUser")
+
+  authoredMedicalNotes MedicalNote[] @relation("MedicalNoteAuthorUser")
+
+  authoredReferrals Referral[] @relation("ReferralAuthorUser")
 
   @@map("users")
 }
@@ -69,6 +97,7 @@ model User {
 model Patient {
   id                String   @id @default(cuid())
   userId            String   @unique @map("user_id")
+  createdByDoctorId  String? @map("created_by_doctor_id")
   dateOfBirth       DateTime @map("date_of_birth")
   gender            String
   bloodType         String?  @map("blood_type")
@@ -84,6 +113,7 @@ model Patient {
   user                User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   appointments        Appointment[]
   prescriptions       Prescription[]
+  dailyVitalSnapshots DailyVitalSnapshot[]
   vitals              Vital[]
   labOrders           LabOrder[]
   medicalNotes        MedicalNote[]
@@ -92,8 +122,63 @@ model Patient {
   ameliaConversations AmeliaConversation[]
   ameliaMemories      AmeliaMemory[]
   reminders           Reminder[]
+  creatorDoctor       Doctor? @relation("ClinicPatients", fields: [createdByDoctorId], references: [id], onDelete: SetNull)
+  claimInvitations    ClaimInvitation[]
+
+  createdByFacilityId String? @map("created_by_facility_id")
+
+  creatorFacility Facility? @relation("FacilityClinicPatients", fields: [createdByFacilityId], references: [id], onDelete: SetNull)
+
+  recordAccessRequests RecordAccessRequest[] @relation("RequestPatient")
+
+  recordAccessGrants RecordAccessGrant[] @relation("GrantPatient")
+
+  recordAccessLogs RecordAccessLog[] @relation("AccessLogPatient")
 
   @@map("patients")
+}
+
+model OtpChallenge {
+  id           String @id
+  recipientHash String @map("recipient_hash")
+  ipHash        String @map("ip_hash")
+  purpose       String
+  targetUserId  String? @map("target_user_id")
+  bindingHash   String @map("binding_hash")
+  codeHash      String @map("code_hash")
+  context       Json
+  expiresAt     DateTime @map("expires_at")
+  attempts      Int @default(0)
+  consumedAt    DateTime? @map("consumed_at")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  targetUser User? @relation(fields: [targetUserId], references: [id], onDelete: Cascade)
+
+  @@index([recipientHash, createdAt])
+  @@index([ipHash, createdAt])
+  @@map("otp_challenges")
+}
+
+model ClaimInvitation {
+  id             String @id @default(cuid())
+  patientId      String @map("patient_id")
+  issuerDoctorId String @map("issuer_doctor_id")
+  tokenHash      String @unique @map("token_hash")
+  expiresAt      DateTime @map("expires_at")
+  usedAt         DateTime? @map("used_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+  patient        Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  issuerDoctor   Doctor @relation(fields: [issuerDoctorId], references: [id], onDelete: Cascade)
+
+  @@index([patientId, expiresAt])
+  @@map("claim_invitations")
+}
+
+model OtpVerificationBudget {
+  id          String @id
+  windowStart DateTime @map("window_start")
+  count       Int
+  @@map("otp_verification_budgets")
 }
 
 model Doctor {
@@ -103,13 +188,16 @@ model Doctor {
   licenseNumber     String   @unique @map("license_number")
   yearsOfExperience Int      @map("years_of_experience")
   bio               String?
-  consultationFee   Float    @map("consultation_fee")
+  consultationFee   Decimal  @db.Decimal(12, 2) @map("consultation_fee")
   availableDays     String[] @map("available_days")
   availableFrom     String?  @map("available_from")
   availableTo       String?  @map("available_to")
+  timeZone          String?  @map("time_zone")
   isVerified        Boolean  @default(false) @map("is_verified")
   rating            Float    @default(0)
   totalReviews      Int      @default(0) @map("total_reviews")
+  clinicPatients    Patient[] @relation("ClinicPatients")
+  claimInvitations  ClaimInvitation[]
   createdAt         DateTime @default(now()) @map("created_at")
   updatedAt         DateTime @updatedAt @map("updated_at")
 
@@ -121,6 +209,33 @@ model Doctor {
   referralsFrom       Referral[]           @relation("ReferringDoctor")
   referralsTo         Referral[]           @relation("ReferredDoctor")
   ameliaConversations AmeliaConversation[]
+  verification DoctorVerification?
+
+  facilityMemberships FacilityMembership[] @relation("FacilityMemberDoctor")
+
+  accessRequestRequesterDoctor RecordAccessRequest[] @relation("RequestRequesterDoctor")
+
+  accessRequestSourceDoctor RecordAccessRequest[] @relation("RequestSourceDoctor")
+
+  accessGrantRequesterDoctor RecordAccessGrant[] @relation("GrantRequesterDoctor")
+
+  accessGrantSourceDoctor RecordAccessGrant[] @relation("GrantSourceDoctor")
+
+  recordAccessLogs RecordAccessLog[] @relation("AccessLogViewerdoctor")
+
+  authoredAppointments Appointment[] @relation("AppointmentAuthorDoctor")
+
+  authoredPrescriptions Prescription[] @relation("PrescriptionAuthorDoctor")
+
+  authoredVitals Vital[] @relation("VitalAuthorDoctor")
+
+  authoredLabOrders LabOrder[] @relation("LabOrderAuthorDoctor")
+
+  authoredLabResults LabResult[] @relation("LabResultAuthorDoctor")
+
+  authoredMedicalNotes MedicalNote[] @relation("MedicalNoteAuthorDoctor")
+
+  authoredReferrals Referral[] @relation("ReferralAuthorDoctor")
 
   @@index([isVerified, rating])
   @@index([isVerified, specialization, rating])
@@ -160,13 +275,47 @@ model Appointment {
   doctor  Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
   payment Payment?
 
+  authoredByDoctorId String? @map("authored_by_doctor_id")
+
+  authorDoctor Doctor? @relation("AppointmentAuthorDoctor", fields: [authoredByDoctorId], references: [id], onDelete: SetNull)
+
+  authoredByFacilityId String? @map("authored_by_facility_id")
+
+  authorFacility Facility? @relation("AppointmentAuthorFacility", fields: [authoredByFacilityId], references: [id], onDelete: SetNull)
+
+  authoredByUserId String? @map("authored_by_user_id")
+
+  authorUser User? @relation("AppointmentAuthorUser", fields: [authoredByUserId], references: [id], onDelete: SetNull)
+
+  @@index([authoredByDoctorId, patientId])
+  @@index([authoredByFacilityId, patientId])
+
   @@index([patientId, status, scheduledAt])
   @@index([doctorId, status, scheduledAt])
   @@index([doctorId, patientId])
   @@map("appointments")
 }
 
+model RefillRequest {
+  id String @id @default(cuid())
+  prescriptionId String @map("prescription_id")
+  requesterId String @map("requester_id")
+  status String @default("PENDING")
+  reason String?
+  reviewerId String? @map("reviewer_id")
+  reviewedAt DateTime? @map("reviewed_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  prescription Prescription @relation(fields: [prescriptionId], references: [id], onDelete: Cascade)
+  requester User @relation("RefillRequester", fields: [requesterId], references: [id], onDelete: Restrict)
+  reviewer User? @relation("RefillReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
+  @@index([prescriptionId, status, createdAt])
+  @@index([requesterId, createdAt])
+  @@map("refill_requests")
+}
+
 model Prescription {
+  refillRequests RefillRequest[]
   id                 String    @id @default(cuid())
   patientId          String    @map("patient_id")
   doctorId           String?   @map("doctor_id")
@@ -190,10 +339,40 @@ model Prescription {
   patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
   doctor  Doctor? @relation(fields: [doctorId], references: [id], onDelete: Cascade)
 
+  authoredByDoctorId String? @map("authored_by_doctor_id")
+
+  authorDoctor Doctor? @relation("PrescriptionAuthorDoctor", fields: [authoredByDoctorId], references: [id], onDelete: SetNull)
+
+  authoredByFacilityId String? @map("authored_by_facility_id")
+
+  authorFacility Facility? @relation("PrescriptionAuthorFacility", fields: [authoredByFacilityId], references: [id], onDelete: SetNull)
+
+  authoredByUserId String? @map("authored_by_user_id")
+
+  authorUser User? @relation("PrescriptionAuthorUser", fields: [authoredByUserId], references: [id], onDelete: SetNull)
+
+  @@index([authoredByDoctorId, patientId])
+  @@index([authoredByFacilityId, patientId])
+
   @@index([patientId, isActive, prescribedAt])
   @@index([doctorId, prescribedAt])
   @@index([patientId, isSharedWithDoctor])
   @@map("prescriptions")
+}
+
+model DailyVitalSnapshot {
+  id String @id @default(cuid())
+  patientId String @map("patient_id")
+  day String
+  timeZone String @map("time_zone")
+  waterLiters Float @map("water_liters")
+  steps Int
+  medsTaken Boolean @map("meds_taken")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  @@unique([patientId, day, timeZone])
+  @@map("daily_vital_snapshots")
 }
 
 model Vital {
@@ -202,6 +381,9 @@ model Vital {
   bloodPressure    String?  @map("blood_pressure")
   heartRate        Int?     @map("heart_rate")
   temperature      Float?
+  temperatureUnit  String @default("C") @map("temperature_unit")
+  temperatureOriginal Float? @map("temperature_original")
+  temperatureOriginalUnit String? @map("temperature_original_unit")
   respiratoryRate  Int?     @map("respiratory_rate")
   oxygenSaturation Float?   @map("oxygen_saturation")
   weight           Float?
@@ -212,6 +394,21 @@ model Vital {
   createdAt        DateTime @default(now()) @map("created_at")
 
   patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  authoredByDoctorId String? @map("authored_by_doctor_id")
+
+  authorDoctor Doctor? @relation("VitalAuthorDoctor", fields: [authoredByDoctorId], references: [id], onDelete: SetNull)
+
+  authoredByFacilityId String? @map("authored_by_facility_id")
+
+  authorFacility Facility? @relation("VitalAuthorFacility", fields: [authoredByFacilityId], references: [id], onDelete: SetNull)
+
+  authoredByUserId String? @map("authored_by_user_id")
+
+  authorUser User? @relation("VitalAuthorUser", fields: [authoredByUserId], references: [id], onDelete: SetNull)
+
+  @@index([authoredByDoctorId, patientId])
+  @@index([authoredByFacilityId, patientId])
 
   @@index([patientId, recordedAt])
   @@map("vitals")
@@ -233,6 +430,21 @@ model LabOrder {
   doctor  Doctor      @relation(fields: [doctorId], references: [id], onDelete: Cascade)
   results LabResult[]
 
+  authoredByDoctorId String? @map("authored_by_doctor_id")
+
+  authorDoctor Doctor? @relation("LabOrderAuthorDoctor", fields: [authoredByDoctorId], references: [id], onDelete: SetNull)
+
+  authoredByFacilityId String? @map("authored_by_facility_id")
+
+  authorFacility Facility? @relation("LabOrderAuthorFacility", fields: [authoredByFacilityId], references: [id], onDelete: SetNull)
+
+  authoredByUserId String? @map("authored_by_user_id")
+
+  authorUser User? @relation("LabOrderAuthorUser", fields: [authoredByUserId], references: [id], onDelete: SetNull)
+
+  @@index([authoredByDoctorId, patientId])
+  @@index([authoredByFacilityId, patientId])
+
   @@index([patientId, orderedAt])
   @@index([doctorId, orderedAt])
   @@map("lab_orders")
@@ -253,6 +465,21 @@ model LabResult {
 
   labOrder LabOrder @relation(fields: [labOrderId], references: [id], onDelete: Cascade)
 
+  authoredByDoctorId String? @map("authored_by_doctor_id")
+
+  authorDoctor Doctor? @relation("LabResultAuthorDoctor", fields: [authoredByDoctorId], references: [id], onDelete: SetNull)
+
+  authoredByFacilityId String? @map("authored_by_facility_id")
+
+  authorFacility Facility? @relation("LabResultAuthorFacility", fields: [authoredByFacilityId], references: [id], onDelete: SetNull)
+
+  authoredByUserId String? @map("authored_by_user_id")
+
+  authorUser User? @relation("LabResultAuthorUser", fields: [authoredByUserId], references: [id], onDelete: SetNull)
+
+  @@index([authoredByDoctorId, labOrderId])
+  @@index([authoredByFacilityId, labOrderId])
+
   @@index([labOrderId, completedAt])
   @@map("lab_results")
 }
@@ -270,6 +497,21 @@ model MedicalNote {
 
   patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
   doctor  Doctor  @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+
+  authoredByDoctorId String? @map("authored_by_doctor_id")
+
+  authorDoctor Doctor? @relation("MedicalNoteAuthorDoctor", fields: [authoredByDoctorId], references: [id], onDelete: SetNull)
+
+  authoredByFacilityId String? @map("authored_by_facility_id")
+
+  authorFacility Facility? @relation("MedicalNoteAuthorFacility", fields: [authoredByFacilityId], references: [id], onDelete: SetNull)
+
+  authoredByUserId String? @map("authored_by_user_id")
+
+  authorUser User? @relation("MedicalNoteAuthorUser", fields: [authoredByUserId], references: [id], onDelete: SetNull)
+
+  @@index([authoredByDoctorId, patientId])
+  @@index([authoredByFacilityId, patientId])
 
   @@index([patientId, isPrivate, createdAt])
   @@index([patientId, category, createdAt])
@@ -310,6 +552,21 @@ model Referral {
   referringDoctor Doctor  @relation("ReferringDoctor", fields: [referringDoctorId], references: [id], onDelete: Cascade)
   referredDoctor  Doctor  @relation("ReferredDoctor", fields: [referredDoctorId], references: [id], onDelete: Cascade)
 
+  authoredByDoctorId String? @map("authored_by_doctor_id")
+
+  authorDoctor Doctor? @relation("ReferralAuthorDoctor", fields: [authoredByDoctorId], references: [id], onDelete: SetNull)
+
+  authoredByFacilityId String? @map("authored_by_facility_id")
+
+  authorFacility Facility? @relation("ReferralAuthorFacility", fields: [authoredByFacilityId], references: [id], onDelete: SetNull)
+
+  authoredByUserId String? @map("authored_by_user_id")
+
+  authorUser User? @relation("ReferralAuthorUser", fields: [authoredByUserId], references: [id], onDelete: SetNull)
+
+  @@index([authoredByDoctorId, patientId])
+  @@index([authoredByFacilityId, patientId])
+
   @@index([patientId, createdAt])
   @@index([referringDoctorId, createdAt])
   @@index([referredDoctorId, status, createdAt])
@@ -320,7 +577,7 @@ model Payment {
   id                String    @id @default(cuid())
   patientId         String    @map("patient_id")
   appointmentId     String    @unique @map("appointment_id")
-  amount            Float
+  amount            Decimal   @db.Decimal(12, 2)
   currency          String    @default("USD")
   status            String    @default("PENDING")
   paystackReference String?   @map("paystack_reference")
@@ -331,11 +588,48 @@ model Payment {
 
   patient     Patient     @relation(fields: [patientId], references: [id], onDelete: Cascade)
   appointment Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  attempts    PaymentAttempt[]
 
   @@index([patientId, createdAt])
   @@index([paystackReference])
   @@index([status, paidAt])
   @@map("payments")
+}
+
+model PaymentAttempt {
+  id               String   @id @default(cuid())
+  paymentId        String   @map("payment_id")
+  patientId        String   @map("patient_id")
+  appointmentId    String   @map("appointment_id")
+  reference        String   @unique
+  amountMinor      BigInt   @map("amount_minor")
+  currency         String
+  domain           String   @default("test")
+  status           String   @default("INITIATING")
+  authorizationUrl String?  @map("authorization_url")
+  accessCode       String?  @map("access_code")
+  providerTransactionId String? @unique @map("provider_transaction_id")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+  payment          Payment  @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  events           PaymentProviderEvent[]
+
+  @@index([paymentId, status])
+  @@map("payment_attempts")
+}
+
+model PaymentProviderEvent {
+  id                    String   @id @default(cuid())
+  providerEventId       String   @unique @map("provider_event_id")
+  providerTransactionId String   @map("provider_transaction_id")
+  attemptId             String   @map("attempt_id")
+  type                  String
+  outcome               String
+  createdAt             DateTime @default(now()) @map("created_at")
+  attempt               PaymentAttempt @relation(fields: [attemptId], references: [id], onDelete: Restrict)
+
+  @@index([attemptId, createdAt])
+  @@map("payment_provider_events")
 }
 
 model Notification {
@@ -455,6 +749,9 @@ model Reminder {
   label      String
   frequency  String // ONCE | DAILY
   nextFireAt DateTime @map("next_fire_at")
+  timeZone   String? @map("time_zone")
+  localHour  Int? @map("local_hour")
+  localMinute Int? @map("local_minute")
   active     Boolean  @default(true)
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
@@ -464,4 +761,193 @@ model Reminder {
   @@index([patientId, active, nextFireAt])
   @@index([active, nextFireAt])
   @@map("reminders")
+}
+
+enum RecordAccessStatus {
+  PENDING
+  APPROVED
+  DENIED
+  REVOKED
+  EXPIRED
+}
+
+enum RecordScope {
+  PROFILE
+  APPOINTMENTS
+  VITALS
+  PRESCRIPTIONS
+  LAB_TESTS
+  NOTES
+  REFERRALS
+}
+
+model Facility {
+  id String @id @default(cuid())
+  name String
+  isActive Boolean @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  clinicPatients Patient[] @relation("FacilityClinicPatients")
+
+  memberships FacilityMembership[] @relation("FacilityMemberFacility")
+
+  accessRequestRequesterFacility RecordAccessRequest[] @relation("RequestRequesterFacility")
+
+  accessRequestSourceFacility RecordAccessRequest[] @relation("RequestSourceFacility")
+
+  accessGrantRequesterFacility RecordAccessGrant[] @relation("GrantRequesterFacility")
+
+  accessGrantSourceFacility RecordAccessGrant[] @relation("GrantSourceFacility")
+
+  recordAccessLogs RecordAccessLog[] @relation("AccessLogViewerfacility")
+
+  authoredAppointments Appointment[] @relation("AppointmentAuthorFacility")
+
+  authoredPrescriptions Prescription[] @relation("PrescriptionAuthorFacility")
+
+  authoredVitals Vital[] @relation("VitalAuthorFacility")
+
+  authoredLabOrders LabOrder[] @relation("LabOrderAuthorFacility")
+
+  authoredLabResults LabResult[] @relation("LabResultAuthorFacility")
+
+  authoredMedicalNotes MedicalNote[] @relation("MedicalNoteAuthorFacility")
+
+  authoredReferrals Referral[] @relation("ReferralAuthorFacility")
+
+  @@map("facilities")
+}
+
+model FacilityMembership {
+  id String @id @default(cuid())
+  doctorId String @map("doctor_id")
+  facilityId String @map("facility_id")
+  isActive Boolean @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  doctor Doctor @relation("FacilityMemberDoctor", fields: [doctorId], references: [id], onDelete: Cascade)
+
+  facility Facility @relation("FacilityMemberFacility", fields: [facilityId], references: [id], onDelete: Cascade)
+
+  @@unique([doctorId, facilityId])
+  @@index([facilityId, isActive])
+  @@map("facility_memberships")
+}
+
+model RecordAccessRequest {
+  id String @id @default(cuid())
+  patientId String @map("patient_id")
+  requestedByUserId String @map("requested_by_user_id")
+  requesterDoctorId String? @map("requester_doctor_id")
+  requesterFacilityId String? @map("requester_facility_id")
+  sourceDoctorId String? @map("source_doctor_id")
+  sourceFacilityId String? @map("source_facility_id")
+  sourceUserId String? @map("source_user_id")
+  scope RecordScope[]
+  reason String?
+  status RecordAccessStatus @default(PENDING)
+  expiresAt DateTime @map("expires_at")
+  approvedAt DateTime? @map("approved_at")
+  deniedAt DateTime? @map("denied_at")
+  revokedAt DateTime? @map("revoked_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  patient Patient @relation("RequestPatient", fields: [patientId], references: [id], onDelete: Cascade)
+
+  requesterDoctor Doctor? @relation("RequestRequesterDoctor", fields: [requesterDoctorId], references: [id], onDelete: Restrict)
+
+  requesterFacility Facility? @relation("RequestRequesterFacility", fields: [requesterFacilityId], references: [id], onDelete: Restrict)
+
+  sourceDoctor Doctor? @relation("RequestSourceDoctor", fields: [sourceDoctorId], references: [id], onDelete: Restrict)
+
+  sourceFacility Facility? @relation("RequestSourceFacility", fields: [sourceFacilityId], references: [id], onDelete: Restrict)
+
+  sourceUser User? @relation("RequestSourceUser", fields: [sourceUserId], references: [id], onDelete: Restrict)
+
+  requestedBy User @relation("AccessRequestActor", fields: [requestedByUserId], references: [id], onDelete: Restrict)
+
+  grant RecordAccessGrant? @relation("AccessGrantRequest")
+
+  @@index([patientId, status, createdAt])
+  @@index([requestedByUserId, status, createdAt])
+  @@map("record_access_requests")
+}
+
+model RecordAccessGrant {
+  id String @id @default(cuid())
+  requestId String @unique @map("request_id")
+  patientId String @map("patient_id")
+  requesterDoctorId String? @map("requester_doctor_id")
+  requesterFacilityId String? @map("requester_facility_id")
+  sourceDoctorId String? @map("source_doctor_id")
+  sourceFacilityId String? @map("source_facility_id")
+  sourceUserId String? @map("source_user_id")
+  scope RecordScope[]
+  status RecordAccessStatus @default(APPROVED)
+  expiresAt DateTime @map("expires_at")
+  approvedAt DateTime @default(now()) @map("approved_at")
+  revokedAt DateTime? @map("revoked_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  patient Patient @relation("GrantPatient", fields: [patientId], references: [id], onDelete: Cascade)
+
+  requesterDoctor Doctor? @relation("GrantRequesterDoctor", fields: [requesterDoctorId], references: [id], onDelete: Restrict)
+
+  requesterFacility Facility? @relation("GrantRequesterFacility", fields: [requesterFacilityId], references: [id], onDelete: Restrict)
+
+  sourceDoctor Doctor? @relation("GrantSourceDoctor", fields: [sourceDoctorId], references: [id], onDelete: Restrict)
+
+  sourceFacility Facility? @relation("GrantSourceFacility", fields: [sourceFacilityId], references: [id], onDelete: Restrict)
+
+  sourceUser User? @relation("GrantSourceUser", fields: [sourceUserId], references: [id], onDelete: Restrict)
+
+  request RecordAccessRequest @relation("AccessGrantRequest", fields: [requestId], references: [id], onDelete: Restrict)
+
+  accessLogs RecordAccessLog[] @relation("AccessLogGrant")
+
+  @@index([patientId, status, expiresAt])
+  @@index([requesterDoctorId, status, expiresAt])
+  @@index([requesterFacilityId, status, expiresAt])
+  @@map("record_access_grants")
+}
+
+model RecordAccessLog {
+  id String @id @default(cuid())
+  patientId String @map("patient_id")
+  viewerUserId String @map("viewer_user_id")
+  viewerDoctorId String? @map("viewer_doctor_id")
+  viewerFacilityId String? @map("viewer_facility_id")
+  grantId String? @map("grant_id")
+  recordType String @map("record_type")
+  recordId String @map("record_id")
+  viewedAt DateTime @default(now()) @map("viewed_at")
+  patient Patient @relation("AccessLogPatient", fields: [patientId], references: [id], onDelete: Restrict)
+
+  viewerUser User @relation("AccessLogVieweruser", fields: [viewerUserId], references: [id], onDelete: Restrict)
+
+  viewerDoctor Doctor? @relation("AccessLogViewerdoctor", fields: [viewerDoctorId], references: [id], onDelete: Restrict)
+
+  viewerFacility Facility? @relation("AccessLogViewerfacility", fields: [viewerFacilityId], references: [id], onDelete: Restrict)
+
+  grant RecordAccessGrant? @relation("AccessLogGrant", fields: [grantId], references: [id], onDelete: Restrict)
+
+  @@index([patientId, viewedAt])
+  @@index([viewerUserId, viewedAt])
+  @@map("record_access_logs")
+}
+
+
+model DoctorVerification {
+  doctorId String @id @map("doctor_id")
+  status String @default("PENDING")
+  reason String?
+  reviewerId String? @map("reviewer_id")
+  reviewedAt DateTime? @map("reviewed_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  doctor Doctor @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  reviewer User? @relation("DoctorVerificationReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
+
+  @@index([status, updatedAt])
+  @@map("doctor_verifications")
 }

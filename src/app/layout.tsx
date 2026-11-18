@@ -1,8 +1,10 @@
+import {selectMessages} from "@/i18n/messages";
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages } from "next-intl/server";
 import "./globals.css";
+import "./appearance.css";
 import Providers from "@/providers";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
 
@@ -26,7 +28,6 @@ export const viewport: Viewport = {
   themeColor: "#FC94AF",
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
 };
 
 export const metadata: Metadata = {
@@ -35,7 +36,7 @@ export const metadata: Metadata = {
     template: "%s | Nala Vita",
   },
   description:
-    "Nala Vita connects patients, doctors, and administrators. Book appointments, access telemedicine, manage prescriptions, and monitor health — all in one secure, HIPAA-aware platform.",
+    "Nala Vita connects patients, doctors, and administrators. Book appointments, access telemedicine, manage prescriptions, and monitor health — all in one platform.",
   keywords: [
     "healthcare",
     "telemedicine",
@@ -77,13 +78,10 @@ export default async function RootLayout({
 }>) {
   const locale = await getLocale();
 
-  // ✅ FIX: only load the 'common' and 'nav' namespaces at root level.
-  // Each page/layout should load its own namespace via getMessages({ namespace })
-  // so clients only download translations they actually use.
-  const messages = await getMessages();
+  const messages = selectMessages(await getMessages(), ["common", "nav"]);
 
   return (
-    <html lang={locale} className="theme-rose" suppressHydrationWarning>
+    <html lang={locale} data-brand="rose" suppressHydrationWarning>
       <head>
         {/*
           ✅ FIX: silence Chrome's "preloaded but not used" warning.

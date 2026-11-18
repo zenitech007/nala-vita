@@ -1,6 +1,11 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import {useLocale, useTranslations, useFormatter} from "next-intl";
+import BookingTimeSummary from "@/components/appointments/BookingTimeSummary";
+import {isIanaTimeZone} from "@/lib/appointment-availability";
+import {bookingInstant} from "@/lib/booking-time";
+import { Suspense, useEffect, useState, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   Calendar,
@@ -58,6 +63,7 @@ interface DoctorOption {
   availableFrom: string | null;
   availableTo: string | null;
   user: { firstName: string; lastName: string; avatarUrl: string | null };
+  timeZone:string|null;
 }
 
 // ─── Booking Modal Steps ─────────────────────────────────
@@ -106,24 +112,18 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: typeof
   NO_SHOW: { label: "No Show", color: "bg-amber-100 text-amber-700", icon: AlertCircle },
 };
 
-export default function PatientAppointmentsPage() {
+function PatientAppointmentsContent() {
+  const t = useTranslations("appointments");
+  const formatter = useFormatter();
   const [activeTab, setActiveTab] = useState<TabKey>("upcoming");
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [showBooking, setShowBooking] = useState(false);
+  const searchParams = useSearchParams();
+  const [showBooking, setShowBooking] = useState(searchParams.get("action") === "book");
 
-  // Check URL param for auto-open
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("action") === "book") setShowBooking(true);
-  }, []);
-
-  const fetchAppointments = useCallback(async () => {
-    setLoading(true);
-    setLoadError(null);
-    try {
-      const res = await fetch(`/api/appointments?status=${activeTab}`);
+  const fetchAppointments = useCallback(() => {
+    return fetch(`/api/appointments?status=${activeTab}`).then(async res => {
       const data = await res.json().catch(() => null);
 
       if (!res.ok) {
@@ -135,14 +135,15 @@ export default function PatientAppointmentsPage() {
       }
 
       setAppointments(data.appointments);
-    } catch (error) {
+      setLoadError(null);
+    }).catch((error: unknown) => {
       setAppointments([]);
       setLoadError(
         error instanceof Error ? error.message : "Unable to load appointments"
       );
-    } finally {
+    }).finally(() => {
       setLoading(false);
-    }
+    });
   }, [activeTab]);
 
   useEffect(() => {
@@ -150,8 +151,8 @@ export default function PatientAppointmentsPage() {
   }, [fetchAppointments]);
 
   const tabs: { key: TabKey; label: string; count: number | null }[] = [
-    { key: "upcoming", label: "Upcoming", count: activeTab === "upcoming" ? appointments.length : null },
-    { key: "past", label: "Past", count: activeTab === "past" ? appointments.length : null },
+    { key: "upcoming", label: t("upcoming"), count: activeTab === "upcoming" ? appointments.length : null },
+    { key: "past", label: t("past"), count: activeTab === "past" ? appointments.length : null },
     { key: "cancelled", label: "Cancelled", count: activeTab === "cancelled" ? appointments.length : null },
   ];
 
@@ -166,7 +167,7 @@ export default function PatientAppointmentsPage() {
                 <ChevronLeft className="w-5 h-5" />
               </Link>
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">Appointments</h1>
+                <h1 className="text-2xl font-bold text-gray-900">{t("title")}</h1>
                 <p className="text-gray-500 text-sm">Manage your medical appointments</p>
               </div>
             </div>
@@ -187,7 +188,7 @@ export default function PatientAppointmentsPage() {
           {tabs.map((tab) => (
             <button
               key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
+              onClick={() => { if (tab.key !== activeTab) { setLoading(true); setLoadError(null); setActiveTab(tab.key); } }}
               className={cn(
                 "px-5 py-2.5 rounded-lg text-sm font-medium transition",
                 activeTab === tab.key
@@ -216,7 +217,7 @@ export default function PatientAppointmentsPage() {
             <p className="text-gray-700 text-lg font-medium">Could not load appointments</p>
             <p className="text-gray-500 text-sm mt-1">{loadError}</p>
             <button
-              onClick={fetchAppointments}
+              onClick={() => { setLoading(true); setLoadError(null); void fetchAppointments(); }}
               className="mt-4 text-[var(--primary)] hover:opacity-80 font-medium text-sm"
             >
               Try again
@@ -264,7 +265,7 @@ export default function PatientAppointmentsPage() {
                       <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500">
                         <span className="inline-flex items-center gap-1.5">
                           <Calendar className="w-4 h-4" />
-                          {format(new Date(apt.scheduledAt), "MMM d, yyyy")}
+                          {formatter.dateTime(new Date(apt.scheduledAt), { year: "numeric", month: "short", day: "numeric" })}
                         </span>
                         <span className="inline-flex items-center gap-1.5">
                           <Clock className="w-4 h-4" />
@@ -327,6 +328,7 @@ export default function PatientAppointmentsPage() {
 // ═══════════════════════════════════════════════════════════
 
 function BookingModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
+  const locale=useLocale();
   const [step, setStep] = useState<BookingStep>(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -345,16 +347,15 @@ function BookingModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
   // Step 3 — Date & time
   const [selectedDate, setSelectedDate] = useState("");
   const [selectedTime, setSelectedTime] = useState("");
+  let selectedBookingInstant:Date|null=null;
+  try { if(selectedDate&&selectedTime)selectedBookingInstant=bookingInstant(selectedDate,selectedTime); } catch { /* Invalid local times keep progression disabled. */ }
 
   // Step 4 — Reason
   const [reason, setReason] = useState("");
 
-  const loadDoctors = useCallback(async () => {
-    setDoctorsLoading(true);
-    setDoctorsError(null);
+  const loadDoctors = useCallback(() => {
 
-    try {
-      const res = await fetch("/api/doctors?limit=50");
+    return fetch("/api/doctors?limit=50").then(async res => {
       const data = await res.json().catch(() => null);
 
       if (!res.ok) {
@@ -366,15 +367,16 @@ function BookingModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
       }
 
       setDoctors(data.doctors);
-    } catch (error) {
+      setDoctorsError(null);
+    }).catch((error: unknown) => {
       setDoctors([]);
       setSelectedDoctor(null);
       setDoctorsError(
         error instanceof Error ? error.message : "Unable to load doctors"
       );
-    } finally {
+    }).finally(() => {
       setDoctorsLoading(false);
-    }
+    });
   }, []);
 
   useEffect(() => {
@@ -399,7 +401,7 @@ function BookingModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
   });
 
   const handleBook = async () => {
-    if (!selectedDoctor || !selectedDate || !selectedTime) {
+    if (!selectedDoctor || !selectedDoctor.timeZone || !selectedDate || !selectedTime) {
       setSubmitError("Select a doctor, date, and time before booking.");
       return;
     }
@@ -408,15 +410,7 @@ function BookingModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
     setSubmitError(null);
 
     try {
-      // Parse selected time to build the full scheduledAt
-      const [time, meridiem] = selectedTime.split(" ");
-      const [hourStr, minuteStr] = time.split(":");
-      let hour = parseInt(hourStr);
-      if (meridiem === "PM" && hour !== 12) hour += 12;
-      if (meridiem === "AM" && hour === 12) hour = 0;
-
-      const scheduledAt = new Date(selectedDate);
-      scheduledAt.setHours(hour, parseInt(minuteStr), 0, 0);
+      const scheduledAt = bookingInstant(selectedDate,selectedTime);
 
       const res = await fetch("/api/appointments", {
         method: "POST",
@@ -446,9 +440,9 @@ function BookingModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
 
   const canProceed = () => {
     switch (step) {
-      case 1: return !!selectedDoctor;
+      case 1: return !!selectedDoctor?.timeZone&&isIanaTimeZone(selectedDoctor.timeZone);
       case 2: return !!consultationType;
-      case 3: return !!selectedDate && !!selectedTime;
+      case 3: return !!selectedBookingInstant;
       case 4: return true;
       case 5: return true;
       default: return false;
@@ -533,7 +527,7 @@ function BookingModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
                     <AlertCircle className="w-8 h-8 text-red-400 mx-auto mb-2" />
                     <p className="text-sm text-gray-700">{doctorsError}</p>
                     <button
-                      onClick={loadDoctors}
+                      onClick={() => { setDoctorsLoading(true); setDoctorsError(null); void loadDoctors(); }}
                       className="mt-3 text-sm font-medium text-[var(--primary)] hover:opacity-80"
                     >
                       Try again
@@ -544,6 +538,7 @@ function BookingModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
                     {filteredDoctors.map((doc) => (
                       <button
                         key={doc.id}
+                        disabled={!doc.timeZone||!isIanaTimeZone(doc.timeZone)}
                         onClick={() => setSelectedDoctor(doc)}
                         className={cn(
                           "w-full flex items-center gap-4 p-4 rounded-xl border-2 transition text-left",
@@ -560,6 +555,7 @@ function BookingModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
                             Dr. {doc.user.firstName} {doc.user.lastName}
                           </p>
                           <p className="text-sm text-gray-500">{doc.specialization}</p>
+                          {(!doc.timeZone||!isIanaTimeZone(doc.timeZone))&&<p className="text-sm">Booking unavailable until this doctor configures a timezone.</p>}
                           <div className="flex items-center gap-3 mt-1 text-xs text-gray-400">
                             <span>★ {doc.rating}</span>
                             <span>${doc.consultationFee}/visit</span>
@@ -633,7 +629,7 @@ function BookingModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
           {/* ── Step 3: Date & Time ── */}
           {step === 3 && (
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Select Date & Time</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Select Date & Time (your local timezone)</h3>
               <p className="text-sm text-gray-500 mb-6">Pick a convenient date and time slot</p>
 
               {/* Date selection */}
@@ -641,7 +637,7 @@ function BookingModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
                 <label className="block text-sm font-medium text-gray-700 mb-3">Date</label>
                 <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
                   {dateOptions.map((date) => {
-                    const dateStr = date.toISOString().split("T")[0];
+                    const dateStr = format(date, "yyyy-MM-dd");
                     return (
                       <button
                         key={dateStr}
@@ -704,6 +700,7 @@ function BookingModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
           {step === 5 && selectedDoctor && (
             <div>
               <h3 className="text-lg font-semibold text-gray-900 mb-6">Confirm Appointment</h3>
+              {selectedBookingInstant&&<BookingTimeSummary instant={selectedBookingInstant} doctorTimeZone={selectedDoctor.timeZone} locale={locale}/>}
 
               <div className="bg-gray-50 rounded-xl p-5 space-y-4 mb-6">
                 <div className="flex items-center gap-3">
@@ -722,7 +719,7 @@ function BookingModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
                   <div className="flex items-center gap-2 text-sm">
                     <Calendar className="w-4 h-4 text-gray-400" />
                     <span className="text-gray-700">
-                      {selectedDate ? format(new Date(selectedDate), "MMMM d, yyyy") : ""}
+                      {selectedDate ? format(new Date(selectedDate + "T12:00:00"), "MMMM d, yyyy") : ""}
                     </span>
                   </div>
                   <div className="flex items-center gap-2 text-sm">
@@ -827,4 +824,8 @@ function BookingModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
       </div>
     </div>
   );
+}
+
+export default function PatientAppointmentsPage() {
+  return <Suspense fallback={null}><PatientAppointmentsContent /></Suspense>;
 }

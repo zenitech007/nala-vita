@@ -38,3 +38,5 @@ describe("LabPhotoUpload", () => {
     await waitFor(() => expect(screen.getByText(/couldn.t read/i)).toBeInTheDocument());
   });
 });
+
+it('F02 shows retry instead of successful reading for unavailable result',async()=>{mockFetch({status:'unavailable',results:[],summary:'Unavailable',overallNote:'Retry'});render(<LabPhotoUpload/>);pickFile();await waitFor(()=>expect(screen.getByText(/couldn.t read/i)).toBeInTheDocument());expect(screen.queryByText('What Amelia read')).not.toBeInTheDocument();});

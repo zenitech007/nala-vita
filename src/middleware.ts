@@ -1,70 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/auth-helpers-nextjs";
 
-const ROLE_ROUTES: Record<string, string> = {
-  "/patient": "PATIENT",
-  "/doctor": "DOCTOR",
-  "/admin": "ADMIN",
-};
-
 export async function middleware(req: NextRequest) {
-  const res = NextResponse.next();
-
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return req.cookies.getAll().map(({ name, value }) => ({ name, value }));
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            req.cookies.set({ name, value, ...options });
-            res.cookies.set({ name, value, ...options });
-          });
-        },
-      },
-    }
-  );
-
-  // ✅ FIX: getSession() reads the cookie locally — zero network cost.
-  // getUser() (the old code) made a live Supabase Auth API call on every page.
-  let session = null;
-  try {
-    const { data } = await supabase.auth.getSession();
-    session = data?.session ?? null;
-  } catch {
-    session = null;
-  }
-
-  const { pathname } = req.nextUrl;
-
-  if (!session) {
-    const loginUrl = req.nextUrl.clone();
-    loginUrl.pathname = "/login";
-    loginUrl.searchParams.set("redirectTo", pathname);
-    return NextResponse.redirect(loginUrl);
-  }
-
-  // Role is stored in the JWT claims — no extra DB call needed
-  const role =
-    (session.user.user_metadata?.role as string)?.toUpperCase() ?? "";
-
-  for (const [prefix, requiredRole] of Object.entries(ROLE_ROUTES)) {
-    if (pathname.startsWith(prefix)) {
-      if (role !== requiredRole) {
-        const url = req.nextUrl.clone();
-        url.pathname = "/unauthorized";
-        return NextResponse.redirect(url);
-      }
-      break;
-    }
-  }
-
-  return res;
+  const response = NextResponse.next();
+  const supabase = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
+    cookies: {
+      getAll: () => req.cookies.getAll(),
+      setAll(cookies) { for (const { name, value, options } of cookies) {
+        req.cookies.set({ name, value, ...options }); response.cookies.set({ name, value, ...options });
+      } },
+    },
+  });
+  // Verify identity here. Database-backed role/status checks also run in layouts
+  // and APIs; editable JWT metadata never authorizes access.
+  let authenticated = false;
+  try { const { data, error } = await supabase.auth.getUser(); authenticated = !error && !!data.user; } catch { authenticated = false; }
+  if (authenticated) return response;
+  const login = req.nextUrl.clone(); login.pathname = "/login";
+  login.searchParams.set("redirectTo", req.nextUrl.pathname);
+  const redirect = NextResponse.redirect(login);
+  for (const cookie of response.cookies.getAll()) redirect.cookies.set(cookie);
+  return redirect;
 }
-
-export const config = {
-  matcher: ["/patient/:path*", "/doctor/:path*", "/admin/:path*"],
-};
+export const config = { matcher: ["/patient/:path*", "/doctor/:path*", "/admin/:path*"] };

@@ -1,7 +1,12 @@
+import { medicationAdherence } from "@/lib/medication-adherence";
+import { logAudit } from "@/lib/audit";
+import { requireApiUser } from "@/lib/auth";
+import { getRecordVisibility } from "@/lib/record-visibility";
+import { doctorHasPatientAccess } from "@/lib/access-control";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { createServerSupabaseClient } from "@/lib/supabase-server";
+
 import { createNotification } from "@/lib/notifications";
 
 function computeNextDoseAt(frequency: string): string | null {
@@ -33,24 +38,9 @@ function computeNextDoseAt(frequency: string): string | null {
 
 export async function GET(req: NextRequest) {
   try {
-    const supabase = createServerSupabaseClient();
-    const {
-      data: { user: authUser },
-    } = await supabase.auth.getUser();
-
-    if (!authUser) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { supabaseId: authUser.id },
-      include: { patient: true, doctor: true },
-    });
-
-    if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
-    }
-
+    const auth = await requireApiUser({ roles: ["PATIENT", "DOCTOR"] });
+    if (!auth.ok) return auth.response;
+    const user = auth.user;
     const { searchParams } = new URL(req.url);
     const now = new Date();
     const todayStr = now.toISOString().split("T")[0];
@@ -67,28 +57,8 @@ export async function GET(req: NextRequest) {
         );
       }
 
-      const doctorId = user.doctor.id;
-
-      // Access Check: Active appointment or accepted referral
-      const hasAppointment = await prisma.appointment.findFirst({
-        where: { doctorId, patientId },
-        select: { id: true },
-      });
-
-      const hasReferral = hasAppointment
-        ? true
-        : await prisma.referral.findFirst({
-            where: { patientId, referredDoctorId: doctorId, status: "ACCEPTED" },
-            select: { id: true },
-          });
-
-      if (!hasAppointment && !hasReferral) {
-        return NextResponse.json(
-          { error: "Forbidden: No authorized care relationship with patient" },
-          { status: 403 }
-        );
-      }
-
+      if (!await doctorHasPatientAccess(user.doctor.id, patientId)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      const access = await getRecordVisibility(user, patientId);
       // 6-month threshold
       const sixMonthsAgo = new Date(now);
       sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
@@ -96,23 +66,7 @@ export async function GET(req: NextRequest) {
 
       // Query: Doctor medications + patient self-added WHERE isSharedWithDoctor === true
       const prescriptions = await prisma.prescription.findMany({
-        where: {
-          patientId,
-          AND: [
-            {
-              OR: [
-                { addedBy: "DOCTOR" },
-                { isSharedWithDoctor: true },
-              ],
-            },
-            {
-              OR: [
-                { prescribedAt: { gte: sixMonthsAgo } },
-                { isActive: true },
-              ],
-            },
-          ],
-        },
+        where: { AND: [access.where("PRESCRIPTIONS"), { OR: [{ prescribedAt: { gte: sixMonthsAgo } }, { isActive: true }] }] },
         orderBy: { prescribedAt: "desc" },
         include: {
           doctor: {
@@ -123,51 +77,29 @@ export async function GET(req: NextRequest) {
         },
       });
 
-      // Filter usageLogs strictly to the last 6 months (180 days)
-      const sixMonthsDays: string[] = [];
-      for (let i = 180; i >= 0; i--) {
-        const d = new Date(now);
-        d.setDate(d.getDate() - i);
-        sixMonthsDays.push(d.toISOString().split("T")[0]);
-      }
-
+      await access.log("PRESCRIPTIONS", prescriptions);
       let totalExpectedDoses = 0;
       let totalLoggedDoses = 0;
-
       const enriched = prescriptions.map((p) => {
-        const logs = Array.isArray(p.usageLogs) ? p.usageLogs : [];
-        const sixMonthLogs = logs.filter((logEntry) => {
-          const dateStr = logEntry.includes("T") ? logEntry.split("T")[0] : logEntry;
-          return dateStr >= sixMonthsDays[0] && dateStr <= todayStr;
-        });
-
-        const loggedCount = sixMonthLogs.length;
-        totalLoggedDoses += loggedCount;
-
-        // Estimate adherence percentage based on active days (max 180 days)
-        const pDate = new Date(p.prescribedAt);
-        const daysActive = Math.min(
-          180,
-          Math.max(1, Math.floor((now.getTime() - pDate.getTime()) / (1000 * 60 * 60 * 24)))
-        );
-        totalExpectedDoses += daysActive;
-
-        const adherenceRate = Math.min(100, Math.round((loggedCount / daysActive) * 100));
-
+        const adherence = medicationAdherence(p, now, 180);
+        totalExpectedDoses += adherence.expectedDoses;
+        totalLoggedDoses += adherence.loggedDoses;
         return {
           ...p,
-          usageLogs: sixMonthLogs,
+          usageLogs: adherence.logs,
           nextDoseAt: p.isActive ? computeNextDoseAt(p.frequency) : null,
-          adherenceRate,
-          totalLoggedDoses: loggedCount,
-          daysTracked: daysActive,
+          adherenceRate: adherence.rate,
+          adherenceStatus: adherence.status,
+          expectedDoses: adherence.expectedDoses,
+          totalLoggedDoses: adherence.loggedDoses,
+          daysTracked: adherence.daysTracked,
         };
       });
 
       const overallAdherence =
         totalExpectedDoses > 0
           ? Math.min(100, Math.round((totalLoggedDoses / totalExpectedDoses) * 100))
-          : 0;
+          : null;
 
       return NextResponse.json({
         medications: enriched,
@@ -175,6 +107,8 @@ export async function GET(req: NextRequest) {
           window: "6_months",
           overallAdherenceRate: overallAdherence,
           totalLoggedDoses,
+          expectedDoses: totalExpectedDoses,
+          basis: "Estimated from UTC daily entries; individual dose events are unavailable.",
           activeMedicationsCount: enriched.filter((m) => m.isActive).length,
         },
       });
@@ -208,43 +142,28 @@ export async function GET(req: NextRequest) {
       });
 
       let totalLogged7Days = 0;
-      const totalPossible7Days = prescriptions.length * 7;
-
+      let totalPossible7Days = 0;
       const enriched = prescriptions.map((p) => {
-        const logs = Array.isArray(p.usageLogs) ? p.usageLogs : [];
-        const sevenDayLogs = logs.filter((logEntry) => {
-          const dateStr = logEntry.includes("T") ? logEntry.split("T")[0] : logEntry;
-          return last7Days.includes(dateStr);
-        });
-
-        const takenDaysCount = new Set(
-          sevenDayLogs.map((l) => (l.includes("T") ? l.split("T")[0] : l))
-        ).size;
-
-        totalLogged7Days += takenDaysCount;
-
-        const takenToday = sevenDayLogs.some((l) => {
-          const dateStr = l.includes("T") ? l.split("T")[0] : l;
-          return dateStr === todayStr;
-        });
-
-        const adherenceRate7Days = Math.round((takenDaysCount / 7) * 100);
-
+        const adherence = medicationAdherence(p, now, 7);
+        totalLogged7Days += adherence.loggedDoses;
+        totalPossible7Days += adherence.expectedDoses;
         return {
           ...p,
-          usageLogs: sevenDayLogs, // strictly filtered to last 7 days
-          last7DaysLogs: sevenDayLogs,
+          usageLogs: adherence.logs,
+          last7DaysLogs: adherence.logs,
           nextDoseAt: p.isActive ? computeNextDoseAt(p.frequency) : null,
-          takenToday,
-          adherenceRate7Days,
-          takenDaysCount,
+          takenToday: adherence.logs.includes(todayStr),
+          adherenceRate7Days: adherence.rate,
+          adherenceStatus: adherence.status,
+          expectedDoses: adherence.expectedDoses,
+          takenDaysCount: adherence.loggedDoses,
         };
       });
 
       const weeklyAdherence =
         totalPossible7Days > 0
           ? Math.round((totalLogged7Days / totalPossible7Days) * 100)
-          : 0;
+          : null;
 
       return NextResponse.json({
         medications: enriched,
@@ -254,6 +173,8 @@ export async function GET(req: NextRequest) {
           window: "7_days",
           weeklyAdherenceRate: weeklyAdherence,
           totalLogged7Days,
+          expectedDoses: totalPossible7Days,
+          basis: "Estimated from UTC daily entries; individual dose events are unavailable.",
           totalPrescriptions: prescriptions.length,
         },
       });
@@ -290,23 +211,9 @@ const patientAddSchema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = createServerSupabaseClient();
-    const {
-      data: { user: authUser },
-    } = await supabase.auth.getUser();
-
-    if (!authUser) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { supabaseId: authUser.id },
-      include: { patient: true, doctor: true },
-    });
-
-    if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
-    }
+    const auth = await requireApiUser({ roles: ["PATIENT", "DOCTOR"] });
+    if (!auth.ok) return auth.response;
+    const user = auth.user;
 
     const body = await req.json();
 
@@ -315,6 +222,8 @@ export async function POST(req: NextRequest) {
     // ─────────────────────────────────────────────────────────────
     if (user.role === "DOCTOR" && user.doctor) {
       const validated = doctorPrescribeSchema.parse(body);
+
+      if (!await doctorHasPatientAccess(user.doctor!.id, validated.patientId)) return NextResponse.json({error:'Forbidden'}, {status:403});
 
       const patient = await prisma.patient.findUnique({
         where: { id: validated.patientId },
@@ -329,6 +238,7 @@ export async function POST(req: NextRequest) {
         data: {
           patientId: validated.patientId,
           doctorId: user.doctor.id,
+          authoredByDoctorId: user.doctor.id, authoredByUserId: user.id,
           medication: validated.medication,
           dosage: validated.dosage,
           frequency: validated.frequency,
@@ -360,18 +270,12 @@ export async function POST(req: NextRequest) {
       );
 
       // Audit Log
-      await prisma.auditLog.create({
-        data: {
-          userId: user.id,
-          action: "DOCTOR_PRESCRIBE_MEDICATION",
-          resourceType: "PRESCRIPTION",
-          resourceId: prescription.id,
-          metadata: JSON.stringify({
-            patientId: validated.patientId,
-            medication: validated.medication,
-          }),
-        },
-      }).catch(() => {});
+      await logAudit({
+        userId: user.id,
+        action: "DOCTOR_PRESCRIBE_MEDICATION",
+        resourceType: "PRESCRIPTION",
+        resourceId: prescription.id,
+      });
 
       return NextResponse.json(
         {
@@ -392,6 +296,7 @@ export async function POST(req: NextRequest) {
         data: {
           patientId: user.patient.id,
           doctorId: null,
+          authoredByUserId: user.id,
           medication: validated.medication,
           dosage: validated.dosage,
           frequency: validated.frequency,
@@ -406,18 +311,13 @@ export async function POST(req: NextRequest) {
       });
 
       // Audit Log
-      await prisma.auditLog.create({
-        data: {
-          userId: user.id,
-          action: "PATIENT_ADD_MEDICATION",
-          resourceType: "PRESCRIPTION",
-          resourceId: prescription.id,
-          metadata: JSON.stringify({
-            medication: validated.medication,
-            isSharedWithDoctor: validated.isSharedWithDoctor,
-          }),
-        },
-      }).catch(() => {});
+      await logAudit({
+        userId: user.id,
+        action: "PATIENT_ADD_MEDICATION",
+        resourceType: "PRESCRIPTION",
+        resourceId: prescription.id,
+        metadata: { isSharedWithDoctor: validated.isSharedWithDoctor },
+      });
 
       return NextResponse.json(
         {

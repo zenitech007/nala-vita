@@ -1,33 +1,10 @@
 "use client";
+import {fetchJson} from "@/lib/api-fetch";
+import { formatTemperature } from "@/lib/temperature";
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import {
-  FileText,
-  FlaskConical,
-  Pill,
-  HeartPulse,
-  UserCheck,
-  Loader2,
-  ChevronDown,
-  ChevronUp,
-  ExternalLink,
-  Activity,
-  Heart,
-  Thermometer,
-  Droplets,
-  Weight,
-  Candy,
-  Lock,
-  Unlock,
-  Share2,
-  CheckCircle2,
-  XCircle,
-  ShieldCheck,
-  AlertCircle,
-  X,
-  UserPlus,
-} from "lucide-react";
+import { FileText, FlaskConical, Pill, HeartPulse, UserCheck, Loader2, ChevronDown, ChevronUp, ExternalLink, Activity, Heart, Thermometer, Droplets, Weight, Candy, Lock, Unlock, Share2, CheckCircle2, XCircle, ShieldCheck, AlertCircle, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 
@@ -600,7 +577,7 @@ const VITAL_CARDS: VitalCardConfig[] = [
     icon: Thermometer,
     color: "text-emerald-600",
     bgColor: "bg-emerald-50",
-    format: (v) => `${v} °F`,
+    format: (v) => formatTemperature(Number(v), "F"),
   },
   {
     key: "oxygenSaturation",
@@ -944,7 +921,7 @@ function ShareRecordsModal({
         throw new Error(data.error || "Failed to share medical records");
       }
 
-      onSuccess(data.message || "Medical records shared successfully");
+      onSuccess(data.message || "Request prepared. Open Who has access to verify and approve it.");
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error sharing records");
@@ -1043,9 +1020,9 @@ function ShareRecordsModal({
               <span className="text-xs font-semibold text-emerald-900">Protected Health Data Sharing</span>
             </div>
             <ul className="text-xs text-emerald-800 space-y-1 list-disc list-inside">
-              <li>Shares your active prescriptions, vitals, and lab results</li>
-              <li>Shares clinical visit notes, <strong>excluding notes you marked as Restricted (Private)</strong></li>
-              <li>Directly links the provider to your record in accordance with patient authorization</li>
+              <li>Prepares a request for your entered records and profile</li>
+              <li>Choose the source, scope and duration in <Link href="/patient/access" className="underline">Who has access</Link>, then verify an email code</li>
+              <li>Providers keep their authored records. Previously viewed data cannot be recalled.</li>
             </ul>
           </div>
 
@@ -1066,12 +1043,12 @@ function ShareRecordsModal({
               {submitting ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  Authorizing...
+                  Preparing request...
                 </>
               ) : (
                 <>
                   <Share2 className="w-4 h-4" />
-                  Authorize & Share Records
+                  Prepare sharing request
                 </>
               )}
             </button>
@@ -1092,19 +1069,10 @@ export default function PatientRecordsPage() {
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [showShareModal, setShowShareModal] = useState(false);
 
-  async function fetchRecords() {
-    try {
-      setLoading(true);
-      setError(null);
-      const res = await fetch("/api/records");
-      if (!res.ok) throw new Error("Failed to load records");
-      const json: RecordsData = await res.json();
-      setData(json);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
-    } finally {
-      setLoading(false);
-    }
+  function fetchRecords(){
+    return fetchJson<RecordsData>("/api/records")
+      .then(json=>{setData(json);setError(null);setLoading(false);})
+      .catch(error=>{setError(error instanceof Error?error.message:"Records unavailable");setLoading(false);});
   }
 
   useEffect(() => {
@@ -1230,9 +1198,10 @@ export default function PatientRecordsPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Medical Records</h1>
           <p className="text-sm text-gray-500 mt-1">
-            View your complete medical history, manage privacy, and authorize doctor transfers.
+            View your medical history and manage scoped record sharing.
           </p>
         </div>
+        <Link href="/patient/access" className="self-start rounded-xl border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-900">Who has access</Link>
         <button
           onClick={() => setShowShareModal(true)}
           className="inline-flex items-center gap-2 px-4 py-2.5 bg-[var(--primary)] text-white text-sm font-semibold rounded-xl hover:opacity-95 shadow-sm transition-all self-start sm:self-auto"

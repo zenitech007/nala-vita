@@ -1,9 +1,10 @@
+import {mockOf} from "../helpers/mock";
 import { describe, it, expect, jest, beforeEach } from "@jest/globals";
 import { render, screen, fireEvent } from "@testing-library/react";
 import AddMedicationModal from "@/components/medications/AddMedicationModal";
 
 const onClose = jest.fn();
-const onAdd = jest.fn().mockImplementation(() => Promise.resolve());
+const onAdd=mockOf<React.ComponentProps<typeof AddMedicationModal>["onAdd"]>().mockResolvedValue(undefined);
 
 beforeEach(() => {
   onClose.mockClear();
@@ -48,7 +49,7 @@ describe("AddMedicationModal", () => {
     await new Promise((r) => setTimeout(r, 50));
 
     expect(onAdd).toHaveBeenCalled();
-    const arg = onAdd.mock.calls[0][0] as Record<string, unknown>;
+    const arg = onAdd.mock.calls[0][0];
     expect(arg.name).toBe("Lisinopril");
     expect(arg.dosage).toBe("10mg");
     expect(arg.frequency).toBe("Once daily");

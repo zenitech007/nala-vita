@@ -1,16 +1,17 @@
+import {mockOf} from "../helpers/mock";
 import { describe, it, expect, jest, beforeEach } from "@jest/globals";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import HealthDashboard from "@/components/dashboard/HealthDashboard";
 
-const onUpdate = jest.fn().mockImplementation(() => Promise.resolve());
+const onUpdate=mockOf<NonNullable<React.ComponentProps<typeof HealthDashboard>["onUpdate"]>>().mockResolvedValue(undefined);
 
-beforeEach(() => onUpdate.mockClear());
+beforeEach(() => {onUpdate.mockClear();});
 
 describe("HealthDashboard", () => {
   it("renders hydration, medication, and steps sections", () => {
     render(<HealthDashboard />);
     expect(screen.getByText(/hydration/i)).toBeInTheDocument();
-    expect(screen.getByText(/medication/i)).toBeInTheDocument();
+    expect(screen.getByRole("heading",{name:"Medication"})).toBeInTheDocument();
     expect(screen.getByText(/steps/i)).toBeInTheDocument();
   });
 
@@ -38,7 +39,7 @@ describe("HealthDashboard", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: /add 250ml/i }));
-    await new Promise((r) => setTimeout(r, 20));
+    await waitFor(()=>expect(screen.getByRole("status")).toHaveTextContent("Daily vitals saved"));
 
     expect(onUpdate).toHaveBeenCalled();
     const arg = onUpdate.mock.calls[0][0] as { waterLiters: number };
@@ -57,10 +58,18 @@ describe("HealthDashboard", () => {
     const tapHint = screen.getByText(/tap to log/i);
     const card = tapHint.closest("div[class*='cursor-pointer']") as HTMLElement;
     fireEvent.click(card);
-    await new Promise((r) => setTimeout(r, 20));
+    await waitFor(()=>expect(screen.getByRole("status")).toHaveTextContent("Daily vitals saved"));
 
     expect(onUpdate).toHaveBeenCalled();
     const arg = onUpdate.mock.calls[0][0] as { medsTaken: boolean };
     expect(arg.medsTaken).toBe(true);
   });
+});
+
+it("keeps the daily draft and reports save failures without a saved claim",async()=>{
+ const failure=jest.fn<()=>Promise<void>>().mockRejectedValue(new Error("Unable to save daily vitals"));
+ render(<HealthDashboard initialVitals={{waterLiters:1,steps:0,medsTaken:false}} onUpdate={failure}/>);
+ fireEvent.click(screen.getByRole("button",{name:/add 250ml/i}));
+ await waitFor(()=>expect(screen.getByRole("alert")).toHaveTextContent("Unable to save daily vitals"));
+ expect(screen.getByText("1.25")).toBeInTheDocument();expect(screen.queryByText("Daily vitals saved")).not.toBeInTheDocument();
 });

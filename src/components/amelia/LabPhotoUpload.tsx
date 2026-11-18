@@ -5,7 +5,7 @@ import { Camera, Loader2, X } from "lucide-react";
 import { downscaleImage } from "@/lib/downscaleImage";
 
 interface ExtractedLab { name: string; value: string; unit: string | null; referenceRange: string | null; flag: string }
-interface LabPhotoResult { results: ExtractedLab[]; summary: string; overallNote: string }
+interface LabPhotoResult { status?: "available" | "unavailable"; results: ExtractedLab[]; summary: string; overallNote: string }
 
 const FLAG_STYLE: Record<string, string> = {
   abnormal: "text-red-600",
@@ -30,7 +30,7 @@ export default function LabPhotoUpload() {
         body: JSON.stringify({ imageDataUrl }),
       });
       const data = await res.json();
-      if (res.ok) {
+      if (res.ok && data.status !== "unavailable") {
         setResult(data);
         setState("done");
       } else {

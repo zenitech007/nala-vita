@@ -1,7 +1,7 @@
+import { parsePagination, PaginationError } from "@/lib/pagination";
+import { requireApiUser } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
-import { createServerSupabaseClient } from "@/lib/supabase-server";
-import { prisma } from "@/lib/prisma";
-import { listConversations, getLatestConversation } from "@/lib/amelia/conversations";
+import { listConversationPage, getLatestConversation } from "@/lib/amelia/conversations";
 
 /**
  * GET /api/amelia/conversations          → sidebar list
@@ -9,25 +9,21 @@ import { listConversations, getLatestConversation } from "@/lib/amelia/conversat
  */
 export async function GET(req: NextRequest) {
   try {
-    const supabase = createServerSupabaseClient();
-    const { data: { user: authUser } } = await supabase.auth.getUser();
-    if (!authUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await requireApiUser({ roles: ["PATIENT"], profile: "patient" });
+    if (!auth.ok) return auth.response;
+    const user = auth.user;
 
-    const user = await prisma.user.findUnique({
-      where: { supabaseId: authUser.id },
-      include: { patient: true },
-    });
-    if (!user?.patient) return NextResponse.json({ error: "Patient profile not found" }, { status: 404 });
-
-    const conversations = await listConversations(user.patient.id);
+    const { limit, cursor } = parsePagination(req.nextUrl.searchParams, 50);
+    const { conversations, nextCursor } = await listConversationPage(user.patient!.id, limit, cursor);
 
     if (req.nextUrl.searchParams.get("latest") === "1") {
-      const latest = await getLatestConversation(user.patient.id);
-      return NextResponse.json({ conversations, latest });
+      const latest = await getLatestConversation(user.patient!.id);
+      return NextResponse.json({ conversations, latest, nextCursor });
     }
 
-    return NextResponse.json({ conversations });
+    return NextResponse.json({ conversations, nextCursor });
   } catch (error) {
+    if (error instanceof PaginationError) return NextResponse.json({ error: error.message }, { status: 400 });
     console.error("Amelia conversations GET error:", error);
     return NextResponse.json({ error: "Failed to load conversations." }, { status: 500 });
   }

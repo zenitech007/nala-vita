@@ -3,36 +3,10 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import {
-  Globe,
-  Type,
-  Sun,
-  Moon,
-  Check,
-  Loader2,
-  ChevronLeft,
-  Palette,
-  User,
-  Bell,
-  Shield,
-  Cpu,
-  Save,
-  Phone,
-  Mail,
-  Heart,
-  Scale,
-  Sparkles,
-  Smartphone,
-  Volume2,
-  Lock,
-  FileText,
-  AlertCircle,
-  Activity,
-  CheckCircle2,
-  RefreshCw,
-} from "lucide-react";
+import { Globe, Type, Sun, Moon, Check, Loader2, ChevronLeft, Palette, User, Bell, Shield, Cpu, Save, Phone, Mail, Heart, Scale, Sparkles, Smartphone, Volume2, Lock, FileText, AlertCircle, Activity } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useTranslations } from "next-intl";
+import {useLocalPreference,readBoolean} from "@/hooks/useLocalPreference";
+import { useTranslations, useLocale } from "next-intl";
 import { ThemeSwitcher } from "@/components/ui/ThemeSwitcher";
 
 // ─── Types ───────────────────────────────────────────────
@@ -74,6 +48,7 @@ interface UserProfileData {
   firstName?: string;
   lastName?: string;
   phone?: string;
+  timeZone?: string;
   role?: string;
   avatarUrl?: string | null;
   patient?: {
@@ -151,11 +126,11 @@ export default function SettingsPanel({
   const [activeTab, setActiveTab] = useState<SettingsTab>("general");
 
   // ─── General & Display State ────────────────────────────
-  const [currentLocale, setCurrentLocale] = useState("en");
-  const [fontSize, setFontSize] = useState<FontSize>("medium");
-  const [highContrast, setHighContrast] = useState(false);
-  const [unitSystem, setUnitSystem] = useState<UnitSystem>("metric");
-  const [glucoseUnit, setGlucoseUnit] = useState<GlucoseUnit>("mg/dL");
+  const currentLocale=useLocale();
+  const [fontSize,setFontSize]=useLocalPreference<FontSize>("mediconnect-font-size","medium",raw=>raw==="small"||raw==="medium"||raw==="large"?raw:undefined);
+  const [highContrast,setHighContrast]=useLocalPreference("mediconnect-high-contrast",false,readBoolean);
+  const [unitSystem,setUnitSystem]=useLocalPreference<UnitSystem>("mediconnect-unit-system","metric",raw=>raw==="imperial"||raw==="metric"?raw:undefined);
+  const [glucoseUnit,setGlucoseUnit]=useLocalPreference<GlucoseUnit>("mediconnect-glucose-unit","mg/dL",raw=>raw==="mmol/L"||raw==="mg/dL"?raw:undefined);
 
   // ─── Profile State ──────────────────────────────────────
   const [profile, setProfile] = useState<UserProfileData>({
@@ -172,14 +147,16 @@ export default function SettingsPanel({
       insuranceNumber: "",
     },
   });
-  const [loadingProfile, setLoadingProfile] = useState(true);
+  const [, setLoadingProfile] = useState(true);
   const [savingProfile, setSavingProfile] = useState(false);
+  const [profileError, setProfileError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<Record<string,string>>({});
 
   // ─── Notification Preferences State ─────────────────────
-  const [notifyEmail, setNotifyEmail] = useState(true);
-  const [notifySms, setNotifySms] = useState(true);
-  const [notifyAmelia, setNotifyAmelia] = useState(true);
-  const [notifySound, setNotifySound] = useState(true);
+  const [notifyEmail,setNotifyEmail]=useLocalPreference("mediconnect-notify-email",true,readBoolean);
+  const [notifySms,setNotifySms]=useLocalPreference("mediconnect-notify-sms",true,readBoolean);
+  const [notifyAmelia,setNotifyAmelia]=useLocalPreference("mediconnect-notify-amelia",true,readBoolean);
+  const [notifySound,setNotifySound]=useLocalPreference("mediconnect-notify-sound",true,readBoolean);
 
   // ─── UI Status States ───────────────────────────────────
   const [savingLocale, setSavingLocale] = useState(false);
@@ -190,47 +167,9 @@ export default function SettingsPanel({
     setTimeout(() => setSavedBanner(null), 3500);
   };
 
-  // ─── Load Local Preferences ─────────────────────────────
-  useEffect(() => {
-    const match = document.cookie.match(/NEXT_LOCALE=([^;]+)/);
-    if (match) setCurrentLocale(match[1]);
-
-    const storedFontSize = localStorage.getItem("mediconnect-font-size");
-    if (storedFontSize === "small" || storedFontSize === "medium" || storedFontSize === "large") {
-      setFontSize(storedFontSize);
-    }
-
-    const storedContrast = localStorage.getItem("mediconnect-high-contrast");
-    if (storedContrast === "true") setHighContrast(true);
-
-    const storedUnits = localStorage.getItem("mediconnect-unit-system");
-    if (storedUnits === "imperial" || storedUnits === "metric") {
-      setUnitSystem(storedUnits);
-    }
-
-    const storedGlucose = localStorage.getItem("mediconnect-glucose-unit");
-    if (storedGlucose === "mmol/L" || storedGlucose === "mg/dL") {
-      setGlucoseUnit(storedGlucose);
-    }
-
-    // Notifications
-    const storedEmail = localStorage.getItem("mediconnect-notify-email");
-    if (storedEmail !== null) setNotifyEmail(storedEmail === "true");
-
-    const storedSms = localStorage.getItem("mediconnect-notify-sms");
-    if (storedSms !== null) setNotifySms(storedSms === "true");
-
-    const storedAmelia = localStorage.getItem("mediconnect-notify-amelia");
-    if (storedAmelia !== null) setNotifyAmelia(storedAmelia === "true");
-
-    const storedSound = localStorage.getItem("mediconnect-notify-sound");
-    if (storedSound !== null) setNotifySound(storedSound === "true");
-  }, []);
-
   // ─── Apply Font Size and High Contrast ──────────────────
   useEffect(() => {
     document.documentElement.style.fontSize = FONT_SIZE_ROOT[fontSize];
-    localStorage.setItem("mediconnect-font-size", fontSize);
   }, [fontSize]);
 
   useEffect(() => {
@@ -239,7 +178,6 @@ export default function SettingsPanel({
     } else {
       document.documentElement.classList.remove("high-contrast");
     }
-    localStorage.setItem("mediconnect-high-contrast", String(highContrast));
   }, [highContrast]);
 
   // ─── Persist Unit Preferences ───────────────────────────
@@ -298,11 +236,13 @@ export default function SettingsPanel({
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setSavingProfile(true);
+    setProfileError("");setFieldErrors({});
     try {
       const payload = {
         firstName: profile.firstName,
         lastName: profile.lastName,
         phone: profile.phone,
+        timeZone: profile.timeZone || undefined,
         emergencyName: profile.patient?.emergencyName,
         emergencyPhone: profile.patient?.emergencyPhone,
         address: profile.patient?.address,
@@ -320,10 +260,17 @@ export default function SettingsPanel({
       if (res.ok) {
         showToast("Profile & health information saved successfully!");
       } else {
-        showToast("Failed to save profile. Please try again.");
+        const body: unknown = await res.json().catch(() => null);
+        const result = body && typeof body === "object" ? body as {error?:unknown;details?:unknown} : {};
+        const fields: Record<string,string> = {};
+        if(Array.isArray(result.details)) for(const item of result.details) {
+          if(item && typeof item === "object" && "path" in item && Array.isArray(item.path) && typeof item.path[0] === "string" && "message" in item && typeof item.message === "string") fields[item.path[0]]=item.message;
+        }
+        setFieldErrors(fields);
+        setProfileError(typeof result.error === "string" ? result.error : "Failed to save profile. Please try again.");
       }
     } catch {
-      showToast("Network error saving profile");
+      setProfileError("Could not reach the service. Your draft is kept; please retry.");
     } finally {
       setSavingProfile(false);
     }
@@ -341,7 +288,6 @@ export default function SettingsPanel({
         });
 
         if (res.ok) {
-          setCurrentLocale(locale);
           showToast(t("savedSuccessfully"));
           router.refresh();
         }
@@ -446,6 +392,7 @@ export default function SettingsPanel({
               initial={{ opacity: 0, y: -20, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -20, scale: 0.95 }}
+              role="status"
               className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-2xl bg-gray-900 text-white shadow-xl border border-gray-700"
             >
               <div className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500 text-white">
@@ -611,10 +558,11 @@ export default function SettingsPanel({
                   </div>
                   <div>
                     <h2 className="text-base font-semibold text-gray-900">Clinical Units</h2>
-                    <p className="text-sm text-gray-500">Choose standard measurement units for vitals and lab data.</p>
+                    <p className="text-sm text-gray-500">Unit conversion settings are not connected to clinical displays.</p>
                   </div>
                 </div>
 
+                <fieldset disabled className="min-w-0"><legend className="sr-only">Clinical unit preferences</legend><p className="mb-4 text-sm" role="status">Unit conversion preferences are unavailable. Vitals keep their explicitly recorded units.</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">
@@ -676,6 +624,7 @@ export default function SettingsPanel({
                     </div>
                   </div>
                 </div>
+              </fieldset>
               </motion.section>
             </motion.div>
           )}
@@ -690,6 +639,7 @@ export default function SettingsPanel({
               transition={{ duration: 0.2 }}
             >
               <form onSubmit={handleSaveProfile} className="space-y-6">
+                {profileError&&<p role="alert">{profileError}</p>}
                 {/* Account Card */}
                 <section className="bg-white rounded-2xl border border-gray-200/80 p-6 shadow-xs">
                   <div className="flex items-center gap-4 mb-6 pb-6 border-b border-gray-100">
@@ -717,36 +667,53 @@ export default function SettingsPanel({
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1.5">First Name</label>
-                      <input
+                      <label htmlFor="profile-firstName" className="block text-xs font-medium text-gray-700 mb-1.5">First Name</label>
+                      <input id="profile-firstName" aria-invalid={!!fieldErrors.firstName} aria-describedby={fieldErrors.firstName ? "profile-firstName-error" : undefined}
                         type="text"
                         value={profile.firstName ?? ""}
                         onChange={(e) => setProfile({ ...profile, firstName: e.target.value })}
                         placeholder="First Name"
                         className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
                       />
+                      {fieldErrors.firstName&&<p id="profile-firstName-error" role="alert">{fieldErrors.firstName}</p>}
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1.5">Last Name</label>
-                      <input
+                      <label htmlFor="profile-lastName" className="block text-xs font-medium text-gray-700 mb-1.5">Last Name</label>
+                      <input id="profile-lastName" aria-invalid={!!fieldErrors.lastName} aria-describedby={fieldErrors.lastName ? "profile-lastName-error" : undefined}
                         type="text"
                         value={profile.lastName ?? ""}
                         onChange={(e) => setProfile({ ...profile, lastName: e.target.value })}
                         placeholder="Last Name"
                         className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
                       />
+                      {fieldErrors.lastName&&<p id="profile-lastName-error" role="alert">{fieldErrors.lastName}</p>}
                     </div>
                     <div className="sm:col-span-2">
-                      <label className="block text-xs font-medium text-gray-700 mb-1.5">Phone Number</label>
+                      <label htmlFor="profile-timezone" className="block text-xs font-medium text-gray-700 mb-1.5">Reminder timezone</label>
+                      <input
+                        id="profile-timezone"
+                        type="text"
+                        value={profile.timeZone ?? ""}
+                        onChange={(e) => setProfile({ ...profile, timeZone: e.target.value })}
+                        placeholder="Africa/Lagos"
+                        aria-invalid={!!fieldErrors.timeZone} aria-describedby={fieldErrors.timeZone ? "profile-timezone-help profile-timeZone-error" : "profile-timezone-help"}
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+                      />
+                      <p id="profile-timezone-help" className="mt-1 text-sm text-gray-600">Save your IANA timezone before setting reminders. Existing reminders keep their saved timezone.</p>
+                      {fieldErrors.timeZone&&<p id="profile-timeZone-error" role="alert">{fieldErrors.timeZone}</p>}
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label htmlFor="profile-phone" className="block text-xs font-medium text-gray-700 mb-1.5">Phone Number</label>
                       <div className="relative">
                         <Phone className="w-4 h-4 absolute left-3.5 top-3 text-gray-400" />
-                        <input
+                        <input id="profile-phone" aria-invalid={!!fieldErrors.phone} aria-describedby={fieldErrors.phone ? "profile-phone-error" : undefined}
                           type="tel"
                           value={profile.phone ?? ""}
                           onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
                           placeholder="+234 800 000 0000"
                           className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
                         />
+                      {fieldErrors.phone&&<p id="profile-phone-error" role="alert">{fieldErrors.phone}</p>}
                       </div>
                     </div>
                   </div>
@@ -766,8 +733,8 @@ export default function SettingsPanel({
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1.5">Blood Type</label>
-                      <select
+                      <label htmlFor="profile-bloodType" className="block text-xs font-medium text-gray-700 mb-1.5">Blood Type</label>
+                      <select id="profile-bloodType" aria-invalid={!!fieldErrors.bloodType} aria-describedby={fieldErrors.bloodType ? "profile-bloodType-error" : undefined}
                         value={profile.patient?.bloodType ?? ""}
                         onChange={(e) =>
                           setProfile({
@@ -787,11 +754,12 @@ export default function SettingsPanel({
                         <option value="O+">O+</option>
                         <option value="O-">O-</option>
                       </select>
+                      {fieldErrors.bloodType&&<p id="profile-bloodType-error" role="alert">{fieldErrors.bloodType}</p>}
                     </div>
 
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1.5">Residential Address</label>
-                      <input
+                      <label htmlFor="profile-address" className="block text-xs font-medium text-gray-700 mb-1.5">Residential Address</label>
+                      <input id="profile-address" aria-invalid={!!fieldErrors.address} aria-describedby={fieldErrors.address ? "profile-address-error" : undefined}
                         type="text"
                         value={profile.patient?.address ?? ""}
                         onChange={(e) =>
@@ -803,11 +771,12 @@ export default function SettingsPanel({
                         placeholder="Street, City, State"
                         className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
                       />
+                      {fieldErrors.address&&<p id="profile-address-error" role="alert">{fieldErrors.address}</p>}
                     </div>
 
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1.5">Emergency Contact Name</label>
-                      <input
+                      <label htmlFor="profile-emergencyName" className="block text-xs font-medium text-gray-700 mb-1.5">Emergency Contact Name</label>
+                      <input id="profile-emergencyName" aria-invalid={!!fieldErrors.emergencyName} aria-describedby={fieldErrors.emergencyName ? "profile-emergencyName-error" : undefined}
                         type="text"
                         value={profile.patient?.emergencyName ?? ""}
                         onChange={(e) =>
@@ -819,11 +788,12 @@ export default function SettingsPanel({
                         placeholder="Spouse / Parent / Next of Kin"
                         className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
                       />
+                      {fieldErrors.emergencyName&&<p id="profile-emergencyName-error" role="alert">{fieldErrors.emergencyName}</p>}
                     </div>
 
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1.5">Emergency Contact Phone</label>
-                      <input
+                      <label htmlFor="profile-emergencyPhone" className="block text-xs font-medium text-gray-700 mb-1.5">Emergency Contact Phone</label>
+                      <input id="profile-emergencyPhone" aria-invalid={!!fieldErrors.emergencyPhone} aria-describedby={fieldErrors.emergencyPhone ? "profile-emergencyPhone-error" : undefined}
                         type="tel"
                         value={profile.patient?.emergencyPhone ?? ""}
                         onChange={(e) =>
@@ -835,6 +805,7 @@ export default function SettingsPanel({
                         placeholder="+234 800 123 4567"
                         className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
                       />
+                      {fieldErrors.emergencyPhone&&<p id="profile-emergencyPhone-error" role="alert">{fieldErrors.emergencyPhone}</p>}
                     </div>
                   </div>
                 </section>
@@ -853,8 +824,8 @@ export default function SettingsPanel({
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1.5">Insurance Provider</label>
-                      <input
+                      <label htmlFor="profile-insuranceProvider" className="block text-xs font-medium text-gray-700 mb-1.5">Insurance Provider</label>
+                      <input id="profile-insuranceProvider" aria-invalid={!!fieldErrors.insuranceProvider} aria-describedby={fieldErrors.insuranceProvider ? "profile-insuranceProvider-error" : undefined}
                         type="text"
                         value={profile.patient?.insuranceProvider ?? ""}
                         onChange={(e) =>
@@ -866,10 +837,11 @@ export default function SettingsPanel({
                         placeholder="e.g. AXA Mansard, Hygeia HMO"
                         className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
                       />
+                      {fieldErrors.insuranceProvider&&<p id="profile-insuranceProvider-error" role="alert">{fieldErrors.insuranceProvider}</p>}
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1.5">Policy / Member ID</label>
-                      <input
+                      <label htmlFor="profile-insuranceNumber" className="block text-xs font-medium text-gray-700 mb-1.5">Policy / Member ID</label>
+                      <input id="profile-insuranceNumber" aria-invalid={!!fieldErrors.insuranceNumber} aria-describedby={fieldErrors.insuranceNumber ? "profile-insuranceNumber-error" : undefined}
                         type="text"
                         value={profile.patient?.insuranceNumber ?? ""}
                         onChange={(e) =>
@@ -881,6 +853,7 @@ export default function SettingsPanel({
                         placeholder="POL-12345678"
                         className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
                       />
+                      {fieldErrors.insuranceNumber&&<p id="profile-insuranceNumber-error" role="alert">{fieldErrors.insuranceNumber}</p>}
                     </div>
                   </div>
                 </section>
@@ -923,10 +896,11 @@ export default function SettingsPanel({
                   </div>
                   <div>
                     <h2 className="text-base font-semibold text-gray-900">Delivery Channels</h2>
-                    <p className="text-sm text-gray-500">Configure how and where Nala Vita contacts you.</p>
+                    <p className="text-sm text-gray-500">Delivery preference controls are not connected to notification services.</p>
                   </div>
                 </div>
 
+                <fieldset disabled className="min-w-0"><legend className="sr-only">Notification delivery preferences</legend><p className="mb-4 text-sm" role="status">Notification delivery preferences are unavailable. These controls do not change delivery.</p>
                 <div className="divide-y divide-gray-100">
                   {/* Email Notifications */}
                   <div className="flex items-center justify-between py-4">
@@ -1008,6 +982,7 @@ export default function SettingsPanel({
                     />
                   </div>
                 </div>
+              </fieldset>
               </section>
             </motion.div>
           )}
@@ -1022,57 +997,15 @@ export default function SettingsPanel({
               transition={{ duration: 0.2 }}
               className="space-y-6"
             >
-              {/* HIPAA / Security Status */}
+              {/* Security information */}
               <section className="bg-white rounded-2xl border border-gray-200/80 p-6 shadow-xs">
                 <div className="flex items-center gap-3 mb-5">
                   <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center">
                     <Shield className="w-5 h-5 text-emerald-700" />
                   </div>
                   <div>
-                    <h2 className="text-base font-semibold text-gray-900">Data Security & Encryption</h2>
-                    <p className="text-sm text-gray-500">HIPAA & GDPR-aligned clinical protection protocols.</p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 mb-6">
-                  <div className="p-4 rounded-xl bg-gray-50 border border-gray-100 flex items-start gap-3">
-                    <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
-                    <div>
-                      <p className="text-sm font-semibold text-gray-900">End-to-End In Transit</p>
-                      <p className="text-xs text-gray-500 mt-0.5">
-                        TLS 1.3 encryption across all telehealth video channels and patient records.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="p-4 rounded-xl bg-gray-50 border border-gray-100 flex items-start gap-3">
-                    <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
-                    <div>
-                      <p className="text-sm font-semibold text-gray-900">PHI Redaction Engine</p>
-                      <p className="text-xs text-gray-500 mt-0.5">
-                        Automatic stripping of Protected Health Information from audit records.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="p-4 rounded-xl bg-gray-50 border border-gray-100 flex items-start gap-3">
-                    <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
-                    <div>
-                      <p className="text-sm font-semibold text-gray-900">Supabase Row-Level Security</p>
-                      <p className="text-xs text-gray-500 mt-0.5">
-                        Strict multi-tenant role isolation ensuring only authorized doctors access records.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="p-4 rounded-xl bg-gray-50 border border-gray-100 flex items-start gap-3">
-                    <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
-                    <div>
-                      <p className="text-sm font-semibold text-gray-900">Session Guard</p>
-                      <p className="text-xs text-gray-500 mt-0.5">
-                        Cryptographically signed JWT tokens with automatic timeout protection.
-                      </p>
-                    </div>
+                    <h2 className="text-base font-semibold text-gray-900">Record access information</h2>
+                    <p className="text-sm text-gray-500">Review your sharing choices before sharing records with a clinician.</p>
                   </div>
                 </div>
 
@@ -1146,13 +1079,7 @@ export default function SettingsPanel({
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-xs font-semibold text-emerald-700">
-                    <span className="relative flex h-2.5 w-2.5">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
-                    </span>
-                    Operational
-                  </div>
+                  <p className="text-sm text-gray-600">Live service status unavailable.</p>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 relative z-10">
@@ -1186,59 +1113,7 @@ export default function SettingsPanel({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                  <div className="flex items-center justify-between p-4 rounded-xl bg-gray-50 border border-gray-100">
-                    <div className="flex items-center gap-3">
-                      <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-                      <div>
-                        <p className="text-sm font-semibold text-gray-900">PostgreSQL (Prisma 7)</p>
-                        <p className="text-xs text-gray-500">Connection pool active</p>
-                      </div>
-                    </div>
-                    <span className="text-xs font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">
-                      Healthy
-                    </span>
-                  </div>
-
-                  <div className="flex items-center justify-between p-4 rounded-xl bg-gray-50 border border-gray-100">
-                    <div className="flex items-center gap-3">
-                      <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-                      <div>
-                        <p className="text-sm font-semibold text-gray-900">Supabase Storage & Realtime</p>
-                        <p className="text-xs text-gray-500">Websockets connected</p>
-                      </div>
-                    </div>
-                    <span className="text-xs font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">
-                      Connected
-                    </span>
-                  </div>
-
-                  <div className="flex items-center justify-between p-4 rounded-xl bg-gray-50 border border-gray-100">
-                    <div className="flex items-center gap-3">
-                      <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-                      <div>
-                        <p className="text-sm font-semibold text-gray-900">Paystack Gateway</p>
-                        <p className="text-xs text-gray-500">Webhooks ready</p>
-                      </div>
-                    </div>
-                    <span className="text-xs font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">
-                      Operational
-                    </span>
-                  </div>
-
-                  <div className="flex items-center justify-between p-4 rounded-xl bg-gray-50 border border-gray-100">
-                    <div className="flex items-center gap-3">
-                      <div className="w-2.5 h-2.5 rounded-full bg-blue-500" />
-                      <div>
-                        <p className="text-sm font-semibold text-gray-900">App Version</p>
-                        <p className="text-xs text-gray-500">Nala Vita MediConnect</p>
-                      </div>
-                    </div>
-                    <span className="text-xs font-mono font-medium text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md">
-                      v0.1.0-prod
-                    </span>
-                  </div>
-                </div>
+                <p className="text-sm text-gray-600">Live infrastructure status is unavailable. Contact support if a service fails.</p>
               </section>
             </motion.div>
           )}

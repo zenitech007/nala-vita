@@ -1,5 +1,6 @@
 // src/lib/amelia/context.ts
-import { prisma } from "@/lib/prisma";
+import { loadVisiblePatientRecord } from "@/lib/visible-patient-record";
+import type { RecordViewer } from "@/lib/record-visibility";
 import type { AmeliaContext } from "./types";
 
 function ageFromDob(dob: Date | null): number | null {
@@ -7,34 +8,11 @@ function ageFromDob(dob: Date | null): number | null {
   return Math.floor((Date.now() - dob.getTime()) / (365.25 * 24 * 3600 * 1000));
 }
 
-export async function getPatientContext(patientId: string): Promise<AmeliaContext> {
+export async function getPatientContext(patientId: string, viewer: RecordViewer): Promise<AmeliaContext> {
   const now = new Date();
-  const patient = await prisma.patient.findUnique({
-    where: { id: patientId },
-    include: {
-      user: true,
-      vitals: { orderBy: { recordedAt: "desc" }, take: 3 },
-      prescriptions: { where: { isActive: true }, orderBy: { prescribedAt: "desc" }, take: 10 },
-      labOrders: { orderBy: { orderedAt: "desc" }, take: 5, include: { results: true } },
-      appointments: {
-        where: { scheduledAt: { gte: now }, status: { in: ["CONFIRMED", "SCHEDULED"] } },
-        orderBy: { scheduledAt: "asc" },
-        take: 3,
-        include: {
-          doctor: {
-            include: { user: { select: { firstName: true, lastName: true } } },
-          },
-        },
-      },
-      medicalNotes: {
-        where: { isPrivate: false },
-        orderBy: { createdAt: "desc" },
-        take: 3,
-      },
-    },
-  });
-
-  if (!patient) throw new Error(`Patient not found: ${patientId}`);
+  const record = await loadVisiblePatientRecord(viewer, patientId);
+  const patient = { ...record.patient, ...record };
+  const profile = record.patient;
 
   const recentLabs = (patient.labOrders || []).flatMap((o) =>
     (o.results || []).map((r) => ({
@@ -45,7 +23,7 @@ export async function getPatientContext(patientId: string): Promise<AmeliaContex
     }))
   );
 
-  const upcomingAppointments = (patient.appointments || []).map((a) => ({
+  const upcomingAppointments = (patient.appointments || []).filter(a => a.scheduledAt >= now && ["CONFIRMED", "SCHEDULED"].includes(a.status)).map((a) => ({
     doctorName: `${a.doctor.user.firstName} ${a.doctor.user.lastName}`,
     specialization: a.doctor.specialization,
     date: a.scheduledAt.toISOString().split("T")[0],
@@ -59,12 +37,13 @@ export async function getPatientContext(patientId: string): Promise<AmeliaContex
   }));
 
   return {
-    firstName: patient.user.firstName,
-    age: ageFromDob(patient.dateOfBirth),
-    gender: patient.gender,
-    bloodType: patient.bloodType,
-    allergies: patient.allergies,
-    activeMedications: (patient.prescriptions || []).map((p) => ({
+    firstName: profile.user.firstName,
+    age: ageFromDob(profile.dateOfBirth),
+    gender: profile.gender,
+    bloodType: profile.bloodType,
+    allergies: profile.allergies,
+    accessLimited: record.accessLimited,
+    activeMedications: (patient.prescriptions || []).filter(p => p.isActive).map((p) => ({
       medication: p.medication,
       dosage: p.dosage,
       frequency: p.frequency,
@@ -76,6 +55,8 @@ export async function getPatientContext(patientId: string): Promise<AmeliaContex
       heartRate: v.heartRate,
       bloodSugar: v.bloodSugar,
       oxygenSaturation: v.oxygenSaturation,
+      temperature: v.temperature ?? null,
+      temperatureUnit: "C",
     })),
     recentLabs,
     upcomingAppointments,

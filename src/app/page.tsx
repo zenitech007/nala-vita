@@ -11,23 +11,16 @@ export default function Home() {
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    supabase.auth
-      .getSession()
-      .then((res) => {
-        const session = res?.data?.session;
-        if (!session) {
-          setChecking(false);
-          return;
-        }
-        const role = session.user.user_metadata?.role?.toUpperCase();
-        if (role === "DOCTOR") router.replace("/doctor/dashboard");
-        else if (role === "ADMIN") router.replace("/admin/dashboard");
-        else router.replace("/patient/dashboard");
-      })
-      .catch((err) => {
-        console.warn("Supabase session check failed (project may be paused or offline):", err?.message || err);
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) {
         setChecking(false);
-      });
+        return;
+      }
+      const role = session.user.user_metadata?.role?.toUpperCase();
+      if (role === "DOCTOR") router.replace("/doctor/dashboard");
+      else if (role === "ADMIN") router.replace("/admin/dashboard");
+      else router.replace("/patient/dashboard");
+    });
   }, [router]);
 
   if (checking) {
@@ -111,10 +104,9 @@ export default function Home() {
             <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center mb-4">
               <Shield className="w-5 h-5 text-purple-600" />
             </div>
-            <h3 className="font-semibold text-gray-900">HIPAA Compliant</h3>
+            <h3 className="font-semibold text-gray-900">Record Management</h3>
             <p className="mt-2 text-sm text-gray-600">
-              End-to-end security with audit logging, role-based access, and
-              encrypted data at rest.
+              Review your records and manage sharing with your care team.
             </p>
           </div>
         </div>

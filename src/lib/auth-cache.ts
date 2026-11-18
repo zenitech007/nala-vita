@@ -7,10 +7,9 @@ import { prisma } from "@/lib/prisma";
  */
 export const getCachedSession = cache(async () => {
   const supabase = createServerSupabaseClient();
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  return session;
+  const { data: { user }, error } = await supabase.auth.getUser();
+  if (error || !user) return null;
+  return { user: { id: user.id } };
 });
 
 /**
@@ -24,14 +23,16 @@ export const getAuthenticatedUserWithProfile = cache(async () => {
   const user = await prisma.user.findUnique({
     where: { supabaseId: session.user.id },
     include: {
+      admin: true,
       patient: {
         select: { id: true, dateOfBirth: true, gender: true, bloodType: true },
       },
       doctor: {
-        select: { id: true, specialization: true, licenseNumber: true },
+        select: { id: true, specialization: true, licenseNumber: true, isVerified: true, verification: { select: { status: true, reason: true } } },
       },
     },
   });
 
+  if (!user?.isActive) return null;
   return { session, user };
 });

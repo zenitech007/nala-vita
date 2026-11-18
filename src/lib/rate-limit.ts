@@ -34,6 +34,7 @@ export interface RateLimitConfig {
 
 interface RateLimitEntry {
   timestamps: number[];
+  windowMs: number;
 }
 
 const store = new Map<string, RateLimitEntry>();
@@ -41,12 +42,12 @@ const store = new Map<string, RateLimitEntry>();
 const CLEANUP_INTERVAL = 60_000; // 1 minute
 let cleanupTimer: ReturnType<typeof setInterval> | null = null;
 
-function ensureCleanup(windowMs: number) {
+function ensureCleanup() {
   if (cleanupTimer) return;
   cleanupTimer = setInterval(() => {
-    const cutoff = Date.now() - windowMs;
+    const now = Date.now();
     store.forEach((entry, key) => {
-      entry.timestamps = entry.timestamps.filter((t: number) => t > cutoff);
+      entry.timestamps = entry.timestamps.filter(t => t > now - entry.windowMs);
       if (entry.timestamps.length === 0) store.delete(key);
     });
   }, CLEANUP_INTERVAL);
@@ -62,11 +63,11 @@ function inMemoryRateLimit(
   const now = Date.now();
   const windowStart = now - windowMs;
 
-  ensureCleanup(windowMs);
+  ensureCleanup();
 
   let entry = store.get(key);
   if (!entry) {
-    entry = { timestamps: [] };
+    entry = { timestamps: [], windowMs };
     store.set(key, entry);
   }
 
@@ -95,6 +96,7 @@ type UpstashLimiter = {
     success: boolean;
     remaining: number;
     reset: number;
+    reason?: string;
   }>;
 };
 
@@ -115,6 +117,7 @@ async function getUpstashLimiter(
             redis: unknown;
             limiter: unknown;
             prefix?: string;
+            timeout?: number;
           }): UpstashLimiter;
           slidingWindow: (maxRequests: number, window: string) => unknown;
         };
@@ -139,6 +142,7 @@ async function getUpstashLimiter(
             `${windowSeconds}s`
           ),
           prefix: "mediconnect:rl",
+          timeout: 1500,
         })
       );
     }
@@ -163,14 +167,7 @@ export function checkRateLimit(
   key: string,
   config: RateLimitConfig = { maxRequests: 10, windowMs: 60_000 }
 ): RateLimitResult {
-  if (process.env.UPSTASH_REDIS_REST_URL) {
-    // Remind callers to use the async version when Redis is configured
-    console.warn(
-      `[rate-limit] UPSTASH_REDIS_REST_URL is set but checkRateLimit() ` +
-      `was called synchronously for key "${key}". ` +
-      `Switch to checkRateLimitAsync() for distributed rate limiting.`
-    );
-  }
+  warnMemoryFallback("synchronous limiter");
   return inMemoryRateLimit(key, config);
 }
 
@@ -184,15 +181,23 @@ export async function checkRateLimitAsync(
   config: RateLimitConfig = { maxRequests: 10, windowMs: 60_000 }
 ): Promise<RateLimitResult> {
   const upstash = await getUpstashLimiter(config);
-
   if (upstash) {
-    const result = await upstash.limit(key);
-    return {
-      allowed: result.success,
-      remaining: result.remaining,
-      resetAt: result.reset,
-    };
+    try {
+      const result = await upstash.limit(key);
+      if (result.reason !== "timeout") {
+        return { allowed: result.success, remaining: result.remaining, resetAt: result.reset };
+      }
+    } catch {
+      // Report the fallback once without logging key material or Redis errors.
+    }
   }
-
+  warnMemoryFallback(upstash ? "Upstash unavailable" : "Upstash not configured or initialization failed");
   return inMemoryRateLimit(key, config);
+}
+
+let warnedMemory = false;
+function warnMemoryFallback(reason: string) {
+  if (warnedMemory || process.env.NODE_ENV === "test") return;
+  warnedMemory = true;
+  console.warn(`[rate-limit] Using process-local limits. ${reason}. Configure Upstash for shared production limits.`);
 }

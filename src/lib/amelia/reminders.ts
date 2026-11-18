@@ -1,31 +1,27 @@
 // src/lib/amelia/reminders.ts
 import { prisma } from "@/lib/prisma";
 import { chat } from "./llm";
-import { createNotification } from "@/lib/notifications";
+import { nextDailyFireAt, reminderLocalClock } from "@/lib/reminder-schedule";
+import { isIanaTimeZone } from "@/lib/appointment-availability";
 import type { ReminderKind, ReminderFrequency, ReminderCandidate, ReminderRecord } from "./types";
 
 const VALID_KINDS: ReminderKind[] = ["MEDICATION", "APPOINTMENT", "VITALS", "OTHER"];
 
-export function describeSchedule(frequency: ReminderFrequency, nextFireAt: Date): string {
-  let h = nextFireAt.getHours();
-  const m = nextFireAt.getMinutes();
-  const ampm = h >= 12 ? "PM" : "AM";
-  h = h % 12;
-  if (h === 0) h = 12;
-  const time = `${h}:${m.toString().padStart(2, "0")} ${ampm}`;
-  if (frequency === "DAILY") return `every day at ${time}`;
-  const date = nextFireAt.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-  return `on ${date} at ${time}`;
+export function describeSchedule(frequency: ReminderFrequency, nextFireAt: Date, timeZone: string): string {
+  if (!isIanaTimeZone(timeZone)) return "Timezone required. Save your timezone in Settings and recreate this reminder.";
+  const time = new Intl.DateTimeFormat("en-US", { timeZone, hour: "numeric", minute: "2-digit" }).format(nextFireAt);
+  if (frequency === "DAILY") return `every day at ${time} (${timeZone})`;
+  const date = new Intl.DateTimeFormat("en-US", { timeZone, month: "short", day: "numeric" }).format(nextFireAt);
+  return `on ${date} at ${time} (${timeZone})`;
 }
 
-export function computeNextFireAt(candidate: ReminderCandidate, now: Date): Date {
+export function computeNextFireAt(candidate: ReminderCandidate, now: Date, timeZone: string): Date {
+  if (!isIanaTimeZone(timeZone)) throw new Error("Timezone required.");
   if (candidate.frequency === "ONCE") {
-    return new Date(candidate.isoDateTime ?? now);
+    if (!candidate.isoDateTime || !Number.isFinite(Date.parse(candidate.isoDateTime))) throw new Error("Reminder date required.");
+    return new Date(candidate.isoDateTime);
   }
-  const next = new Date(now);
-  next.setHours(candidate.hour ?? 8, candidate.minute ?? 0, 0, 0);
-  if (next.getTime() <= now.getTime()) next.setDate(next.getDate() + 1);
-  return next;
+  return nextDailyFireAt(candidate.hour ?? 8, candidate.minute ?? 0, timeZone, now);
 }
 
 export async function detectReminder(userText: string, assistantText: string): Promise<ReminderCandidate | null> {
@@ -38,7 +34,7 @@ export async function detectReminder(userText: string, assistantText: string): P
       },
       { role: "user", content: `Patient said: ${userText}\nAmelia replied: ${assistantText}` },
     ],
-    { model: "gpt-4o-mini", temperature: 0, maxTokens: 200 }
+    { temperature: 0, maxTokens: 200 }
   );
 
   let parsed: unknown;
@@ -72,10 +68,17 @@ export async function detectReminder(userText: string, assistantText: string): P
 
 export async function createReminder(
   patientId: string,
-  data: { kind: ReminderKind; label: string; frequency: ReminderFrequency; nextFireAt: Date }
+  data: { kind: ReminderKind; label: string; frequency: ReminderFrequency; nextFireAt: Date; timeZone: string }
 ): Promise<void> {
+  if (!isIanaTimeZone(data.timeZone)) throw new Error("Timezone required.");
+  const { hour, minute } = reminderLocalClock(data.nextFireAt, data.timeZone);
   await prisma.reminder.create({
-    data: { patientId, kind: data.kind, label: data.label, frequency: data.frequency, nextFireAt: data.nextFireAt },
+    data: {
+      patientId, kind: data.kind, label: data.label, frequency: data.frequency,
+      nextFireAt: data.nextFireAt, timeZone: data.timeZone,
+      localHour: data.frequency === "DAILY" ? hour : null,
+      localMinute: data.frequency === "DAILY" ? minute : null,
+    },
   });
 }
 
@@ -87,25 +90,10 @@ export async function listReminders(patientId: string): Promise<ReminderRecord[]
     label: r.label,
     frequency: r.frequency as ReminderFrequency,
     nextFireAt: r.nextFireAt.toISOString(),
-    schedule: describeSchedule(r.frequency as ReminderFrequency, r.nextFireAt),
+    schedule: describeSchedule(r.frequency as ReminderFrequency, r.nextFireAt, r.timeZone ?? ""),
   }));
 }
 
 export async function cancelReminder(id: string, patientId: string): Promise<void> {
   await prisma.reminder.updateMany({ where: { id, patientId }, data: { active: false } });
-}
-
-export async function fireDueReminders(patientId: string, userId: string, now: Date = new Date()): Promise<number> {
-  const due = await prisma.reminder.findMany({ where: { patientId, active: true, nextFireAt: { lte: now } } });
-  for (const r of due) {
-    await createNotification(userId, "Reminder", r.label, "REMINDER", { link: "/patient/amelia" });
-    if (r.frequency === "DAILY") {
-      const next = new Date(r.nextFireAt);
-      while (next.getTime() <= now.getTime()) next.setDate(next.getDate() + 1);
-      await prisma.reminder.update({ where: { id: r.id }, data: { nextFireAt: next } });
-    } else {
-      await prisma.reminder.update({ where: { id: r.id }, data: { active: false } });
-    }
-  }
-  return due.length;
 }

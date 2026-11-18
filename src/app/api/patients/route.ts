@@ -1,37 +1,27 @@
+import { logAudit } from "@/lib/audit";
+import { workspacePatientWhere } from "@/lib/record-visibility";
+import { loadVisiblePatientRecord } from "@/lib/visible-patient-record";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
-import { createServerSupabaseClient } from "@/lib/supabase-server";
+
+import { requireApiUser } from "@/lib/auth";
+import { requestRecordAccess } from "@/lib/record-access-requests";
+import { RECORD_SCOPES } from "@/lib/record-scope";
+import { ConsentError } from "@/lib/record-access-requests";
 
 export async function GET(req: NextRequest) {
   try {
-    const supabase = createServerSupabaseClient();
-    const {
-      data: { user: authUser },
-    } = await supabase.auth.getUser();
-
-    if (!authUser) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { supabaseId: authUser.id },
-      include: { doctor: true },
-    });
-
-    if (!user || user.role !== "DOCTOR" || !user.doctor) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-
+    const auth = await requireApiUser({ roles: ["DOCTOR"], profile: "doctor" });
+    if (!auth.ok) return auth.response;
+    const user = auth.user;
     const { searchParams } = new URL(req.url);
     const search = searchParams.get("search") || "";
-    const all = searchParams.get("all") === "true";
     const page = Math.max(1, Number(searchParams.get("page")) || 1);
     const limit = Math.min(50, Math.max(1, Number(searchParams.get("limit")) || 10));
     const skip = (page - 1) * limit;
 
-    const doctorId = user.doctor.id;
+    const doctorId = user.doctor!.id;
 
     const searchFilter = search
       ? {
@@ -44,100 +34,15 @@ export async function GET(req: NextRequest) {
         }
       : {};
 
-    let where: Record<string, unknown>;
-    let patientIdList: string[] = [];
-
-    if (all) {
-      where = searchFilter;
-    } else {
-      const [apptPatientIds, refPatientIds] = await Promise.all([
-        prisma.appointment.findMany({
-          where: { doctorId },
-          select: { patientId: true },
-          distinct: ["patientId"],
-        }),
-        prisma.referral.findMany({
-          where: { referredDoctorId: doctorId, status: "ACCEPTED" },
-          select: { patientId: true },
-          distinct: ["patientId"],
-        }),
-      ]);
-
-      const idSet = new Set([
-        ...apptPatientIds.map((a) => a.patientId),
-        ...refPatientIds.map((r) => r.patientId),
-      ]);
-      patientIdList = Array.from(idSet);
-
-      if (patientIdList.length === 0) {
-        return NextResponse.json({ patients: [], total: 0, page, limit });
-      }
-
-      where = {
-        id: { in: patientIdList },
-        ...searchFilter,
-      };
-    }
-
-    const [patients, total] = await Promise.all([
-      prisma.patient.findMany({
-        where,
-        skip,
-        take: limit,
-        include: {
-          user: {
-            select: {
-              firstName: true,
-              lastName: true,
-              avatarUrl: true,
-              email: true,
-              phone: true,
-            },
-          },
-          appointments: {
-            where: { doctorId },
-            orderBy: { scheduledAt: "desc" },
-            take: 1,
-            select: { scheduledAt: true, status: true },
-          },
-        },
-      }),
-      prisma.patient.count({ where }),
+    const where = { AND: [workspacePatientWhere(doctorId), searchFilter] };
+    const [targets, total] = await Promise.all([
+      prisma.patient.findMany({ where, select: { id: true }, skip, take: limit }), prisma.patient.count({ where }),
     ]);
-
-    const result = patients.map((p) => {
-      const lastAppt = p.appointments[0] || null;
-      return {
-        id: p.id,
-        dateOfBirth: p.dateOfBirth,
-        gender: p.gender,
-        bloodType: p.bloodType,
-        allergies: p.allergies,
-        user: p.user,
-        lastAppointment: lastAppt
-          ? { date: lastAppt.scheduledAt, status: lastAppt.status }
-          : null,
-        totalAppointments: p.appointments.length,
-      };
-    });
-
-    // Get accurate total appointments count per patient
-    const returnedPatientIds = patients.map((p) => p.id);
-    const appointmentCounts = returnedPatientIds.length > 0
-      ? await prisma.appointment.groupBy({
-          by: ["patientId"],
-          where: { doctorId, patientId: { in: returnedPatientIds } },
-          _count: { id: true },
-        })
-      : [];
-
-    const countMap = new Map(appointmentCounts.map((c) => [c.patientId, c._count.id]));
-
-    const enriched = result.map((p) => ({
-      ...p,
-      totalAppointments: countMap.get(p.id) || 0,
+    const enriched = await Promise.all(targets.map(async target => {
+      const { patient, appointments, accessLimited, profileAvailable } = await loadVisiblePatientRecord(user, target.id);
+      const last = appointments.filter(a => a.doctorId === doctorId)[0];
+      return { ...patient, lastAppointment: last ? { date: last.scheduledAt, status: last.status } : null, totalAppointments: appointments.filter(a => a.doctorId === doctorId).length, accessLimited, profileAvailable };
     }));
-
     return NextResponse.json({ patients: enriched, total, page, limit });
   } catch (error) {
     console.error("[GET /api/patients]", error);
@@ -148,10 +53,11 @@ export async function GET(req: NextRequest) {
 // ─── POST: Doctor/Clinic registers an in-person patient ───
 
 const createPatientSchema = z.object({
+  facilityId: z.string().min(1).optional(),
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
-  email: z.string().email("Invalid email address"),
-  phone: z.string().optional(),
+  email: z.string().trim().email("Invalid email address").optional(),
+  phone: z.string().trim().min(1).optional(),
   dateOfBirth: z.string().min(1, "Date of birth is required"),
   gender: z.string().min(1, "Gender is required"),
   bloodType: z.string().optional(),
@@ -162,79 +68,52 @@ const createPatientSchema = z.object({
   insuranceProvider: z.string().optional(),
   insuranceNumber: z.string().optional(),
   initialNotes: z.string().optional(),
-});
+}).refine(value => !!(value.email || value.phone), "Provide an email or phone contact");
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = createServerSupabaseClient();
-    const {
-      data: { user: authUser },
-    } = await supabase.auth.getUser();
-
-    if (!authUser) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const doctorUser = await prisma.user.findUnique({
-      where: { supabaseId: authUser.id },
-      include: { doctor: true },
-    });
-
-    if (!doctorUser || doctorUser.role !== "DOCTOR" || !doctorUser.doctor) {
-      return NextResponse.json(
-        { error: "Forbidden: Only authorized doctors can intake patients" },
-        { status: 403 }
-      );
-    }
+    const auth = await requireApiUser({ roles: ["DOCTOR"], profile: "doctor" });
+    if (!auth.ok) return auth.response;
+    const doctorUser = auth.user;
 
     const body = await req.json();
     const validated = createPatientSchema.parse(body);
 
-    const doctorId = doctorUser.doctor.id;
+    const doctorId = doctorUser.doctor!.id;
+    const facilityId = validated.facilityId ?? null;
+    if (facilityId && !await prisma.facilityMembership.findFirst({ where: { doctorId, facilityId, isActive: true, facility: { isActive: true } } }))
+      return NextResponse.json({ error: "Forbidden facility" }, { status: 403 });
 
     // Check if user already exists
-    let existingUser = await prisma.user.findUnique({
+    let existingUser = validated.email ? await prisma.user.findUnique({
       where: { email: validated.email },
-      include: { patient: true },
-    });
+      select: { id: true, role: true, patient: { select: { id: true, createdByDoctorId: true, createdByFacilityId: true } } },
+    }) : null;
 
     if (!existingUser && validated.phone) {
-      existingUser = await prisma.user.findFirst({
+      const phoneMatches = await prisma.user.findMany({
         where: { phone: validated.phone, role: "PATIENT" },
-        include: { patient: true },
+        select: { id: true, role: true, patient: { select: { id: true, createdByDoctorId: true, createdByFacilityId: true } } },
+        take: 2,
       });
+      if (phoneMatches.length > 1) return NextResponse.json({ error: "This phone matches multiple records. Confirm a unique email or ask the patient to use their clinic invitation." }, { status: 409 });
+      existingUser = phoneMatches[0] ?? null;
     }
 
     let patientId: string;
 
     if (existingUser) {
-      // User exists
-      if (!existingUser.patient) {
-        const newPatient = await prisma.patient.create({
-          data: {
-            userId: existingUser.id,
-            dateOfBirth: new Date(validated.dateOfBirth),
-            gender: validated.gender,
-            bloodType: validated.bloodType || null,
-            allergies: validated.allergies,
-            address: validated.address || null,
-            emergencyName: validated.emergencyName || null,
-            emergencyPhone: validated.emergencyPhone || null,
-            insuranceProvider: validated.insuranceProvider || null,
-            insuranceNumber: validated.insuranceNumber || null,
-          },
-        });
-        patientId = newPatient.id;
-      } else {
-        patientId = existingUser.patient.id;
-      }
+      if (existingUser.role !== "PATIENT" || !existingUser.patient) return NextResponse.json({ error: "This contact is not eligible for patient intake" }, { status: 409 });
+      const source = existingUser.patient.createdByFacilityId ? { sourceFacilityId: existingUser.patient.createdByFacilityId }
+        : existingUser.patient.createdByDoctorId ? { sourceDoctorId: existingUser.patient.createdByDoctorId } : { sourceUserId: existingUser.id };
+      const request = await requestRecordAccess(doctorUser, { patientId: existingUser.patient.id, scope: [...RECORD_SCOPES], requesterFacilityId: facilityId, ...source });
+      return NextResponse.json({ request, message: "Patient approval requested. Existing records remain private. Submitted clinical details and initial notes have not been written." }, { status: 202 });
     } else {
       // Create provisional User and Patient record
-      const provisionalSupabaseId = crypto.randomUUID();
       const newUser = await prisma.user.create({
         data: {
-          supabaseId: provisionalSupabaseId,
-          email: validated.email,
+          supabaseId: null,
+          email: validated.email ?? null,
           firstName: validated.firstName,
           lastName: validated.lastName,
           phone: validated.phone || null,
@@ -242,6 +121,8 @@ export async function POST(req: NextRequest) {
           emailVerified: false,
           patient: {
             create: {
+              createdByDoctorId: doctorId,
+              createdByFacilityId: facilityId,
               dateOfBirth: new Date(validated.dateOfBirth),
               gender: validated.gender,
               bloodType: validated.bloodType || null,
@@ -259,25 +140,14 @@ export async function POST(req: NextRequest) {
       patientId = newUser.patient!.id;
     }
 
-    // Connect this doctor to the patient via an initial intake appointment
-    await prisma.appointment.create({
-      data: {
-        patientId,
-        doctorId,
-        scheduledAt: new Date(),
-        consultationType: "IN_PERSON",
-        status: "CONFIRMED",
-        reason: "Clinical Intake & Patient Registration",
-        notes: validated.initialNotes || "In-person patient registered by healthcare provider.",
-      },
-    });
-
     // If initial notes provided, record a medical note
     if (validated.initialNotes?.trim()) {
       await prisma.medicalNote.create({
         data: {
           patientId,
           doctorId,
+          authoredByDoctorId: doctorId,
+          authoredByFacilityId: facilityId,
           title: "Intake & Clinical History",
           content: validated.initialNotes.trim(),
           category: "consultation",
@@ -287,19 +157,12 @@ export async function POST(req: NextRequest) {
     }
 
     // Audit log
-    await prisma.auditLog.create({
-      data: {
-        userId: doctorUser.id,
-        action: "CLINIC_REGISTER_PATIENT",
-        resourceType: "PATIENT_RECORD",
-        resourceId: patientId,
-        metadata: JSON.stringify({
-          doctorId,
-          email: validated.email,
-          phone: validated.phone,
-        }),
-      },
-    }).catch(() => {});
+    await logAudit({
+      userId: doctorUser.id,
+      action: "CLINIC_REGISTER_PATIENT",
+      resourceType: "PATIENT_RECORD",
+      resourceId: patientId,
+    });
 
     const patientRecord = await prisma.patient.findUnique({
       where: { id: patientId },
@@ -319,12 +182,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         message:
-          "Patient registered successfully. They can claim online access anytime by signing up with their email or phone.",
+          "Patient registered successfully. They can claim online access by verifying the email on file, or with a clinic invitation and email verification.",
         patient: patientRecord,
       },
       { status: 201 }
     );
   } catch (error) {
+    if (error instanceof ConsentError) return NextResponse.json({ error: error.message }, { status: error.status });
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: "Validation failed", details: error.issues },

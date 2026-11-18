@@ -1,3 +1,7 @@
+import { listMessageConversations } from "@/lib/message-conversations";
+import { parsePagination, cursorWhere, pageResult, PaginationError } from "@/lib/pagination";
+import { chatTopic } from "@/lib/realtime-events";
+import { publishPrivateEvent } from "@/lib/realtime-publish";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
@@ -21,87 +25,8 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url);
     const otherUserId = searchParams.get("otherUserId");
-    const requestedLimit = Number.parseInt(searchParams.get("limit") || "50", 10);
-    const requestedOffset = Number.parseInt(searchParams.get("offset") || "0", 10);
-    const limit = Number.isFinite(requestedLimit)
-      ? Math.min(Math.max(requestedLimit, 1), 100)
-      : 50;
-    const offset = Number.isFinite(requestedOffset)
-      ? Math.max(requestedOffset, 0)
-      : 0;
-
-    if (!otherUserId) {
-      // Return conversation list (unique partners)
-      const sentTo = await prisma.message.findMany({
-        where: { senderId: user.id },
-        select: { receiverId: true },
-        distinct: ["receiverId"],
-      });
-
-      const receivedFrom = await prisma.message.findMany({
-        where: { receiverId: user.id },
-        select: { senderId: true },
-        distinct: ["senderId"],
-      });
-
-      const partnerIds = Array.from(
-        new Set([
-          ...sentTo.map((m) => m.receiverId),
-          ...receivedFrom.map((m) => m.senderId),
-        ])
-      );
-
-      const conversationResults = await Promise.all(
-        partnerIds.map(async (partnerId) => {
-          const partner = await getAuthorizedMessageParticipant(user, partnerId);
-          if (!partner) return null;
-
-          const lastMessage = await prisma.message.findFirst({
-            where: {
-              OR: [
-                { senderId: user.id, receiverId: partnerId },
-                { senderId: partnerId, receiverId: user.id },
-              ],
-            },
-            orderBy: { createdAt: "desc" },
-          });
-
-          const unreadCount = await prisma.message.count({
-            where: {
-              senderId: partnerId,
-              receiverId: user.id,
-              isRead: false,
-            },
-          });
-
-          return {
-            // Kept for the patient chat index route.
-            userId: partner.id,
-            partner: {
-              id: partner.id,
-              firstName: partner.firstName,
-              lastName: partner.lastName,
-              avatarUrl: partner.avatarUrl,
-              role: partner.role,
-            },
-            lastMessage,
-            unreadCount,
-          };
-        })
-      );
-      const conversations = conversationResults.filter(
-        (conversation) => conversation !== null
-      );
-
-      // Sort by last message time
-      conversations.sort((a, b) => {
-        const ta = a.lastMessage ? new Date(a.lastMessage.createdAt).getTime() : 0;
-        const tb = b.lastMessage ? new Date(b.lastMessage.createdAt).getTime() : 0;
-        return tb - ta;
-      });
-
-      return NextResponse.json({ conversations });
-    }
+    const { limit, cursor } = parsePagination(searchParams, 50);
+    if (!otherUserId) return NextResponse.json(await listMessageConversations(user, limit, cursor));
 
     const participant = await getAuthorizedMessageParticipant(user, otherUserId);
     if (!participant) {
@@ -113,19 +38,18 @@ export async function GET(req: NextRequest) {
 
     // Return thread between current user and otherUserId
     const messages = await prisma.message.findMany({
-      where: {
-        OR: [
+      where: { AND: [{ OR: [
           { senderId: user.id, receiverId: otherUserId },
           { senderId: otherUserId, receiverId: user.id },
-        ],
-      },
-      orderBy: { createdAt: "asc" },
-      take: limit,
-      skip: offset,
+        ] }, cursorWhere(cursor, "createdAt")] },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      take: limit + 1,
     });
 
-    return NextResponse.json({ messages });
+    const page = pageResult(messages, limit, "createdAt");
+    return NextResponse.json({ messages: page.items.reverse(), nextCursor: page.nextCursor });
   } catch (error) {
+    if (error instanceof PaginationError) return NextResponse.json({ error: error.message }, { status: 400 });
     console.error("GET /api/messages error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
@@ -224,6 +148,9 @@ export async function POST(req: NextRequest) {
       return message;
     });
 
+    if (!await publishPrivateEvent(chatTopic(receiver.id), "invalidate", { senderId: user.id, receiverId: receiver.id })) {
+      console.warn("Private chat update unavailable");
+    }
     return NextResponse.json({ message: result }, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -237,7 +164,7 @@ export async function POST(req: NextRequest) {
 // ─── PATCH: Mark messages as read ────────────────────────
 
 const markReadSchema = z.object({
-  messageIds: z.array(z.string()).min(1),
+  messageIds: z.array(z.string().min(1).max(128)).min(1).max(100),
 });
 
 export async function PATCH(req: NextRequest) {
@@ -251,14 +178,17 @@ export async function PATCH(req: NextRequest) {
     const validated = markReadSchema.parse(body);
 
     // Only mark messages where the current user is the receiver
-    await prisma.message.updateMany({
-      where: {
-        id: { in: validated.messageIds },
-        receiverId: user.id,
-      },
+    const changed = await prisma.message.updateManyAndReturn({
+      where: { id: { in: validated.messageIds }, receiverId: user.id, isRead: false },
       data: { isRead: true },
+      select: { senderId: true },
     });
-
+    const recipients = [...new Set(changed.map(message => message.senderId))];
+    await Promise.all(recipients.map(async receiverId => {
+      if (!await publishPrivateEvent(chatTopic(receiverId), "invalidate", { senderId: user.id, receiverId })) {
+        console.warn("Private read receipt update unavailable");
+      }
+    }));
     return NextResponse.json({ success: true });
   } catch (error) {
     if (error instanceof z.ZodError) {

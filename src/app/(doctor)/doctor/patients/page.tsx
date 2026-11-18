@@ -26,7 +26,7 @@ interface PatientUser {
   firstName: string;
   lastName: string;
   avatarUrl: string | null;
-  email: string;
+  email: string | null;
   phone: string | null;
 }
 
@@ -114,6 +114,8 @@ function IntakePatientModal({
   const [initialNotes, setInitialNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pendingMessage, setPendingMessage] = useState<string | null>(null);
+  const close = () => { setPendingMessage(null); onClose(); };
 
   if (!isOpen) return null;
 
@@ -121,6 +123,7 @@ function IntakePatientModal({
     e.preventDefault();
     setSubmitting(true);
     setError(null);
+    setPendingMessage(null);
 
     try {
       const res = await fetch("/api/patients", {
@@ -129,7 +132,7 @@ function IntakePatientModal({
         body: JSON.stringify({
           firstName: firstName.trim(),
           lastName: lastName.trim(),
-          email: email.trim().toLowerCase(),
+          email: email.trim().toLowerCase() || undefined,
           phone: phone.trim() || undefined,
           dateOfBirth,
           gender,
@@ -147,7 +150,8 @@ function IntakePatientModal({
       }
 
       onSuccess(data.message || "Patient successfully registered in clinic directory");
-      onClose();
+      if (res.status === 202) { setPendingMessage(data.message); return; }
+      close();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Registration error");
     } finally {
@@ -170,7 +174,7 @@ function IntakePatientModal({
             </div>
           </div>
           <button
-            onClick={onClose}
+            onClick={close}
             className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition"
           >
             <X className="w-5 h-5" />
@@ -179,6 +183,7 @@ function IntakePatientModal({
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-4">
+          {pendingMessage && <p role="status" className="text-sm text-gray-800">{pendingMessage} Keep your draft. After approval, open the scoped patient record to add notes. <Link href="/doctor/record-access" className="underline">View request status</Link></p>}
           {error && (
             <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 shrink-0" />
@@ -189,7 +194,7 @@ function IntakePatientModal({
           <div className="bg-blue-50 border border-blue-200 rounded-xl p-3.5 flex items-start gap-2.5">
             <ShieldCheck className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
             <p className="text-xs text-blue-800 leading-relaxed">
-              <strong>Seamless Patient Claiming:</strong> When the patient signs up online with this email or phone number, their account will automatically claim all their clinical notes, vitals, prescriptions, and lab orders created here.
+              <strong>Verified record claiming:</strong> The patient must verify the email on file, or use a clinic invitation and verify their chosen email. Phone numbers do not claim records and no SMS is sent.
             </p>
           </div>
 
@@ -224,12 +229,13 @@ function IntakePatientModal({
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
-                Email Address <span className="text-red-500">*</span>
+              <label htmlFor="intake-email" className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                Email Address (or provide a phone number)
               </label>
               <input
                 type="email"
-                required
+                id="intake-email"
+                required={!phone.trim()}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="patient@example.com"
@@ -237,11 +243,13 @@ function IntakePatientModal({
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+              <label htmlFor="intake-phone" className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
                 Phone Number
               </label>
               <input
                 type="tel"
+                id="intake-phone"
+                required={!email.trim()}
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="+1 555-0199"
@@ -321,7 +329,7 @@ function IntakePatientModal({
           <div className="pt-3 flex items-center justify-end gap-2 border-t border-gray-100">
             <button
               type="button"
-              onClick={onClose}
+              onClick={close}
               className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-xl transition"
             >
               Cancel
@@ -361,21 +369,17 @@ export default function DoctorPatientsPage() {
   const [bannerMessage, setBannerMessage] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const fetchPatients = useCallback(async (query: string) => {
-    setLoading(true);
-    try {
-      const params = query ? `?search=${encodeURIComponent(query)}` : "";
-      const res = await fetch(`/api/patients${params}`);
+  const fetchPatients = useCallback((query: string) => {
+    const params = query ? `?search=${encodeURIComponent(query)}` : "";
+    return fetch(`/api/patients${params}`).then(async res => {
       if (res.ok) {
         const data: PatientsResponse = await res.json();
         setPatients(data.patients);
         setTotal(data.total);
       }
-    } catch {
-      // network error — leave current state
-    } finally {
-      setLoading(false);
-    }
+    }).catch(() => {
+      // Keep the current directory when the network is unavailable.
+    }).finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
@@ -384,6 +388,7 @@ export default function DoctorPatientsPage() {
 
   const handleSearchChange = (value: string) => {
     setSearch(value);
+    setLoading(true);
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       fetchPatients(value);
@@ -423,6 +428,7 @@ export default function DoctorPatientsPage() {
               </span>
 
               {/* Register In-Person Patient button */}
+              <Link href="/doctor/record-access" className="rounded-xl border border-gray-300 px-3 py-2 text-sm font-medium text-gray-800">Record requests</Link>
               <button
                 onClick={() => setShowIntakeModal(true)}
                 className="inline-flex items-center gap-2 px-3.5 py-2 bg-[var(--primary)] hover:opacity-95 text-white text-sm font-semibold rounded-xl shadow-sm transition"

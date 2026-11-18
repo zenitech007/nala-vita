@@ -1,3 +1,7 @@
+import { createHash } from "node:crypto";
+import { z } from "zod";
+import { loadVisiblePatientRecord } from "@/lib/visible-patient-record";
+import type { RecordViewer } from "@/lib/record-visibility";
 // src/lib/amelia/medsafety.ts
 import { prisma } from "@/lib/prisma";
 import { chat } from "./llm";
@@ -6,6 +10,7 @@ import { createNotification } from "@/lib/notifications";
 export type Severity = "high" | "moderate" | "low";
 
 export interface MedSafetyResult {
+  status: "available" | "unavailable";
   interactions: { drugs: string[]; severity: Severity; note: string }[];
   dosingNotes: { medication: string; note: string }[];
   allergyConflicts: { medication: string; allergy: string; note: string }[];
@@ -49,17 +54,39 @@ function mergeConflicts(
   return [...llm, ...det.filter((c) => !seen.has(`${c.medication.toLowerCase()}|${c.allergy.toLowerCase()}`))];
 }
 
-const ADVISORY = "These are potential concerns — confirm with your pharmacist or doctor.";
+const shortText = z.string().trim().min(1).max(1000);
+const analysisSchema = z.object({
+  interactions: z.array(z.object({
+    drugs: z.array(shortText).min(2).max(20),
+    severity: z.enum(["high", "moderate", "low"]),
+    note: shortText,
+  })).max(100),
+  dosingNotes: z.array(z.object({ medication: shortText, note: shortText })).max(100),
+  allergyConflicts: z.array(z.object({ medication: shortText, allergy: shortText, note: shortText })).max(100),
+  overallNote: shortText,
+});
+
+function unavailableAnalysis(allergyConflicts: MedSafetyResult["allergyConflicts"]): MedSafetyResult {
+  return {
+    status: "unavailable",
+    interactions: [],
+    dosingNotes: [],
+    allergyConflicts,
+    overallNote: "Analysis unavailable. Ask your pharmacist or doctor to review your medications. Listed allergy matches may still require attention.",
+  };
+}
 
 export async function analyzeMedications(meds: MedInput[], allergies: string[]): Promise<MedSafetyResult> {
   const deterministic = exactAllergyMatches(meds, allergies);
   if (meds.length === 0) {
-    return { interactions: [], dosingNotes: [], allergyConflicts: deterministic, overallNote: "No active medications on record." };
+    return { status: "available", interactions: [], dosingNotes: [], allergyConflicts: deterministic, overallNote: "No active medications on record." };
   }
 
   const medLines = meds.map((m) => `- ${m.medication} ${m.dosage}`).join("\n");
   const allergyLine = allergies.length ? allergies.join(", ") : "none on record";
-  const raw = await chat(
+  let raw: string;
+  try {
+    raw = await chat(
     [
       {
         role: "system",
@@ -71,40 +98,53 @@ export async function analyzeMedications(meds: MedInput[], allergies: string[]):
     { temperature: 0.2, maxTokens: 700 }
   );
 
-  let parsed: Partial<MedSafetyResult> = {};
+  } catch {
+    return unavailableAnalysis(deterministic);
+  }
+
+  if (raw.length > 32_000) return unavailableAnalysis(deterministic);
+  let parsed: z.infer<typeof analysisSchema>;
   try {
     const cleaned = raw.replace(/^```json\s*/i, "").replace(/```\s*$/, "").trim();
-    parsed = JSON.parse(cleaned);
+    parsed = analysisSchema.parse(JSON.parse(cleaned));
   } catch {
-    parsed = {};
+    return unavailableAnalysis(deterministic);
   }
 
   return {
-    interactions: Array.isArray(parsed.interactions) ? parsed.interactions : [],
-    dosingNotes: Array.isArray(parsed.dosingNotes) ? parsed.dosingNotes : [],
-    allergyConflicts: mergeConflicts(Array.isArray(parsed.allergyConflicts) ? parsed.allergyConflicts : [], deterministic),
-    overallNote: typeof parsed.overallNote === "string" && parsed.overallNote.trim() ? parsed.overallNote : ADVISORY,
+    status: "available",
+    ...parsed,
+    allergyConflicts: mergeConflicts(parsed.allergyConflicts, deterministic),
   };
 }
 
-const cache = new Map<string, { hash: string; result: MedSafetyResult }>();
+const CACHE_VERSION = "med-safety-v2";
+const CACHE_TTL_MS = 5 * 60 * 1000;
+const CACHE_MAX_ENTRIES = 128;
+const cache = new Map<string, { expiresAt: number; result: MedSafetyResult }>();
 
 export async function getCachedOrAnalyze(patientId: string, meds: MedInput[], allergies: string[]): Promise<MedSafetyResult> {
-  const hash = medListHash(meds) + "::" + [...allergies].map((a) => a.toLowerCase().trim()).sort().join(",");
-  const cached = cache.get(patientId);
-  if (cached && cached.hash === hash) return cached.result;
+  const key = createHash("sha256").update(JSON.stringify([
+    CACHE_VERSION, patientId, medListHash(meds),
+    allergies.map(a => a.toLowerCase().trim()).sort(),
+  ])).digest("hex");
+  const now = Date.now();
+  for (const [cachedKey, entry] of cache) {
+    if (entry.expiresAt <= now) cache.delete(cachedKey);
+  }
+  const cached = cache.get(key);
+  if (cached) return cached.result;
   const result = await analyzeMedications(meds, allergies);
-  cache.set(patientId, { hash, result });
+  if (result.status === "available") {
+    if (cache.size >= CACHE_MAX_ENTRIES) cache.delete(cache.keys().next().value!);
+    cache.set(key, { expiresAt: Date.now() + CACHE_TTL_MS, result });
+  }
   return result;
 }
 
-export async function checkNewPrescriptionSafety(patientId: string, newMedName: string): Promise<void> {
-  const patient = await prisma.patient.findUnique({
-    where: { id: patientId },
-    include: { prescriptions: { where: { isActive: true } } },
-  });
-  if (!patient) return;
-
+export async function checkNewPrescriptionSafety(patientId: string, newMedName: string, viewer: RecordViewer): Promise<void> {
+  const record = await loadVisiblePatientRecord(viewer, patientId);
+  const patient = { ...record.patient, prescriptions: record.prescriptions.filter(p => p.isActive) };
   const meds: MedInput[] = patient.prescriptions.map((p) => ({ medication: p.medication, dosage: p.dosage }));
   const result = await analyzeMedications(meds, patient.allergies);
 
@@ -120,7 +160,7 @@ export async function checkNewPrescriptionSafety(patientId: string, newMedName: 
 
   if (relevant) {
     await createNotification(
-      patient.userId,
+      (await prisma.patient.findUniqueOrThrow({ where: { id: patientId }, select: { userId: true } })).userId,
       "Medication safety",
       "Amelia flagged a possible interaction with your new medication — review it.",
       "MED_SAFETY",

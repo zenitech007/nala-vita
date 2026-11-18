@@ -1,8 +1,9 @@
+import {symptomAssessmentSchema,parseClinicalAssessment,clinicalAssessmentUnavailable} from "@/lib/clinical-ai-response";
+import { ProviderTimeoutError, providerTimeoutResponse, withProviderDeadline } from "@/lib/provider-deadline";
+import { requireApiUser } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { ai, GEMINI_MODEL } from "@/lib/gemini";
-import { createServerSupabaseClient } from "@/lib/supabase-server";
-import { prisma } from "@/lib/prisma";
 import { checkRateLimitAsync } from "@/lib/rate-limit";
 
 const symptomCheckSchema = z.object({
@@ -16,22 +17,9 @@ const symptomCheckSchema = z.object({
 export async function POST(req: NextRequest) {
   try {
     // ─── Authenticate ────────────────────────────────────
-    const supabase = createServerSupabaseClient();
-    const {
-      data: { user: authUser },
-    } = await supabase.auth.getUser();
-
-    if (!authUser) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { supabaseId: authUser.id },
-    });
-
-    if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
-    }
+    const auth = await requireApiUser({ roles: ["PATIENT"], profile: "patient" });
+    if (!auth.ok) return auth.response;
+    const user = auth.user;
 
     // ─── Rate limit (10 calls / 60s per user) ────────────
     const limit = await checkRateLimitAsync(`ai:symptom-check:${user.id}`);
@@ -87,49 +75,30 @@ Provide 2-4 possible conditions, a clear recommendation, and 3-5 self-care tips.
     const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
     if (geminiKey) {
       try {
-        const response = await ai.models.generateContent({
+        const response = await withProviderDeadline(signal => ai.models.generateContent({
           model: GEMINI_MODEL,
           contents: prompt,
           config: {
+          abortSignal: signal,
             systemInstruction:
               "You are a medical triage assistant that returns structured JSON responses. Never provide definitive diagnoses. Always recommend professional medical consultation.",
             maxOutputTokens: 1000,
           },
-        });
+        }), req.signal);
         responseText = response.text?.trim() || "";
       } catch (gemErr) {
-        console.warn("Gemini symptom-check error, using clinical triage fallback:", gemErr);
+        if (gemErr instanceof ProviderTimeoutError || req.signal.aborted) throw gemErr;
+        console.warn("Clinical AI provider failed; assessment unavailable.");
       }
     }
 
-    let result: any = null;
-    if (responseText) {
-      try {
-        const cleaned = responseText.replace(/^```json\s*/i, "").replace(/```\s*$/, "").trim();
-        const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
-        result = JSON.parse(jsonMatch ? jsonMatch[0] : cleaned);
-      } catch {
-        result = null;
-      }
-    }
-
-    if (!result) {
-      result = {
-        urgency: "Medium",
-        possibleConditions: ["Acute symptomatic presentation", "General viral or inflammatory response"],
-        recommendation: "Rest and monitor your symptoms. If they persist beyond 48 hours or intensify, consult your healthcare provider.",
-        selfCareAdvice: [
-          "Stay well hydrated with fluids and electrolyte solutions",
-          "Allow time for physical rest and recovery",
-          "Track your symptoms and temperature",
-          "Seek immediate medical attention if you experience severe shortness of breath or high fever",
-        ],
-      };
-    }
+    const result = parseClinicalAssessment(responseText, symptomAssessmentSchema);
+    if (!result) return clinicalAssessmentUnavailable();
 
     return NextResponse.json(
       {
         ...result,
+        status: "available",
         disclaimer:
           "This assessment is for informational purposes only and does not constitute medical advice. Always consult a qualified healthcare professional for proper diagnosis and treatment.",
       },
@@ -141,6 +110,7 @@ Provide 2-4 possible conditions, a clear recommendation, and 3-5 self-care tips.
       }
     );
   } catch (error) {
+    if (error instanceof ProviderTimeoutError) return providerTimeoutResponse();
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: "Validation failed", details: error.issues },

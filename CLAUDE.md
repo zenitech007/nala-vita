@@ -1,6 +1,6 @@
 ## Project: Nala Vita (MediConnect)
 
-Single Next.js 14 App Router project at this directory root. Patient-doctor medical platform — route groups `(patient)/(doctor)/(admin)/(auth)` under `src/app/`. Stack: Next 14, TypeScript, Prisma 7, Supabase (PostgreSQL + Auth + Storage + Realtime), Tailwind 3, OpenAI, jest, next-intl.
+Single Next.js 16 App Router project at this directory root. Patient-doctor medical platform — route groups `(patient)/(doctor)/(admin)/(auth)` under `src/app/`. Stack: Next 16, TypeScript, Prisma 7, Supabase (PostgreSQL + Auth + Storage + Realtime), Tailwind 3, OpenAI, jest, next-intl.
 
 ## graphify
 

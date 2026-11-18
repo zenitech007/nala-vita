@@ -13,15 +13,16 @@ import type { AmeliaTurnInput, AmeliaReply } from "./types";
  */
 async function prepareTurn(input: AmeliaTurnInput) {
   const latestUser = [...input.messages].reverse().find((m) => m.role === "user");
-  const redFlags = latestUser ? detectRedFlags(latestUser.content) : [];
+  const redFlags = detectRedFlags(input.rawMessage ?? latestUser?.content ?? "");
 
   // Functional cues are advisory only — unlike red flags they never short-circuit,
   // because "your key sticks" must not produce "call an ambulance".
   const functionalCues = latestUser ? detectFunctionalCues(latestUser.content) : [];
 
+  if (!input.viewer) throw new Error("Authenticated record viewer required");
   const [ctx, memories] = await Promise.all([
-    getPatientContext(input.patientId),
-    getMemoriesForGrounding(input.patientId),
+    getPatientContext(input.patientId, input.viewer),
+    input.viewer.role === "PATIENT" && input.viewer.patient?.id === input.patientId ? getMemoriesForGrounding(input.patientId) : Promise.resolve({ known: [], toConfirm: [] }),
   ]);
 
   const turns: ChatTurn[] = [
@@ -34,7 +35,7 @@ async function prepareTurn(input: AmeliaTurnInput) {
 
 export async function runAmeliaTurn(input: AmeliaTurnInput): Promise<AmeliaReply> {
   const latestUser = [...input.messages].reverse().find((m) => m.role === "user");
-  const earlyFlags = latestUser ? detectRedFlags(latestUser.content) : [];
+  const earlyFlags = detectRedFlags(input.rawMessage ?? latestUser?.content ?? "");
 
   // Emergency short-circuit — deterministic, no LLM call, no data load.
   if (earlyFlags.length > 0) {
@@ -42,7 +43,7 @@ export async function runAmeliaTurn(input: AmeliaTurnInput): Promise<AmeliaReply
   }
 
   const { turns, redFlags, ctx } = await prepareTurn(input);
-  const content = await chat(turns, { context: ctx });
+  const content = await chat(turns, { context: ctx, signal: input.signal });
 
   return { content, urgency: urgencyFromRedFlags(redFlags), redFlags, disclaimer: PATIENT_DISCLAIMER };
 }
@@ -64,7 +65,7 @@ export async function* runAmeliaTurnStream(
   input: AmeliaTurnInput
 ): AsyncGenerator<{ type: "start"; meta: AmeliaStreamStart } | { type: "delta"; text: string }> {
   const latestUser = [...input.messages].reverse().find((m) => m.role === "user");
-  const earlyFlags = latestUser ? detectRedFlags(latestUser.content) : [];
+  const earlyFlags = detectRedFlags(input.rawMessage ?? latestUser?.content ?? "");
 
   if (earlyFlags.length > 0) {
     yield {
@@ -82,7 +83,7 @@ export async function* runAmeliaTurnStream(
     meta: { urgency: urgencyFromRedFlags(redFlags), redFlags, disclaimer: PATIENT_DISCLAIMER },
   };
 
-  for await (const delta of chatStream(turns, { context: ctx })) {
+  for await (const delta of chatStream(turns, { context: ctx, signal: input.signal })) {
     yield { type: "delta", text: delta };
   }
 }

@@ -1,13 +1,16 @@
+import {mockOf,mockQuery} from "../../helpers/mock";
+import type {AuthReply,UserProjection} from "../../helpers/projections";
+jest.mock("@/lib/visible-patient-record", () => ({ loadVisiblePatientRecord: async () => ({ patient: { allergies: ["penicillin"] }, prescriptions: [{ medication: "Aspirin", dosage: "81mg", isActive: true }] }) }));
 import { describe, it, expect, jest, beforeEach } from "@jest/globals";
 
-const getUser = jest.fn();
+const getUser=mockQuery<AuthReply>();
 jest.mock("@/lib/supabase-server", () => ({
   createServerSupabaseClient: () => ({
     auth: { getUser: () => getUser() },
   }),
 }));
 
-const userFindUnique = jest.fn();
+const userFindUnique=mockQuery<UserProjection|null>();
 jest.mock("@/lib/prisma", () => ({
   prisma: {
     user: { findUnique: (...a: unknown[]) => userFindUnique(...a) },
@@ -22,16 +25,13 @@ jest.mock("@/lib/rate-limit", () => ({
   }),
 }));
 
-const getCachedOrAnalyze = jest.fn();
+const getCachedOrAnalyze=mockOf<typeof import("@/lib/amelia/medsafety").getCachedOrAnalyze>();
 jest.mock("@/lib/amelia/medsafety", () => ({
-  getCachedOrAnalyze: (...a: unknown[]) => getCachedOrAnalyze(...a),
+  getCachedOrAnalyze: (...a: Parameters<typeof getCachedOrAnalyze>) => getCachedOrAnalyze(...a),
 }));
 
 import { GET } from "@/app/api/amelia/med-safety/route";
 
-function req() {
-  return new Request("http://localhost/api/amelia/med-safety") as never;
-}
 
 beforeEach(() => {
   [getUser, userFindUnique, getCachedOrAnalyze].forEach((m) => m.mockReset());
@@ -40,27 +40,27 @@ beforeEach(() => {
 describe("GET /api/amelia/med-safety", () => {
   it("401s when unauthenticated", async () => {
     getUser.mockResolvedValue({ data: { user: null } });
-    expect((await GET(req())).status).toBe(401);
+    expect((await GET()).status).toBe(401);
   });
 
   it("returns the analysis for the patient's active meds", async () => {
     getUser.mockResolvedValue({ data: { user: { id: "u1" } } });
     userFindUnique.mockResolvedValue({
-      id: "u1",
+      id: "u1", role: "PATIENT", isActive: true,
       patient: {
         id: "pat1",
         allergies: ["penicillin"],
         prescriptions: [{ medication: "Aspirin", dosage: "81mg" }],
       },
     });
-    getCachedOrAnalyze.mockResolvedValue({
+    getCachedOrAnalyze.mockResolvedValue({status:"available",
       interactions: [],
       dosingNotes: [],
       allergyConflicts: [],
       overallNote: "ok",
     });
 
-    const res = await GET(req());
+    const res = await GET();
     const json = await res.json();
 
     expect(res.status).toBe(200);

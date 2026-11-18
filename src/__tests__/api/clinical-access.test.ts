@@ -1,0 +1,8 @@
+const getUser=jest.fn(),findUser=jest.fn(),findPatient=jest.fn(),relationship=jest.fn();
+jest.mock('@/lib/supabase-server',()=>({createServerSupabaseClient:()=>({auth:{getUser}})}));
+jest.mock('@/lib/prisma',()=>({prisma:{user:{findUnique:(...a:unknown[])=>findUser(...a)},patient:{findFirst:async()=>null,findUnique:(...a:unknown[])=>findPatient(...a)},appointment:{findFirst:(...a:unknown[])=>relationship(...a)},referral:{findFirst:async()=>null}}}));
+jest.mock('@/lib/amelia/medsafety',()=>({checkNewPrescriptionSafety:jest.fn()}));jest.mock('@/lib/notifications',()=>({createNotification:jest.fn()}));
+import {POST as prescription} from '@/app/api/prescriptions/route';import {POST as lab} from '@/app/api/lab-tests/route';import {POST as notes} from '@/app/api/patients/[id]/notes/route';import {POST as referral} from '@/app/api/referrals/route';
+const routes=[['prescription',prescription,{medication:'Test',dosage:'1',frequency:'daily',duration:'1 day'}],['lab',lab,{testName:'Test'}],['notes',notes,{title:'Test',content:'Test'}],['referral',referral,{referredDoctorId:'d2',reason:'Test'}]] as const;
+beforeEach(()=>{jest.resetAllMocks();getUser.mockResolvedValue({data:{user:{id:'a'}}});findPatient.mockResolvedValue({id:'victim',userId:'p',user:{id:'p'}});});
+describe.each(routes)('F08 %s',(_name,handler,body)=>{it('rejects unrelated doctor before patient data read',async()=>{findUser.mockResolvedValue({id:'u',role:'DOCTOR',isActive:true,doctor:{id:'d',isVerified:true}});const res=await handler(new Request('http://localhost/api/test',{method:'POST',body:JSON.stringify({...body,patientId:'victim'})}) as never,{params:Promise.resolve({id:'victim'})});expect(res.status).toBe(403);expect(findPatient).not.toHaveBeenCalled();});});

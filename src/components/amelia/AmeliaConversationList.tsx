@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import {useLocalPreference,readBoolean} from "@/hooks/useLocalPreference";
 import { MessageSquare, PanelLeftClose, PanelLeftOpen, Plus, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -50,22 +50,8 @@ export default function AmeliaConversationList({
   // Floating only makes sense for the rail, so `overlay` implies it.
   const isRail = collapsible || overlay;
 
-  // Closed by default; the stored preference is applied after mount so the
-  // server and first client render agree.
-  const [isCollapsed, setIsCollapsed] = useState(true);
-
-  useEffect(() => {
-    if (!isRail) return;
-    const stored = localStorage.getItem(storageKeyFor(overlay));
-    if (stored !== null) setIsCollapsed(stored === "true");
-  }, [isRail, overlay]);
-
-  const toggleCollapse = () =>
-    setIsCollapsed((v) => {
-      const next = !v;
-      localStorage.setItem(storageKeyFor(overlay), String(next));
-      return next;
-    });
+  const [isCollapsed,setIsCollapsed]=useLocalPreference(storageKeyFor(overlay),true,readBoolean);
+  const toggleCollapse=()=>setIsCollapsed(value=>!value);
 
   // Only the rail variant ever hides its labels.
   const collapsed = isRail && isCollapsed;

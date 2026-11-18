@@ -1,7 +1,11 @@
+import {notificationFixture} from "../helpers/fixtures";
+import {mockOf,mockQuery} from "../helpers/mock";
+import type {AuthReply,UserProjection,PatientProjection,PrescriptionProjection} from "../helpers/projections";
+import type {Appointment,Referral} from "@prisma/client";
 import { describe, it, expect, jest, beforeEach } from "@jest/globals";
 
 // Mock Supabase Server
-const getUser = jest.fn();
+const getUser = mockQuery<AuthReply>();
 jest.mock("@/lib/supabase-server", () => ({
   createServerSupabaseClient: () => ({
     auth: { getUser: () => getUser() },
@@ -9,28 +13,30 @@ jest.mock("@/lib/supabase-server", () => ({
 }));
 
 // Mock Notifications
-const createNotification = jest.fn();
+const createNotification=mockOf<typeof import("@/lib/notifications").createNotification>();
 jest.mock("@/lib/notifications", () => ({
-  createNotification: (...args: unknown[]) => createNotification(...args),
+  createNotification: (...args: Parameters<typeof createNotification>) => createNotification(...args),
 }));
 
 // Mock Prisma
-const userFindUnique = jest.fn();
-const patientFindUnique = jest.fn();
-const appointmentFindFirst = jest.fn();
-const referralFindFirst = jest.fn();
-const prescriptionFindUnique = jest.fn();
-const prescriptionFindMany = jest.fn();
-const prescriptionCreate = jest.fn();
-const prescriptionUpdate = jest.fn();
-const auditLogCreate = jest.fn();
+const userFindUnique = mockQuery<UserProjection|null>();
+const patientFindUnique = mockQuery<PatientProjection|null>();
+const appointmentFindFirst = mockQuery<Partial<Appointment>|null>();
+const referralFindFirst = mockQuery<Partial<Referral>|null>();
+const prescriptionFindUnique = mockQuery<PrescriptionProjection|null>();
+const prescriptionFindMany = mockQuery<PrescriptionProjection[]>();
+const prescriptionCreate = mockQuery<PrescriptionProjection>();
+const prescriptionUpdate = mockQuery<PrescriptionProjection>();
+const auditLogCreate = mockQuery<{id:string}>();
 
 jest.mock("@/lib/prisma", () => ({
   prisma: {
     user: {
       findUnique: (...a: unknown[]) => userFindUnique(...a),
     },
+    facilityMembership: { findMany: async () => [] }, recordAccessGrant: { findMany: async () => [] }, recordAccessLog: { createMany: async () => ({}) },
     patient: {
+      findFirst: async () => null,
       findUnique: (...a: unknown[]) => patientFindUnique(...a),
     },
     appointment: {
@@ -41,6 +47,7 @@ jest.mock("@/lib/prisma", () => ({
     },
     prescription: {
       findUnique: (...a: unknown[]) => prescriptionFindUnique(...a),
+      findFirst: (...a: unknown[]) => prescriptionFindUnique(...a),
       findMany: (...a: unknown[]) => prescriptionFindMany(...a),
       create: (...a: unknown[]) => prescriptionCreate(...a),
       update: (...a: unknown[]) => prescriptionUpdate(...a),
@@ -61,8 +68,9 @@ describe("Two-Sided Medication Pipeline & Adherence Suite", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    patientFindUnique.mockResolvedValue({ id: "pat-1", userId: "u-pat-1" });
     auditLogCreate.mockResolvedValue({ id: "audit-1" });
-    createNotification.mockResolvedValue(true);
+    createNotification.mockResolvedValue(notificationFixture());
   });
 
   describe("Patient Dashboard: 7-Day Adherence & Prescription Self-Management", () => {
@@ -73,7 +81,7 @@ describe("Two-Sided Medication Pipeline & Adherence Suite", () => {
 
       userFindUnique.mockResolvedValueOnce({
         id: "u-patient-1",
-        role: "PATIENT",
+        role: "PATIENT", isActive: true,
         patient: { id: "pat-1" },
         doctor: null,
       });
@@ -93,7 +101,7 @@ describe("Two-Sided Medication Pipeline & Adherence Suite", () => {
           refillsAllowed: 2,
           refillsUsed: 0,
           isActive: true,
-          prescribedAt: new Date().toISOString(),
+          prescribedAt: new Date(),
           expiresAt: null,
           addedBy: "DOCTOR",
           isSharedWithDoctor: true,
@@ -129,7 +137,7 @@ describe("Two-Sided Medication Pipeline & Adherence Suite", () => {
 
       userFindUnique.mockResolvedValueOnce({
         id: "u-patient-1",
-        role: "PATIENT",
+        role: "PATIENT", isActive: true,
         patient: { id: "pat-1" },
         doctor: null,
       });
@@ -186,7 +194,7 @@ describe("Two-Sided Medication Pipeline & Adherence Suite", () => {
 
       userFindUnique.mockResolvedValueOnce({
         id: "u-patient-1",
-        role: "PATIENT",
+        role: "PATIENT", isActive: true,
         patient: { id: "pat-1" },
         doctor: null,
       });
@@ -217,7 +225,7 @@ describe("Two-Sided Medication Pipeline & Adherence Suite", () => {
       expect(res.status).toBe(200);
       expect(data.action).toBe("LOGGED");
       expect(prescriptionUpdate).toHaveBeenCalledWith({
-        where: { id: "rx-1" },
+        where: { id: "rx-1", patientId: "pat-1" },
         data: { usageLogs: [todayStr] },
       });
 
@@ -227,7 +235,7 @@ describe("Two-Sided Medication Pipeline & Adherence Suite", () => {
       });
       userFindUnique.mockResolvedValueOnce({
         id: "u-patient-1",
-        role: "PATIENT",
+        role: "PATIENT", isActive: true,
         patient: { id: "pat-1" },
         doctor: null,
       });
@@ -255,7 +263,7 @@ describe("Two-Sided Medication Pipeline & Adherence Suite", () => {
       expect(res2.status).toBe(200);
       expect(data2.action).toBe("UNLOGGED");
       expect(prescriptionUpdate).toHaveBeenCalledWith({
-        where: { id: "rx-1" },
+        where: { id: "rx-1", patientId: "pat-1" },
         data: { usageLogs: [] },
       });
     });
@@ -267,7 +275,7 @@ describe("Two-Sided Medication Pipeline & Adherence Suite", () => {
 
       userFindUnique.mockResolvedValueOnce({
         id: "u-patient-1",
-        role: "PATIENT",
+        role: "PATIENT", isActive: true,
         patient: { id: "pat-1" },
         doctor: null,
       });
@@ -297,7 +305,7 @@ describe("Two-Sided Medication Pipeline & Adherence Suite", () => {
       expect(res.status).toBe(200);
       expect(data.isSharedWithDoctor).toBe(false);
       expect(prescriptionUpdate).toHaveBeenCalledWith({
-        where: { id: "rx-supp-1" },
+        where: { id: "rx-supp-1", patientId: "pat-1" },
         data: { isSharedWithDoctor: false },
       });
     });
@@ -311,8 +319,8 @@ describe("Two-Sided Medication Pipeline & Adherence Suite", () => {
 
       userFindUnique.mockResolvedValueOnce({
         id: "u-doc-1",
-        role: "DOCTOR",
-        doctor: { id: "doc-1" },
+        role: "DOCTOR", isActive: true,
+        doctor: { id: "doc-1", isVerified: true },
         patient: null,
       });
 
@@ -327,8 +335,8 @@ describe("Two-Sided Medication Pipeline & Adherence Suite", () => {
       });
       userFindUnique.mockResolvedValueOnce({
         id: "u-doc-1",
-        role: "DOCTOR",
-        doctor: { id: "doc-1" },
+        role: "DOCTOR", isActive: true,
+        doctor: { id: "doc-1", isVerified: true },
         patient: null,
       });
       appointmentFindFirst.mockResolvedValueOnce(null);
@@ -346,8 +354,8 @@ describe("Two-Sided Medication Pipeline & Adherence Suite", () => {
 
       userFindUnique.mockResolvedValueOnce({
         id: "u-doc-1",
-        role: "DOCTOR",
-        doctor: { id: "doc-1" },
+        role: "DOCTOR", isActive: true,
+        doctor: { id: "doc-1", isVerified: true },
         patient: null,
       });
 
@@ -366,7 +374,7 @@ describe("Two-Sided Medication Pipeline & Adherence Suite", () => {
           refillsAllowed: 3,
           refillsUsed: 1,
           isActive: true,
-          prescribedAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+          prescribedAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
           expiresAt: null,
           addedBy: "DOCTOR",
           isSharedWithDoctor: true,
@@ -382,27 +390,18 @@ describe("Two-Sided Medication Pipeline & Adherence Suite", () => {
       const data = await res.json();
 
       expect(res.status).toBe(200);
-      expect(prescriptionFindMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({
-            patientId: "pat-1",
-            AND: expect.arrayContaining([
-              {
-                OR: [
-                  { addedBy: "DOCTOR" },
-                  { isSharedWithDoctor: true },
-                ],
-              },
-            ]),
-          }),
-        })
-      );
+      expect(prescriptionFindMany).toHaveBeenCalledWith(expect.objectContaining({ where: { AND: expect.arrayContaining([
+        { patientId: "pat-1", OR: [{ authoredByDoctorId: "doc-1" }] },
+      ]) } }));
       expect(data.adherenceStats.window).toBe("6_months");
       expect(data.medications[0].medication).toBe("Metformin");
-      expect(data.medications[0].totalLoggedDoses).toBe(1);
+      // A 30-day course begun 30 days ago ended yesterday. Today is outside the course.
+      expect(data.medications[0].totalLoggedDoses).toBe(0);
     });
 
     it("should allow a doctor to prescribe medication to a patient", async () => {
+      appointmentFindFirst.mockResolvedValueOnce({id:"care"});
+      referralFindFirst.mockResolvedValueOnce(null);
       getUser.mockResolvedValueOnce({
         data: { user: { id: "auth-doctor-1" } },
       });
@@ -411,8 +410,8 @@ describe("Two-Sided Medication Pipeline & Adherence Suite", () => {
         id: "u-doc-1",
         firstName: "Gregory",
         lastName: "House",
-        role: "DOCTOR",
-        doctor: { id: "doc-1" },
+        role: "DOCTOR", isActive: true,
+        doctor: { id: "doc-1", isVerified: true },
         patient: null,
       });
 

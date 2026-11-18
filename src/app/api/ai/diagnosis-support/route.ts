@@ -1,9 +1,11 @@
+import {diagnosisAssessmentSchema,parseClinicalAssessment,clinicalAssessmentUnavailable} from "@/lib/clinical-ai-response";
+import { ProviderTimeoutError, providerTimeoutResponse, withProviderDeadline } from "@/lib/provider-deadline";
+import { requireApiUser } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { ai, GEMINI_MODEL } from "@/lib/gemini";
-import { createServerSupabaseClient } from "@/lib/supabase-server";
-import { prisma } from "@/lib/prisma";
 import { checkRateLimitAsync } from "@/lib/rate-limit";
+import { temperatureToCelsius, formatTemperature } from "@/lib/temperature";
 
 // ─── Input schema ────────────────────────────────────────
 
@@ -13,10 +15,11 @@ const diagnosisSupportSchema = z.object({
     bloodPressure: z.string().optional(),
     heartRate: z.number().optional(),
     temperature: z.number().optional(),
+    temperatureUnit: z.enum(["C", "F"]).optional(),
     respiratoryRate: z.number().optional(),
     oxygenSaturation: z.number().optional(),
     bloodSugar: z.number().optional(),
-  }).optional(),
+  }).refine(value => (value.temperature === undefined) === (value.temperatureUnit === undefined), "Temperature requires an explicit C or F unit").optional(),
   history: z.array(z.string()).optional(),
   currentMedications: z.array(z.string()).optional(),
   patientAge: z.number().optional(),
@@ -28,28 +31,10 @@ const diagnosisSupportSchema = z.object({
 export async function POST(req: NextRequest) {
   try {
     // Authenticate — only doctors may use this endpoint
-    const supabase = createServerSupabaseClient();
-    const {
-      data: { user: authUser },
-    } = await supabase.auth.getUser();
+    const auth = await requireApiUser({ roles: ["DOCTOR"], profile: "doctor" });
+    if (!auth.ok) return auth.response;
+    const user = auth.user;
 
-    if (!authUser) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { supabaseId: authUser.id },
-      include: { doctor: true },
-    });
-
-    if (!user?.doctor) {
-      return NextResponse.json(
-        { error: "Only doctors can access clinical decision support" },
-        { status: 403 }
-      );
-    }
-
-    // ─── Rate limit (10 calls / 60s per user) ────────────
     const limit = await checkRateLimitAsync(`ai:diagnosis-support:${user.id}`);
     if (!limit.allowed) {
       return NextResponse.json(
@@ -75,8 +60,8 @@ export async function POST(req: NextRequest) {
 
     const vitalsText = validated.vitals
       ? Object.entries(validated.vitals)
-          .filter(([, v]) => v !== undefined && v !== null && v !== "")
-          .map(([k, v]) => `  - ${k}: ${v}`)
+          .filter(([k, v]) => k !== "temperatureUnit" && v !== undefined && v !== null && v !== "")
+          .map(([k, v]) => `  - ${k}: ${k === "temperature" ? formatTemperature(temperatureToCelsius(v as number, validated.vitals!.temperatureUnit!), "C") : v}`)
           .join("\n") || "  None recorded"
       : "  None recorded";
 
@@ -160,62 +145,35 @@ Guidelines:
     const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
     if (geminiKey) {
       try {
-        const response = await ai.models.generateContent({
+        const response = await withProviderDeadline(signal => ai.models.generateContent({
           model: GEMINI_MODEL,
           contents: prompt,
           config: {
+          abortSignal: signal,
             systemInstruction:
               "You are an expert clinical decision support AI. You assist licensed physicians by providing evidence-based differential diagnoses, drug interaction checks, test recommendations, treatment options, and red flag alerts. You always return valid JSON. This is a decision support tool, not a replacement for clinical judgment.",
             maxOutputTokens: 2000,
           },
-        });
+        }), req.signal);
         responseText = response.text?.trim() || "";
       } catch (gemErr) {
-        console.warn("Gemini diagnosis-support error, using clinical fallback:", gemErr);
+        if (gemErr instanceof ProviderTimeoutError || req.signal.aborted) throw gemErr;
+        console.warn("Clinical AI provider failed; assessment unavailable.");
       }
     }
 
-    let result: any = null;
-    if (responseText) {
-      try {
-        const cleaned = responseText.replace(/^```json\s*/i, "").replace(/```\s*$/, "").trim();
-        const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
-        result = JSON.parse(jsonMatch ? jsonMatch[0] : cleaned);
-      } catch {
-        result = null;
-      }
-    }
-
-    if (!result) {
-      result = {
-        differentialDiagnoses: [
-          {
-            condition: "Symptomatic Presentation Under Evaluation",
-            probability: "Moderate",
-            rationale: "Clinical features align with presenting symptoms; routine diagnostics recommended to exclude secondary etiology.",
-            icd10: "R68.89"
-          }
-        ],
-        drugInteractions: [],
-        recommendedTests: [
-          { test: "Complete Blood Count (CBC)", reason: "Assess for baseline systemic or inflammatory response" },
-          { test: "Comprehensive Metabolic Panel (CMP)", reason: "Evaluate renal and hepatic baseline" }
-        ],
-        treatmentOptions: [
-          { treatment: "Supportive care and monitoring", details: "Maintain adequate hydration and rest pending confirmatory testing." }
-        ],
-        redFlags: [],
-        summary: "Clinical decision support generated from presenting symptoms. Standard laboratory evaluation recommended."
-      };
-    }
+    const result = parseClinicalAssessment(responseText, diagnosisAssessmentSchema);
+    if (!result) return clinicalAssessmentUnavailable();
 
     return NextResponse.json({
       ...result,
+        status: "available",
       disclaimer:
         "This AI-generated clinical decision support is intended to assist licensed physicians only. It does not replace professional clinical judgment. All treatment decisions must be made by a qualified healthcare provider.",
       generatedAt: new Date().toISOString(),
     });
   } catch (error) {
+    if (error instanceof ProviderTimeoutError) return providerTimeoutResponse();
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: "Validation failed", details: error.issues },

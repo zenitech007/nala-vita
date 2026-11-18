@@ -1,0 +1,10 @@
+jest.mock("@/app/globals.css",()=>({}));
+jest.mock("@/app/appearance.css",()=>({}));
+jest.mock("next/font/local",()=>({__esModule:true,default:()=>({variable:"font"})}));
+jest.mock("next-intl",()=>({NextIntlClientProvider:()=>null}));
+jest.mock("next-intl/server",()=>({getLocale:async()=>"en",getMessages:async()=>({})}));
+jest.mock("@/providers",()=>({__esModule:true,default:()=>null}));
+jest.mock("@/components/providers/ThemeProvider",()=>({ThemeProvider:()=>null}));
+jest.mock("@/components/common/RouteProgress",()=>({__esModule:true,default:()=>null}));
+import { viewport } from "@/app/layout";
+test("viewport lets the browser support user zoom",()=>{expect(viewport.maximumScale).toBeUndefined();expect(viewport.userScalable).not.toBe(false);expect(viewport.width).toBe("device-width");});

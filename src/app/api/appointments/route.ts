@@ -1,30 +1,20 @@
+import { requireApiUser } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { createServerSupabaseClient } from "@/lib/supabase-server";
+
+import { appointmentAvailabilityError } from "@/lib/appointment-availability";
+import { AppointmentConflict, reserveAppointmentSlot } from "@/lib/appointment-lock";
+import { Prisma } from "@prisma/client";
+import { moneyForJson } from "@/lib/money";
 
 // ─── GET: Fetch logged-in patient's appointments ─────────
 
 export async function GET(req: NextRequest) {
   try {
-    const supabase = createServerSupabaseClient();
-    const {
-      data: { user: authUser },
-    } = await supabase.auth.getUser();
-
-    if (!authUser) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { supabaseId: authUser.id },
-      include: { patient: true, doctor: true },
-    });
-
-    if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
-    }
-
+    const auth = await requireApiUser({ roles: ["PATIENT", "DOCTOR"] });
+    if (!auth.ok) return auth.response;
+    const user = auth.user;
     const { searchParams } = new URL(req.url);
     const statusFilter = searchParams.get("status"); // upcoming | past | cancelled
 
@@ -61,18 +51,12 @@ export async function GET(req: NextRequest) {
             },
           },
         },
-        patient: {
-          include: {
-            user: {
-              select: { firstName: true, lastName: true, avatarUrl: true },
-            },
-          },
-        },
+        patient: { select: { id: true, user: { select: { firstName: true, lastName: true, avatarUrl: true } } } },
       },
       orderBy: { scheduledAt: statusFilter === "past" ? "desc" : "asc" },
     });
 
-    return NextResponse.json({ appointments });
+    return NextResponse.json(moneyForJson({ appointments }));
   } catch (error) {
     console.error("GET /api/appointments error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
@@ -87,82 +71,45 @@ const createAppointmentSchema = z.object({
   consultationType: z.enum(["IN_PERSON", "VIDEO", "PHONE", "CHAT"]),
   urgencyLevel: z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]).optional(),
   reason: z.string().optional(),
-  duration: z.number().min(15).max(120).optional(),
+  duration: z.number().int().min(15).max(120).optional(),
 });
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = createServerSupabaseClient();
-    const {
-      data: { user: authUser },
-    } = await supabase.auth.getUser();
-
-    if (!authUser) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { supabaseId: authUser.id },
-      include: { patient: true },
-    });
-
-    if (!user?.patient) {
-      return NextResponse.json({ error: "Patient profile not found" }, { status: 404 });
-    }
+    const auth = await requireApiUser({ roles: ["PATIENT"], profile: "patient" });
+    if (!auth.ok) return auth.response;
+    const user = auth.user;
 
     const body = await req.json();
     const validated = createAppointmentSchema.parse(body);
 
+    if (!user.isActive || user.role !== "PATIENT") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
     // Verify doctor exists
     const doctor = await prisma.doctor.findUnique({
       where: { id: validated.doctorId },
+      include: { user: { select: { isActive: true } } },
     });
 
     if (!doctor) {
       return NextResponse.json({ error: "Doctor not found" }, { status: 404 });
     }
 
-    // Check for conflicting appointment: two intervals overlap when
-    //   existingStart < newEnd  AND  existingEnd > newStart
-    // Prisma doesn't know each appointment's duration directly, so we fetch
-    // active appointments in the broad window and check overlap in JS.
     const scheduledDate = new Date(validated.scheduledAt);
     const duration = validated.duration || 30;
-    const slotEnd = new Date(scheduledDate.getTime() + duration * 60_000);
-
-    const broadWindowStart = new Date(scheduledDate.getTime() - 4 * 60 * 60 * 1000); // 4 h before
-    const broadWindowEnd   = new Date(scheduledDate.getTime() + 4 * 60 * 60 * 1000); // 4 h after
-
-    const activeInWindow = await prisma.appointment.findMany({
-      where: {
-        doctorId: validated.doctorId,
-        status: { in: ["SCHEDULED", "CONFIRMED", "IN_PROGRESS"] },
-        scheduledAt: { gte: broadWindowStart, lte: broadWindowEnd },
-      },
-      select: { id: true, scheduledAt: true, duration: true },
-    });
-
-    const conflict = activeInWindow.find((appt) => {
-      const existingStart = appt.scheduledAt.getTime();
-      const existingEnd   = existingStart + appt.duration * 60_000;
-      const newStart      = scheduledDate.getTime();
-      const newEnd        = slotEnd.getTime();
-      return existingStart < newEnd && existingEnd > newStart;
-    });
-
-    if (conflict) {
-      return NextResponse.json(
-        { error: "This time slot is not available. Please choose a different time." },
-        { status: 409 }
-      );
-    }
+    const availabilityError = appointmentAvailabilityError(doctor, scheduledDate, duration);
+    if (availabilityError) return NextResponse.json({ error: availabilityError }, { status: 422 });
 
     // Create appointment and pending payment in a transaction
     const result = await prisma.$transaction(async (tx) => {
+      await reserveAppointmentSlot(tx, doctor.id, user.patient!.id, scheduledDate, duration);
       const appointment = await tx.appointment.create({
         data: {
           patientId: user.patient!.id,
           doctorId: validated.doctorId,
+          authoredByDoctorId: validated.doctorId,
           scheduledAt: scheduledDate,
           duration,
           consultationType: validated.consultationType,
@@ -186,24 +133,30 @@ export async function POST(req: NextRequest) {
         data: {
           patientId: user.patient!.id,
           appointmentId: appointment.id,
-          amount: doctor.consultationFee + 2, // fee + platform fee
+          amount: new Prisma.Decimal(doctor.consultationFee).plus(2), // exact fee + platform fee
           currency: "USD",
           status: "PENDING",
         },
       });
 
       return { appointment, payment };
-    });
+    }, { isolationLevel: "ReadCommitted" });
 
     return NextResponse.json(
-      {
+      moneyForJson({
         message: "Appointment booked successfully",
         appointment: result.appointment,
         payment: result.payment,
-      },
+      }),
       { status: 201 }
     );
   } catch (error) {
+    // Exclusion violations protect every writer once the forward migration is applied.
+    const databaseError = error as { code?: string; meta?: { code?: string; database_error?: string } };
+    if (error instanceof AppointmentConflict || databaseError.code === "23P01"
+      || databaseError.meta?.code === "23P01" || databaseError.meta?.database_error?.includes("appointments_no_")) {
+      return NextResponse.json({ error: "This doctor or patient already has an overlapping appointment" }, { status: 409 });
+    }
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: "Validation failed", details: error.issues },

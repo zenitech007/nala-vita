@@ -1,37 +1,41 @@
+import { fetchJson } from "@/lib/api-fetch";
+import { useQueryUserId, userQueryKey } from "@/providers";
 import { useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 
 export function useNotifications(userId: string | null) {
   const qc = useQueryClient();
+  const verifiedUserId = useQueryUserId();
+  const activeUserId = userId === verifiedUserId ? userId : null;
 
   const query = useQuery({
-    queryKey: ["notifications"],
-    queryFn: () => fetch("/api/notifications").then((r) => r.json()),
-    enabled: !!userId,
+    queryKey: userQueryKey(activeUserId, "notifications"),
+    queryFn: ({ signal }) => fetchJson("/api/notifications", { signal }),
+    enabled: !!activeUserId,
   });
 
   useEffect(() => {
-    if (!userId) return;
+    if (!activeUserId) return;
     const channel = supabase
-      .channel(`notifications:${userId}`)
+      .channel(`notifications:${activeUserId}`)
       .on(
         "postgres_changes",
         {
           event: "INSERT",
           schema: "public",
           table: "notifications",
-          filter: `user_id=eq.${userId}`,
+          filter: `user_id=eq.${activeUserId}`,
         },
         () => {
-          qc.invalidateQueries({ queryKey: ["notifications"] });
+          qc.invalidateQueries({ queryKey: userQueryKey(activeUserId, "notifications") });
         }
       )
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [userId, qc]);
+  }, [activeUserId, qc]);
 
   return query;
 }

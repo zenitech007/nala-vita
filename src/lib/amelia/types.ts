@@ -8,6 +8,7 @@ export interface RedFlag {
 }
 
 export interface AmeliaContext {
+  accessLimited?: boolean;
   firstName: string;
   age: number | null;
   gender: string | null;
@@ -20,6 +21,8 @@ export interface AmeliaContext {
     heartRate: number | null;
     bloodSugar: number | null;
     oxygenSaturation: number | null;
+    temperature?: number | null;
+    temperatureUnit?: "C";
   }[];
   recentLabs: { testName: string; resultValue: string; unit: string | null; isAbnormal: boolean }[];
   upcomingAppointments?: { doctorName: string; specialization: string; date: string; reason?: string | null }[];
@@ -28,6 +31,10 @@ export interface AmeliaContext {
 
 
 export interface AmeliaTurnInput {
+  /** Raw submitted text, screened independently of history and image extraction. */
+  rawMessage?: string;
+  signal?: AbortSignal;
+  viewer?: import("@/lib/record-visibility").RecordViewer;
   audience: Audience;
   patientId: string;
   messages: { role: "user" | "assistant"; content: string }[];

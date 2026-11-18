@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { ShieldCheck, AlertTriangle, Loader2 } from "lucide-react";
 
 interface MedSafetyResult {
+  status: "available" | "unavailable";
   interactions: { drugs: string[]; severity: string; note: string }[];
   dosingNotes: { medication: string; note: string }[];
   allergyConflicts: { medication: string; allergy: string; note: string }[];
@@ -59,7 +60,8 @@ export default function MedSafetyPanel() {
         <ShieldCheck className="w-5 h-5 text-[var(--primary)]" />
         <h2 className="text-base font-semibold text-gray-900">Medication safety</h2>
       </div>
-      {!hasConcerns ? (
+      {result.status === "unavailable" && <p role="status" className="text-sm text-gray-500">Medication safety analysis unavailable. Ask your pharmacist or doctor for a review.</p>}
+      {!hasConcerns && result.status === "available" ? (
         <p className="text-sm text-gray-500">No concerns found across your current medications.</p>
       ) : (
         <div className="space-y-2">
@@ -83,7 +85,7 @@ export default function MedSafetyPanel() {
           ))}
         </div>
       )}
-      {result.overallNote && <p className="text-xs text-gray-400 mt-3">{result.overallNote}</p>}
+      {result.status === "available" && result.overallNote && <p className="text-xs text-gray-400 mt-3">{result.overallNote}</p>}
     </section>
   );
 }

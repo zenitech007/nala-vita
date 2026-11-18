@@ -1,14 +1,18 @@
+import { getCollectionVisibility } from "@/lib/record-visibility";
+import { requireApiUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { TEMPERATURE, formatTemperature } from "@/lib/temperature";
 import { redirect } from "next/navigation";
 import DoctorDashboardClient from "./_components/DoctorDashboardClient";
-import { getAuthenticatedUserWithProfile } from "@/lib/auth-cache";
+
 
 export default async function DoctorDashboardPage() {
-  const authData = await getAuthenticatedUserWithProfile();
-  if (!authData?.session || !authData.user?.doctor) redirect("/login");
-
-  const { user } = authData;
-  const doctorId = authData.user.doctor.id;
+  const auth = await requireApiUser({ roles: ["DOCTOR"], profile: "doctor", allowUnverifiedDoctor: true });
+  if (!auth.ok) redirect("/login");
+  const user = auth.user;
+  if (!user.doctor!.isVerified) return null;
+  const doctorId = user.doctor!.id;
+  const vitalAccess = await getCollectionVisibility(user, "VITALS");
   const now = new Date();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const todayEnd = new Date(todayStart);
@@ -35,11 +39,7 @@ export default async function DoctorDashboardPage() {
       },
       orderBy: { scheduledAt: "asc" },
       include: {
-        patient: {
-          include: {
-            user: { select: { firstName: true, lastName: true } },
-          },
-        },
+        patient: { select: { id: true, user: { select: { firstName: true, lastName: true } } } },
       },
     }),
 
@@ -59,11 +59,7 @@ export default async function DoctorDashboardPage() {
       orderBy: { prescribedAt: "desc" },
       take: 3,
       include: {
-        patient: {
-          include: {
-            user: { select: { firstName: true, lastName: true } },
-          },
-        },
+        patient: { select: { id: true, user: { select: { firstName: true, lastName: true } } } },
       },
     }),
 
@@ -86,27 +82,27 @@ export default async function DoctorDashboardPage() {
   const abnormalVitalsRaw = patientIds.length > 0
     ? await prisma.vital.findMany({
         where: {
+          AND: [vitalAccess.where("VITALS")],
           patientId: { in: patientIds },
           recordedAt: { gte: twentyFourHoursAgo },
           OR: [
             { heartRate: { gt: 100 } },
             { heartRate: { lt: 50 } },
-            { temperature: { gt: 38.5 } },
+            { temperature: { gt: TEMPERATURE.feverC } },
             { oxygenSaturation: { lt: 92 } },
             { bloodSugar: { gt: 180 } },
             { bloodSugar: { lt: 70 } },
           ],
         },
         include: {
-          patient: {
-            include: { user: { select: { firstName: true, lastName: true } } },
-          },
+          patient: { select: { id: true, user: { select: { firstName: true, lastName: true } } } },
         },
         orderBy: { recordedAt: "desc" },
         take: 5,
       })
     : [];
 
+  await vitalAccess.log("VITALS", abnormalVitalsRaw);
   const abnormalVitals = abnormalVitalsRaw.map((v) => {
     let metric = "Vital";
     let value = "";
@@ -116,10 +112,10 @@ export default async function DoctorDashboardPage() {
       metric = "Heart Rate";
       value = `${v.heartRate} bpm`;
       severity = v.heartRate > 120 || v.heartRate < 40 ? "critical" : "warning";
-    } else if (v.temperature && v.temperature > 38.5) {
+    } else if (v.temperature != null && v.temperature > TEMPERATURE.feverC) {
       metric = "Temperature";
-      value = `${v.temperature}°C`;
-      severity = v.temperature > 39.5 ? "critical" : "warning";
+      value = formatTemperature(v.temperature, "C");
+      severity = v.temperature > TEMPERATURE.criticalC ? "critical" : "warning";
     } else if (v.oxygenSaturation && v.oxygenSaturation < 92) {
       metric = "SpO2";
       value = `${v.oxygenSaturation}%`;
@@ -166,7 +162,7 @@ export default async function DoctorDashboardPage() {
       patient: p.patient,
     })),
     totalPatients,
-    revenueThisWeek: revenueThisWeekResult._sum.amount ?? 0,
+    revenueThisWeek: Number(revenueThisWeekResult._sum.amount ?? 0),
   };
 
   return <DoctorDashboardClient data={dashboardData} />;

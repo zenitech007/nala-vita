@@ -200,7 +200,6 @@ export default function AmeliaChat({
       let buffer = "";
       let opened = false;
 
-      // eslint-disable-next-line no-constant-condition
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -223,6 +222,7 @@ export default function AmeliaChat({
 
           if (evt.type === "meta") {
             setConversationId(evt.conversationId as string);
+            if (evt.imageStatus === "unavailable") setMessages((m) => [...m, {role:"assistant",content:"The attached image could not be read. Please retry; no lab findings are available.",sentAt:new Date().toISOString()}]);
           } else if (evt.type === "start") {
             setEmergency(evt.urgency === "emergency");
             setStreaming(true);
@@ -242,7 +242,7 @@ export default function AmeliaChat({
               }));
             }
             void refreshList();
-          } else if (evt.type === "error") {
+          } else if (evt.type === "interrupted" || evt.type === "error") {
             const msg = (evt.error as string) ?? "Amelia was interrupted.";
             if (opened) {
               updateLastAssistant((prev) => ({
@@ -315,7 +315,7 @@ export default function AmeliaChat({
                 </div>
                 <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-700 text-[11px] font-semibold rounded-full border border-emerald-200/60" title={PRIVACY_NOTICE}>
                   <ShieldCheck className="w-3.5 h-3.5" />
-                  <span>Strict Data Isolation &middot; HIPAA Protected</span>
+                  <span>Record access information</span>
                 </div>
               </div>
             )}

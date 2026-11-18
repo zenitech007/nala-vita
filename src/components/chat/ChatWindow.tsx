@@ -15,6 +15,8 @@ import {
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
+import { chatEventSchema, chatTopic, privateChannel } from "@/lib/realtime-events";
+import { preferredScrollBehavior } from "@/lib/motion-preferences";
 import { format } from "date-fns";
 
 // ─── Types ───────────────────────────────────────────────
@@ -64,7 +66,7 @@ interface ChatWindowProps {
 
 // ─── Component ───────────────────────────────────────────
 
-export default function ChatWindow({
+function ChatWindowContent({
   currentUserId,
   otherUserId,
   otherUserName,
@@ -90,20 +92,15 @@ export default function ChatWindow({
 
   // ─── Fetch messages ────────────────────────────────────
 
-  const fetchMessages = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const res = await fetch(`/api/messages?otherUserId=${otherUserId}`);
+  const fetchMessages = useCallback(() => {
+    return fetch(`/api/messages?otherUserId=${otherUserId}`).then(async res => {
       if (!res.ok) throw new Error("Messages could not be loaded");
-
       const data = await res.json();
       setMessages(Array.isArray(data.messages) ? data.messages : []);
       setError("");
-    } catch (err) {
-      setError((err as Error).message || "Messages could not be loaded");
-    } finally {
-      setIsLoading(false);
-    }
+    }).catch((err: unknown) => {
+      setError(err instanceof Error ? err.message : "Messages could not be loaded");
+    }).finally(() => setIsLoading(false));
   }, [otherUserId]);
 
   useEffect(() => {
@@ -113,34 +110,21 @@ export default function ChatWindow({
   // ─── Supabase Realtime subscription ────────────────────
 
   useEffect(() => {
-    const channel = supabase
-      .channel(`messages:${[currentUserId, otherUserId].sort().join("-")}`)
-      .on("broadcast", { event: "new_message" }, ({ payload }) => {
-        const msg = payload as ChatMessage;
-        setMessages((prev) => {
-          if (prev.some((m) => m.id === msg.id)) return prev;
-          return [...prev, msg];
-        });
-      })
-      .on("broadcast", { event: "read_receipt" }, ({ payload }) => {
-        const { messageIds } = payload as { messageIds: string[] };
-        setMessages((prev) =>
-          prev.map((m) =>
-            messageIds.includes(m.id) ? { ...m, isRead: true } : m
-          )
-        );
+    const channel = supabase.channel(chatTopic(currentUserId), privateChannel)
+      .on("broadcast", { event: "invalidate" }, ({ payload }) => {
+        const event = chatEventSchema.safeParse(payload);
+        if (event.success && event.data.senderId === otherUserId && event.data.receiverId === currentUserId) {
+          void fetchMessages();
+        }
       })
       .subscribe();
-
-    return () => {
-      channel.unsubscribe();
-    };
-  }, [currentUserId, otherUserId]);
+    return () => { void channel.unsubscribe(); };
+  }, [currentUserId, otherUserId, fetchMessages]);
 
   // ─── Auto-scroll ───────────────────────────────────────
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    messagesEndRef.current?.scrollIntoView({ behavior: preferredScrollBehavior() });
   }, [messages]);
 
   const handleScroll = () => {
@@ -151,7 +135,7 @@ export default function ChatWindow({
   };
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    messagesEndRef.current?.scrollIntoView({ behavior: preferredScrollBehavior() });
   };
 
   // ─── Mark as read ──────────────────────────────────────
@@ -170,14 +154,6 @@ export default function ChatWindow({
       body: JSON.stringify({ messageIds: ids }),
     }).catch(() => {});
 
-    // Broadcast read receipt
-    supabase
-      .channel(`messages:${[currentUserId, otherUserId].sort().join("-")}`)
-      .send({
-        type: "broadcast",
-        event: "read_receipt",
-        payload: { messageIds: ids },
-      });
   }, [messages, otherUserId, currentUserId]);
 
   // ─── File attachment ───────────────────────────────────
@@ -282,16 +258,7 @@ export default function ChatWindow({
       const msg = data.message as ChatMessage;
 
       // Add to local state immediately
-      setMessages((prev) => [...prev, msg]);
-
-      // Broadcast via realtime
-      supabase
-        .channel(`messages:${[currentUserId, otherUserId].sort().join("-")}`)
-        .send({
-          type: "broadcast",
-          event: "new_message",
-          payload: msg,
-        });
+      setMessages((prev) => prev.some(existing => existing.id === msg.id) ? prev : [...prev, msg]);
 
       setNewMessage("");
       removeAttachment();
@@ -336,10 +303,6 @@ export default function ChatWindow({
         <div>
           <p className="font-semibold text-gray-900 text-sm">{otherUserName}</p>
           <p className="text-xs text-gray-500">{otherUserRole}</p>
-        </div>
-        <div className="ml-auto flex items-center gap-1.5">
-          <div className="w-2 h-2 bg-green-500 rounded-full" />
-          <span className="text-xs text-gray-400">Online</span>
         </div>
       </div>
 
@@ -562,4 +525,8 @@ export default function ChatWindow({
       </div>
     </div>
   );
+}
+
+export default function ChatWindow(props: ChatWindowProps) {
+  return <ChatWindowContent key={`${props.currentUserId}:${props.otherUserId}`} {...props} />;
 }

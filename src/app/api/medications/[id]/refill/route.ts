@@ -1,7 +1,6 @@
+import { requireApiUser } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { createServerSupabaseClient } from "@/lib/supabase-server";
-import { createNotification } from "@/lib/notifications";
 
 export async function PATCH(
   req: NextRequest,
@@ -9,26 +8,11 @@ export async function PATCH(
 ) {
   try {
     const { id: prescriptionId } = await params;
-    const supabase = createServerSupabaseClient();
-    const {
-      data: { user: authUser },
-    } = await supabase.auth.getUser();
-
-    if (!authUser) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { supabaseId: authUser.id },
-      include: { patient: true },
-    });
-
-    if (!user || !user.patient) {
-      return NextResponse.json({ error: "Patient not found" }, { status: 404 });
-    }
-
-    const prescription = await prisma.prescription.findUnique({
-      where: { id: prescriptionId },
+    const auth = await requireApiUser({ roles: ["PATIENT"], profile: "patient" });
+    if (!auth.ok) return auth.response;
+    const user = auth.user;
+    const prescription = await prisma.prescription.findFirst({
+      where: { id: prescriptionId, patientId: user.patient!.id },
       include: {
         doctor: {
           include: { user: { select: { id: true, firstName: true, lastName: true } } },
@@ -36,7 +20,7 @@ export async function PATCH(
       },
     });
 
-    if (!prescription || prescription.patientId !== user.patient.id) {
+    if (!prescription || prescription.patientId !== user.patient!.id) {
       return NextResponse.json({ error: "Prescription not found" }, { status: 404 });
     }
 
@@ -51,16 +35,18 @@ export async function PATCH(
       return NextResponse.json({ error: "No refills remaining" }, { status: 400 });
     }
 
-    await createNotification(
-      prescription.doctor.user.id,
-      "Refill Request",
-      `Patient ${user.firstName} ${user.lastName} has requested a refill for ${prescription.medication}.`,
-      "PRESCRIPTION",
-      { link: `/doctor/prescriptions` }
-    );
-
-    return NextResponse.json({ message: "Refill request sent" });
+    const request = await prisma.$transaction(async tx => {
+      const request = await tx.refillRequest.create({ data: { prescriptionId, requesterId: user.id } });
+      await tx.notification.create({ data: {
+        userId: prescription.doctor!.user.id, title: "Refill Request",
+        message: `Patient ${user.firstName} ${user.lastName} requested a refill review.`,
+        type: "PRESCRIPTION", link: "/doctor/prescriptions",
+      } });
+      return request;
+    });
+    return NextResponse.json({ message: "Refill review requested", request });
   } catch (error) {
+    if (error && typeof error === "object" && "code" in error && error.code === "P2002") return NextResponse.json({ error: "A refill request is already pending" }, { status: 409 });
     console.error("[PATCH /api/medications/[id]/refill]", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }

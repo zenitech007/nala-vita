@@ -1,18 +1,22 @@
+import { fetchJson } from "@/lib/api-fetch";
+import { useQueryUserId, userQueryKey } from "@/providers";
 import { useQuery } from "@tanstack/react-query";
 
 export function usePatients(search?: string) {
+  const userId = useQueryUserId();
   return useQuery({
-    queryKey: ["patients", search],
-    queryFn: () =>
-      fetch(`/api/patients${search ? `?search=${search}` : ""}`)
-        .then((r) => r.json()),
+    queryKey: userQueryKey(userId, "patients", search),
+    queryFn: ({ signal }) =>
+      fetchJson(`/api/patients${search ? `?search=${encodeURIComponent(search)}` : ""}`, { signal }),
+    enabled: !!userId,
   });
 }
 
 export function usePatientEHR(patientId: string) {
+  const userId = useQueryUserId();
   return useQuery({
-    queryKey: ["patient-ehr", patientId],
-    queryFn: () => fetch(`/api/patients/${patientId}`).then((r) => r.json()),
-    enabled: !!patientId,
+    queryKey: userQueryKey(userId, "patient-ehr", patientId),
+    queryFn: ({ signal }) => fetchJson(`/api/patients/${encodeURIComponent(patientId)}`, { signal }),
+    enabled: !!userId && !!patientId,
   });
 }

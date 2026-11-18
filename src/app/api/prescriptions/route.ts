@@ -1,59 +1,24 @@
+import { requireApiUser } from "@/lib/auth";
+import { getCollectionVisibility } from "@/lib/record-visibility";
+import { doctorHasPatientAccess } from "@/lib/access-control";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { createServerSupabaseClient } from "@/lib/supabase-server";
+
 import { checkNewPrescriptionSafety } from "@/lib/amelia/medsafety";
 
 // ─── GET: Return prescriptions by role ───────────────────
 
 export async function GET(req: NextRequest) {
   try {
-    const supabase = createServerSupabaseClient();
-    const {
-      data: { user: authUser },
-    } = await supabase.auth.getUser();
-
-    if (!authUser) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { supabaseId: authUser.id },
-      include: { patient: true, doctor: true },
-    });
-
-    if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
-    }
-
-    const { searchParams } = new URL(req.url);
-    const activeOnly = searchParams.get("active") !== "false";
-
-    // Build role-based filter
-    let roleFilter: object;
-    if (user.role === "DOCTOR" && user.doctor) {
-      roleFilter = { doctorId: user.doctor.id };
-    } else if (user.patient) {
-      roleFilter = { patientId: user.patient.id };
-    } else {
-      // Admin — return all (with optional patient filter)
-      const patientId = searchParams.get("patientId");
-      roleFilter = patientId ? { patientId } : {};
-    }
-
+    const auth = await requireApiUser({ roles: ["PATIENT", "DOCTOR"] });
+    if (!auth.ok) return auth.response;
+    const user = auth.user;
+    const access = await getCollectionVisibility(user, "PRESCRIPTIONS", new URL(req.url).searchParams.get("patientId") ?? undefined);
     const prescriptions = await prisma.prescription.findMany({
-      where: {
-        ...roleFilter,
-        ...(activeOnly ? {} : {}), // Return all, frontend filters by isActive
-      },
+      where: access.where("PRESCRIPTIONS"),
       include: {
-        patient: {
-          include: {
-            user: {
-              select: { firstName: true, lastName: true, avatarUrl: true },
-            },
-          },
-        },
+        patient: { select: { id: true, user: { select: { firstName: true, lastName: true, avatarUrl: true } } } },
         doctor: {
           include: {
             user: {
@@ -65,6 +30,7 @@ export async function GET(req: NextRequest) {
       orderBy: { prescribedAt: "desc" },
     });
 
+    await access.log("PRESCRIPTIONS", prescriptions);
     return NextResponse.json({ prescriptions });
   } catch (error) {
     console.error("GET /api/prescriptions error:", error);
@@ -87,29 +53,14 @@ const createPrescriptionSchema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = createServerSupabaseClient();
-    const {
-      data: { user: authUser },
-    } = await supabase.auth.getUser();
-
-    if (!authUser) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { supabaseId: authUser.id },
-      include: { doctor: true },
-    });
-
-    if (!user?.doctor) {
-      return NextResponse.json(
-        { error: "Only doctors can create prescriptions" },
-        { status: 403 }
-      );
-    }
+    const auth = await requireApiUser({ roles: ["DOCTOR"], profile: "doctor" });
+    if (!auth.ok) return auth.response;
+    const user = auth.user;
 
     const body = await req.json();
     const validated = createPrescriptionSchema.parse(body);
+
+    if (!await doctorHasPatientAccess(user.doctor!.id, validated.patientId)) return NextResponse.json({error:'Forbidden'}, {status:403});
 
     // Verify patient exists
     const patient = await prisma.patient.findUnique({
@@ -127,6 +78,7 @@ export async function POST(req: NextRequest) {
         data: {
           patientId: validated.patientId,
           doctorId: user.doctor!.id,
+          authoredByDoctorId: user.doctor!.id, authoredByUserId: user.id,
           medication: validated.medication,
           dosage: validated.dosage,
           frequency: validated.frequency,
@@ -166,7 +118,7 @@ export async function POST(req: NextRequest) {
     // Phase 2 med-coach: best-effort safety check on the new medication
     // (never block or break prescribing).
     try {
-      await checkNewPrescriptionSafety(validated.patientId, validated.medication);
+      await checkNewPrescriptionSafety(validated.patientId, validated.medication, user);
     } catch (safetyErr) {
       console.error("Medication safety check failed:", safetyErr);
     }

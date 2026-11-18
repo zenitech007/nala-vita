@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { moneyForJson } from "@/lib/money";
 
 export async function GET(req: NextRequest) {
   try {
@@ -25,6 +26,7 @@ export async function GET(req: NextRequest) {
           specialization: true,
           consultationFee: true,
           availableDays: true,
+          timeZone:true,
           availableFrom: true,
           availableTo: true,
           isVerified: true,
@@ -38,7 +40,7 @@ export async function GET(req: NextRequest) {
       prisma.doctor.count({ where }),
     ]);
 
-    return NextResponse.json({ doctors, total, page, limit });
+    return NextResponse.json(moneyForJson({ doctors, total, page, limit }));
   } catch (error) {
     console.error("[GET /api/doctors]", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

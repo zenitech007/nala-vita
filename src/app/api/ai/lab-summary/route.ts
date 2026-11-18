@@ -1,7 +1,9 @@
+import { ProviderTimeoutError, providerTimeoutResponse } from "@/lib/provider-deadline";
+import { requireApiUser } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { createServerSupabaseClient } from "@/lib/supabase-server";
-import { prisma } from "@/lib/prisma";
+
+
 import { checkRateLimitAsync } from "@/lib/rate-limit";
 import { chat } from "@/lib/amelia/llm";
 
@@ -17,11 +19,9 @@ const bodySchema = z.object({ testName: z.string().min(1), results: z.array(resu
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = createServerSupabaseClient();
-    const { data: { user: authUser } } = await supabase.auth.getUser();
-    if (!authUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    const user = await prisma.user.findUnique({ where: { supabaseId: authUser.id } });
-    if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
+    const auth = await requireApiUser({ roles: ["PATIENT", "DOCTOR"] });
+    if (!auth.ok) return auth.response;
+    const user = auth.user;
 
     const limit = await checkRateLimitAsync(`amelia:lab-summary:${user.id}`);
     if (!limit.allowed) return NextResponse.json({ error: "Too many requests." }, { status: 429 });
@@ -36,11 +36,12 @@ export async function POST(req: NextRequest) {
         { role: "system", content: "You are Amelia, a health assistant. Explain lab results to a patient in plain, calm language. Do not diagnose. Always end by suggesting they confirm with a doctor." },
         { role: "user", content: `Explain my "${testName}" results:\n${rows}` },
       ],
-      { temperature: 0.3, maxTokens: 400 }
+      { temperature: 0.3, maxTokens: 400, signal: req.signal }
     );
 
     return NextResponse.json({ summary });
   } catch (error) {
+    if (error instanceof ProviderTimeoutError) return providerTimeoutResponse();
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: "Validation failed", details: error.issues }, { status: 422 });
     }

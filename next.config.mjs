@@ -56,6 +56,13 @@ const nextConfig = {
           },
         ],
       },
+      ...["/doctor/consultation/:path*", "/patient/telemedicine/:path*"].map(source => ({
+        source,
+        headers: [{
+          key: "Permissions-Policy",
+          value: "camera=(self), microphone=(self), geolocation=(self), interest-cohort=()",
+        }],
+      })),
     ];
   },
 };

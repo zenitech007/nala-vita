@@ -187,6 +187,7 @@ export default function AdminBedsPage() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+        <p role="status" className="mb-4 text-sm text-gray-600">Sample data. Bed assignment and discharge are not available yet.</p>
         {/* Summary Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <div className="bg-white rounded-2xl border border-gray-100 p-5">
@@ -403,7 +404,7 @@ export default function AdminBedsPage() {
                   </button>
                   <button
                     onClick={handleDischarge}
-                    disabled={saving}
+                    disabled title="Bed discharge is not available yet"
                     className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-white bg-red-600 hover:bg-red-700 transition disabled:opacity-50"
                   >
                     {saving ? (
@@ -411,7 +412,7 @@ export default function AdminBedsPage() {
                     ) : (
                       <CheckCircle className="w-4 h-4" />
                     )}
-                    {saving ? "Discharging..." : "Discharge Patient"}
+                    {saving ? "Discharging..." : "Discharge Patient — not available yet"}
                   </button>
                 </div>
               </div>
@@ -456,7 +457,7 @@ export default function AdminBedsPage() {
                   </button>
                   <button
                     onClick={handleAssign}
-                    disabled={saving || !assignPatient.trim()}
+                    disabled title="Bed assignment is not available yet"
                     className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-white bg-[var(--primary)] hover:opacity-90 transition disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {saving ? (
@@ -464,7 +465,7 @@ export default function AdminBedsPage() {
                     ) : (
                       <User className="w-4 h-4" />
                     )}
-                    {saving ? "Assigning..." : "Assign Patient"}
+                    {saving ? "Assigning..." : "Assign Patient — not available yet"}
                   </button>
                 </div>
               </div>

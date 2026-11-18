@@ -1,5 +1,8 @@
 "use client";
 
+import {useRouter} from "next/navigation";
+import { fetchJson } from "@/lib/api-fetch";
+
 import { useEffect, useState, useRef, useCallback } from "react";
 import { Bell, X, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -40,29 +43,19 @@ export default function NotificationBell({
   userId,
   className,
 }: NotificationBellProps) {
+  const router = useRouter();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [readError, setReadError] = useState("");
+  const [loading, setLoading] = useState(true);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // ─── Fetch notifications ───────────────────────────────
 
-  const fetchNotifications = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await fetch("/api/notifications?limit=15");
-      if (res.ok) {
-        const data = await res.json();
-        setNotifications(data.notifications || []);
-        setUnreadCount(data.unreadCount || 0);
-      }
-    } catch {
-      // placeholder
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const fetchNotifications=useCallback(()=>fetchJson<{notifications:Notification[];unreadCount:number}>("/api/notifications?limit=15")
+    .then(data=>{setNotifications(data.notifications||[]);setUnreadCount(data.unreadCount||0);setLoading(false);})
+    .catch(failure=>{setReadError(failure instanceof Error?failure.message:"Notifications unavailable");setLoading(false);}),[]);
 
   useEffect(() => {
     fetchNotifications();
@@ -130,7 +123,8 @@ export default function NotificationBell({
 
   const markAsRead = async (notificationId: string) => {
     try {
-      await fetch("/api/notifications", {
+      setReadError("");
+      await fetchJson("/api/notifications", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ notificationIds: [notificationId] }),
@@ -140,14 +134,15 @@ export default function NotificationBell({
         prev.map((n) => (n.id === notificationId ? { ...n, isRead: true } : n))
       );
       setUnreadCount((prev) => Math.max(0, prev - 1));
-    } catch {
-      //
+    } catch (error) {
+      setReadError(error instanceof Error ? error.message : "Could not mark notifications as read.");
     }
   };
 
   const markAllAsRead = async () => {
     try {
-      await fetch("/api/notifications", {
+      setReadError("");
+      await fetchJson("/api/notifications", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ markAllRead: true }),
@@ -155,8 +150,8 @@ export default function NotificationBell({
 
       setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
       setUnreadCount(0);
-    } catch {
-      //
+    } catch (error) {
+      setReadError(error instanceof Error ? error.message : "Could not mark notifications as read.");
     }
   };
 
@@ -167,7 +162,7 @@ export default function NotificationBell({
       markAsRead(notification.id);
     }
     if (notification.link) {
-      window.location.href = notification.link;
+      window.location.assign(notification.link);
     }
     setIsOpen(false);
   };
@@ -176,6 +171,7 @@ export default function NotificationBell({
 
   return (
     <div ref={dropdownRef} className={cn("relative", className)}>
+      {readError && <p role="alert" className="text-sm text-red-700">{readError}</p>}
       {/* Bell button */}
       <button
         onClick={() => {
@@ -290,7 +286,7 @@ export default function NotificationBell({
             <div className="px-5 py-2.5 border-t border-gray-100 text-center">
               <button
                 onClick={() => {
-                  window.location.href = "/notifications";
+                  router.push("/notifications");
                   setIsOpen(false);
                 }}
                 className="text-xs text-[var(--primary)] hover:opacity-80 font-medium"

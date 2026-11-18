@@ -1,0 +1,84 @@
+name: Application checks
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+
+jobs:
+  application:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/nalavita_ci
+      DIRECT_URL: postgresql://ci:ci@127.0.0.1:5432/nalavita_ci
+      NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: synthetic-ci-key
+      SUPABASE_SERVICE_ROLE_KEY: synthetic-ci-service-key
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      GEMINI_API_KEY: synthetic-ci-key
+      OPENAI_API_KEY: ""
+      PAYSTACK_SECRET_KEY: ""
+      PAYSTACK_PUBLIC_KEY: ""
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Production TypeScript
+        if: success() || failure()
+        run: npx tsc --noEmit
+      - name: Semantic test TypeScript
+        if: success() || failure()
+        run: npx tsc --noEmit -p tsconfig.test.json
+      - name: ESLint
+        if: success() || failure()
+        run: npm run lint
+      - name: Node Jest
+        if: success() || failure()
+        env:
+          NODE_OPTIONS: --max-old-space-size=512
+        run: npx jest --selectProjects node --runInBand
+      - name: UI Jest
+        if: success() || failure()
+        run: npx jest --selectProjects jsdom --runInBand
+      - name: Contrast
+        if: success() || failure()
+        run: npm run test:contrast
+      - name: Production build
+        if: success() || failure()
+        run: npm run build
+
+  fresh-migrations:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: nalavita_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci -d nalavita_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/nalavita_ci
+      DIRECT_URL: postgresql://ci:ci@127.0.0.1:5432/nalavita_ci
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Bootstrap disposable Supabase catalog stubs
+        run: psql "$DIRECT_URL" -v ON_ERROR_STOP=1 -f scripts/ci/bootstrap-supabase-catalogs.sql
+      - name: Apply application migrations to fresh service
+        run: npx prisma migrate deploy
+      - name: Verify migration history
+        run: npx prisma migrate status
