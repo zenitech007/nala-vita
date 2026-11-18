@@ -63,13 +63,17 @@ export function SidebarShell({ role, roleLabel, brand = "Nala Vita", user, nav }
   const toggleCollapse = () => setIsCollapsed(value => !value);
 
   const handleSignOut = async () => {
+    setSignOutError("");
+    window.dispatchEvent(new Event("nala-auth-changing"));
     try {
-      await supabase.auth.signOut();
-    } catch (e) {
-      console.warn("Sign out error:", e);
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      router.push("/login");
+      router.refresh();
+    } catch {
+      setSignOutError("Sign out failed. Please retry.");
+      window.dispatchEvent(new Event("nala-auth-change-failed"));
     }
-    router.push("/login");
-    router.refresh();
   };
 
   const settingsHref = `/${role}/settings`;

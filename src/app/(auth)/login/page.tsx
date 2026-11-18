@@ -54,15 +54,8 @@ export default function LoginPage() {
       }
 
       router.refresh();
-    } catch (err: unknown) {
-      const msg = (err as Error)?.message || "";
-      if (msg.includes("fetch") || msg.includes("Failed to fetch") || msg.includes("NetworkError")) {
-        setServerError(
-          "Unable to connect to the authentication server. Please check your network connection or verify that your Supabase project is active."
-        );
-      } else {
-        setServerError(t("unexpectedError"));
-      }
+    } catch {
+      setServerError(t("unexpectedError"));
     }
   };
 
