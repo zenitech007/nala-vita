@@ -1,4 +1,5 @@
 "use client";
+import { useTranslations, useFormatter } from "next-intl";
 import { formatTemperature } from "@/lib/temperature";
 
 import { useEffect, useState, useCallback } from "react";
@@ -80,6 +81,8 @@ const TYPE_ICON: Record<string, typeof Video> = {
 };
 
 export default function DoctorAppointmentsPage() {
+  const t = useTranslations("appointments");
+  const formatter = useFormatter();
   const [activeTab, setActiveTab] = useState<TabKey>("upcoming");
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [appointments, setAppointments] = useState<DoctorAppointment[]>([]);
@@ -150,7 +153,7 @@ export default function DoctorAppointmentsPage() {
                 <ChevronLeft className="w-5 h-5" />
               </Link>
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">Appointments</h1>
+                <h1 className="text-2xl font-bold text-gray-900">{t("title")}</h1>
                 <p className="text-gray-500 text-sm">Manage your patient appointments</p>
               </div>
             </div>
@@ -187,7 +190,12 @@ export default function DoctorAppointmentsPage() {
         <div className={cn("flex-1 min-w-0", selectedAppointment ? "lg:mr-0" : "")}>
           {/* Tabs */}
           <div className="flex gap-1 bg-gray-100 p-1 rounded-xl mb-6 w-fit">
-            {STATUS_TABS.map((tab) => (
+            {[
+              { key: "upcoming" as TabKey, label: t("upcoming") },
+              { key: "in_progress" as TabKey, label: "In Progress" },
+              { key: "completed" as TabKey, label: t("past") },
+              { key: "cancelled" as TabKey, label: "Cancelled" },
+            ].map((tab) => (
               <button
                 key={tab.key}
                 onClick={() => { if (tab.key !== activeTab) { setLoading(true); setActiveTab(tab.key); } }}
@@ -251,7 +259,7 @@ export default function DoctorAppointmentsPage() {
                           <div className="flex items-center gap-4 mt-1.5 text-xs text-gray-400">
                             <span className="inline-flex items-center gap-1">
                               <Calendar className="w-3.5 h-3.5" />
-                              {format(new Date(apt.scheduledAt), "MMM d, yyyy")}
+                              {formatter.dateTime(new Date(apt.scheduledAt), { year: "numeric", month: "short", day: "numeric" })}
                             </span>
                             <span className="inline-flex items-center gap-1">
                               <Clock className="w-3.5 h-3.5" />

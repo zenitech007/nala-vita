@@ -1,6 +1,6 @@
 "use client";
 
-import {useLocale} from "next-intl";
+import {useLocale, useTranslations, useFormatter} from "next-intl";
 import BookingTimeSummary from "@/components/appointments/BookingTimeSummary";
 import {isIanaTimeZone} from "@/lib/appointment-availability";
 import {bookingInstant} from "@/lib/booking-time";
@@ -113,6 +113,8 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: typeof
 };
 
 function PatientAppointmentsContent() {
+  const t = useTranslations("appointments");
+  const formatter = useFormatter();
   const [activeTab, setActiveTab] = useState<TabKey>("upcoming");
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -149,8 +151,8 @@ function PatientAppointmentsContent() {
   }, [fetchAppointments]);
 
   const tabs: { key: TabKey; label: string; count: number | null }[] = [
-    { key: "upcoming", label: "Upcoming", count: activeTab === "upcoming" ? appointments.length : null },
-    { key: "past", label: "Past", count: activeTab === "past" ? appointments.length : null },
+    { key: "upcoming", label: t("upcoming"), count: activeTab === "upcoming" ? appointments.length : null },
+    { key: "past", label: t("past"), count: activeTab === "past" ? appointments.length : null },
     { key: "cancelled", label: "Cancelled", count: activeTab === "cancelled" ? appointments.length : null },
   ];
 
@@ -165,7 +167,7 @@ function PatientAppointmentsContent() {
                 <ChevronLeft className="w-5 h-5" />
               </Link>
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">Appointments</h1>
+                <h1 className="text-2xl font-bold text-gray-900">{t("title")}</h1>
                 <p className="text-gray-500 text-sm">Manage your medical appointments</p>
               </div>
             </div>
@@ -263,7 +265,7 @@ function PatientAppointmentsContent() {
                       <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500">
                         <span className="inline-flex items-center gap-1.5">
                           <Calendar className="w-4 h-4" />
-                          {format(new Date(apt.scheduledAt), "MMM d, yyyy")}
+                          {formatter.dateTime(new Date(apt.scheduledAt), { year: "numeric", month: "short", day: "numeric" })}
                         </span>
                         <span className="inline-flex items-center gap-1.5">
                           <Clock className="w-4 h-4" />
@@ -635,7 +637,7 @@ function BookingModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
                 <label className="block text-sm font-medium text-gray-700 mb-3">Date</label>
                 <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
                   {dateOptions.map((date) => {
-                    const dateStr = date.toISOString().split("T")[0];
+                    const dateStr = format(date, "yyyy-MM-dd");
                     return (
                       <button
                         key={dateStr}
@@ -717,7 +719,7 @@ function BookingModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
                   <div className="flex items-center gap-2 text-sm">
                     <Calendar className="w-4 h-4 text-gray-400" />
                     <span className="text-gray-700">
-                      {selectedDate ? format(new Date(selectedDate), "MMMM d, yyyy") : ""}
+                      {selectedDate ? format(new Date(selectedDate + "T12:00:00"), "MMMM d, yyyy") : ""}
                     </span>
                   </div>
                   <div className="flex items-center gap-2 text-sm">
